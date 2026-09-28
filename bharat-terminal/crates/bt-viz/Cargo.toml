@@ -1,0 +1,17 @@
+[package]
+name = "bt-viz"
+version.workspace = true
+edition.workspace = true
+authors = ["Sourish Dey"]
+license.workspace = true
+description = "Bharat Terminal visualizations — 25 charts including candlestick variants, indicators, India-specific, risk & portfolio. Made by Sourish Dey."
+
+[dependencies]
+bt-core = { path = "../bt-core" }
+bt-analytics = { path = "../bt-analytics" }
+plotters = { version = "0.3", default-features = false, features = ["all_series", "all_elements", "bitmap_backend", "svg_backend", "chrono", "ab_glyph"] }
+plotters-bitmap = "0.3"
+chrono = "0.4"
+ab_glyph = "0.2"
+rand = "0.8"
+rayon = "1.10"

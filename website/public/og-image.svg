@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" role="img" aria-label="Bharat Terminal OG image">
+  <rect width="1200" height="630" fill="#050608"/>
+  <rect x="80" y="120" width="150" height="64" rx="12" fill="#FFB000"/>
+  <text x="155" y="163" text-anchor="middle" font-family="Arial" font-weight="800" font-size="36" fill="#050608">BT</text>
+  <text x="250" y="163" font-family="Arial" font-weight="800" font-size="30" letter-spacing="6" fill="#FFB000">BHARAT TERMINAL</text>
+  <text x="80" y="300" font-family="Arial" font-weight="800" font-size="72" fill="#F5F7FA">Bloomberg power. Zero cost.</text>
+  <text x="80" y="360" font-family="Arial" font-size="30" fill="#A8B0C0">140+ visualizations · Rust · Made in India</text>
+  <text x="1120" y="580" text-anchor="end" font-family="Arial" font-size="22" fill="#FFB000">Made by Sourish Dey</text>
+</svg>

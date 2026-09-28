@@ -1,0 +1,33 @@
+# Bharat Terminal v3 — Default Configuration
+# Author: Sourish Dey
+
+[app]
+name = "Bharat Terminal"
+version = "3.0.0"
+author = "Sourish Dey"
+tagline = "Bloomberg power. Zero cost. Made in India."
+
+[data]
+cache_dir = "./data"
+cache_ttl_intraday = 300
+cache_ttl_daily = 86400
+default_symbol = "RELIANCE.NS"
+default_range = "1y"
+default_interval = "1d"
+live_mode = true
+refresh_seconds = 30
+
+[ui]
+theme = "dark"
+font_size = 14.0
+chart_height = 600.0
+show_volume = true
+show_legend = true
+auto_focus_chart = true
+
+[providers]
+yahoo_enabled = true
+coinbase_enabled = true
+synthetic_fallback = true
+max_retries = 3
+timeout_seconds = 30

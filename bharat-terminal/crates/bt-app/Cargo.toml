@@ -1,0 +1,27 @@
+[package]
+name = "bt-app"
+version.workspace = true
+edition.workspace = true
+authors = ["Sourish Dey"]
+license.workspace = true
+description = "Bharat Terminal desktop app (egui/eframe) — real data, 21 tabs, async. Made by Sourish Dey."
+
+[[bin]]
+name = "bt-app"
+path = "src/main.rs"
+
+[dependencies]
+bt-core = { path = "../bt-core" }
+bt-viz = { path = "../bt-viz" }
+bt-data = { path = "../bt-data" }
+bt-analytics = { path = "../bt-analytics" }
+
+# Upgraded to 0.28.1 for Windows compatibility
+eframe = { version = "0.28.1", default-features = false, features = ["glow", "default_fonts", "persistence", "accesskit"] }
+egui = "0.28"
+egui_plot = "0.28"
+tokio = { version = "1", features = ["full"] }
+chrono = "0.4"
+thiserror = "1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

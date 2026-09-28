@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+      
+      - name: Build
+        run: cargo build --release --workspace
+      
+      - name: Create portable ZIP
+        run: |
+          Compress-Archive -Path "target\release\bt-app.exe","target\release\bt-cli.exe","assets","README.md" -DestinationPath "target\release\BharatTerminal-v3.0.0-portable.zip"
+      
+      - name: Upload Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            target/release/bt-app.exe
+            target/release/bt-cli.exe
+            target/release/BharatTerminal-v3.0.0-portable.zip
+          body: |
+            Bharat Terminal v3 — Made by Sourish Dey
+            
+            ## What's New
+            - 130+ visualizations
+            - Real market data (Yahoo + Coinbase)
+            - Live mode with 30s auto-refresh
+            - 78 companies supported
+            - Windows installer + portable ZIP
+            
+            ## Installation
+            - **Portable:** Extract ZIP and run bt-app.exe
+            - **Installer:** Run the MSI/EXE installer
+            
+            Bloomberg power. Zero cost. Made in India.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

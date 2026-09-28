@@ -1,0 +1,12 @@
+[package]
+name = "bt-analytics"
+version.workspace = true
+edition.workspace = true
+authors = ["Sourish Dey"]
+license.workspace = true
+description = "Bharat Terminal technical indicators and risk analytics. Made by Sourish Dey."
+
+[dependencies]
+bt-core = { path = "../bt-core" }
+rayon = "1.10"
+thiserror = "1"

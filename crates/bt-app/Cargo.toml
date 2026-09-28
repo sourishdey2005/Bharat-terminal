@@ -1,0 +1,39 @@
+[package]
+name = "bt-app"
+version.workspace = true
+edition.workspace = true
+authors = ["Sourish Dey"]
+license.workspace = true
+description = "Bharat Terminal desktop app (egui/eframe) — 130+ visualizations, real data, async. Made by Sourish Dey."
+
+[[bin]]
+name = "bt-app"
+path = "src/main.rs"
+
+[dependencies]
+bt-core = { path = "../bt-core" }
+bt-viz = { path = "../bt-viz" }
+bt-data = { path = "../bt-data" }
+bt-analytics = { path = "../bt-analytics" }
+eframe = { version = "0.28.1", default-features = false, features = ["glow", "default_fonts", "persistence", "accesskit"] }
+egui = "0.28"
+egui_plot = "0.28"
+tokio = { version = "1", features = ["full"] }
+chrono = "0.4"
+thiserror = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[package.metadata.bundle]
+name = "Bharat Terminal"
+identifier = "com.sourishdey.bharatterminal"
+icon = ["assets/icons/icon.ico"]
+version = "3.0.0"
+publisher = "Sourish Dey"
+copyright = "Copyright (c) 2026 Sourish Dey. MIT License."
+category = "Finance"
+short_description = "Bloomberg power. Zero cost. Made in India."
+long_description = "Bharat Terminal is a free, open-source Bloomberg alternative with 130+ visualizations and real-time market data."
+
+[target.'cfg(windows)'.dependencies]
+winres = "0.1"

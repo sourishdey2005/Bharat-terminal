@@ -1,0 +1,20 @@
+[package]
+name = "bt-cli"
+version.workspace = true
+edition.workspace = true
+authors = ["Sourish Dey"]
+license.workspace = true
+description = "Bharat Terminal CLI — renders all 25 visualizations with real or synthetic data. Made by Sourish Dey."
+
+[[bin]]
+name = "bt-cli"
+path = "src/main.rs"
+
+[dependencies]
+bt-core = { path = "../bt-core" }
+bt-viz = { path = "../bt-viz" }
+bt-data = { path = "../bt-data" }
+bt-analytics = { path = "../bt-analytics" }
+clap = { version = "4", features = ["derive", "env"] }
+tokio = { version = "1", features = ["full"] }
+chrono = "0.4"

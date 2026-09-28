@@ -1,0 +1,11 @@
+[package]
+name = "bt-core"
+version.workspace = true
+edition.workspace = true
+authors = ["Sourish Dey"]
+license.workspace = true
+description = "Bharat Terminal core types (candles, series, errors). Made by Sourish Dey."
+
+[dependencies]
+thiserror = "1.0"
+rand = "0.8"

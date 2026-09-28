@@ -1,0 +1,24 @@
+[package]
+name = "bt-data"
+version.workspace = true
+edition.workspace = true
+authors = ["Sourish Dey"]
+license.workspace = true
+description = "Bharat Terminal real market data providers (Yahoo, Coinbase, SQLite cache). Made by Sourish Dey."
+
+[dependencies]
+bt-core = { path = "../bt-core" }
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1"
+tracing = "0.1"
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+[dev-dependencies]
+tempfile = "3"
