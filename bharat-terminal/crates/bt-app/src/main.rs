@@ -33,14 +33,13 @@ const INFO: Color32 = Color32::from_rgb(0x00, 0xBF, 0xFF);
 const PURPLE: Color32 = Color32::from_rgb(0xBF, 0x5A, 0xFF);
 
 const DAY_SECS: f64 = 86400.0;
-const BAR_WIDTH: f64 = 0.7 * DAY_SECS;
-const BAR_HALF: f64 = 0.35 * DAY_SECS;
 
-fn format_ts(ts: f64) -> String {
-    let ts = ts as i64;
-    let dt = chrono::DateTime::from_timestamp(ts, 0).unwrap_or_default();
-    dt.format("%b %Y").to_string()
-}
+/// Fraction of the gap between consecutive bars occupied by a candle body.
+/// Leaves a visible gap so individual bars stay distinguishable.
+const BAR_FILL: f64 = 0.68;
+
+/// Fallback bar spacing when a series has fewer than two bars.
+const FALLBACK_SPACING: f64 = DAY_SECS;
 
 /// Smallest visible body height, as a fraction of the series high/low range.
 /// Keeps doji candles (open == close) from collapsing into an invisible line.
@@ -48,6 +47,73 @@ const MIN_BODY_FRAC: f64 = 0.004;
 
 /// Vertical size of the trend arrow, as a fraction of the series high/low range.
 const ARROW_FRAC: f64 = 0.022;
+
+/// Horizontal padding added around the data, as a fraction of the data span.
+const X_PAD_FRAC: f64 = 0.04;
+
+/// Median spacing between consecutive bar timestamps, in seconds.
+///
+/// This is the real cadence of the series (60s for 1-minute intraday, 86400s
+/// for daily, ...). Deriving geometry from it is what keeps bars from
+/// overlapping into a single blob.
+fn bar_spacing(candles: &[Candle]) -> f64 {
+    if candles.len() < 2 {
+        return FALLBACK_SPACING;
+    }
+    let mut deltas: Vec<f64> = candles
+        .windows(2)
+        .map(|w| w[1].t - w[0].t)
+        .filter(|d| d.is_finite() && *d > 0.0)
+        .collect();
+    if deltas.is_empty() {
+        return FALLBACK_SPACING;
+    }
+    // The median is robust against gaps (lunch breaks, halts, missing bars).
+    deltas.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    deltas[deltas.len() / 2]
+}
+
+/// Half-width of a candle body, in x (time) units.
+fn bar_half(candles: &[Candle]) -> f64 {
+    0.5 * BAR_FILL * bar_spacing(candles)
+}
+
+/// Inclusive x-bounds to show, padded so bars never touch the plot edge.
+fn x_bounds(candles: &[Candle]) -> (f64, f64) {
+    let mut lo = f64::INFINITY;
+    let mut hi = f64::NEG_INFINITY;
+    for c in candles {
+        if c.t.is_finite() {
+            lo = lo.min(c.t);
+            hi = hi.max(c.t);
+        }
+    }
+    if !lo.is_finite() || !hi.is_finite() {
+        return (0.0, FALLBACK_SPACING);
+    }
+    let pad = (hi - lo).max(bar_spacing(candles)) * X_PAD_FRAC;
+    (lo - pad, hi + pad)
+}
+
+/// Formats a timestamp, choosing a format appropriate to the bar cadence so
+/// intraday charts show a clock time and longer ranges show a date.
+fn format_ts_for(ts: f64, spacing: f64) -> String {
+    let secs = ts as i64;
+    let dt = chrono::DateTime::from_timestamp(secs, 0).unwrap_or_default();
+    if spacing < DAY_SECS {
+        dt.format("%H:%M").to_string()
+    } else if spacing < 20.0 * DAY_SECS {
+        dt.format("%d %b").to_string()
+    } else {
+        dt.format("%b %Y").to_string()
+    }
+}
+
+/// Backwards-compatible month/year formatter for callers that have no cadence
+/// context. Prefer [`format_ts_for`].
+fn format_ts(ts: f64) -> String {
+    format_ts_for(ts, DAY_SECS)
+}
 
 /// Returns `(min_low, range)` for the series, used to scale candle geometry.
 fn price_scale(candles: &[Candle]) -> (f64, f64) {
@@ -65,6 +131,86 @@ fn price_scale(candles: &[Candle]) -> (f64, f64) {
         (lo, 1.0)
     } else {
         (lo, range)
+    }
+}
+
+/// Chooses sensible y-axis tick decimals for a price of the given magnitude,
+/// so small-cap and index charts are not labelled with unusable precision.
+fn price_decimals(price: f64) -> usize {
+    let abs = price.abs();
+    if abs >= 10_000.0 {
+        0
+    } else if abs >= 1_000.0 {
+        1
+    } else if abs >= 100.0 {
+        2
+    } else if abs >= 1.0 {
+        3
+    } else {
+        4
+    }
+}
+
+/// Formats a volume value compactly (K/M/B/T) for axis ticks and legends.
+fn abbreviate_volume(v: f64) -> String {
+    let a = v.abs();
+    if a >= 1.0e12 {
+        format!("{:.1}T", v / 1.0e12)
+    } else if a >= 1.0e9 {
+        format!("{:.1}B", v / 1.0e9)
+    } else if a >= 1.0e6 {
+        format!("{:.1}M", v / 1.0e6)
+    } else if a >= 1.0e3 {
+        format!("{:.1}K", v / 1.0e3)
+    } else {
+        format!("{:.0}", v)
+    }
+}
+
+/// Applies the shared professional chart chrome to a time-series plot:
+/// right-hand price axis, date/time-aware x labels, bounded x range and
+/// a small grid. Every time-series tab uses this so they all look consistent.
+///
+/// Call [`pin_bounds`] inside `show` to lock the visible range. `include_x` on
+/// its own only ever widens the range: egui_plot keeps per-plot memory, so a
+/// range viewed earlier kept its zoom and squeezed the next range into a
+/// sliver instead of refitting the data.
+fn style_time_plot<'a>(
+    plot: egui_plot::Plot<'a>,
+    series: &[Candle],
+    height: f32,
+) -> egui_plot::Plot<'a> {
+    let spacing = bar_spacing(series);
+    let (x0, x1) = x_bounds(series);
+    let (lo, range) = price_scale(series);
+    let last = series.last().map(|c| c.close).unwrap_or(1.0);
+    let decimals = price_decimals(last);
+    plot.height(height)
+        .allow_drag(true)
+        .allow_scroll(true)
+        .allow_zoom(false)
+        .include_x(x0)
+        .include_x(x1)
+        .include_y(lo - range * 0.05)
+        .include_y(lo + range * 1.05)
+        .y_axis_position(egui_plot::HPlacement::Right)
+        .y_axis_width((decimals + 6).clamp(8, 18))
+        // egui_plot's default corner readout prints raw epoch values over the
+        // chart, which is noise here; the OHLC legend and hover tooltip cover
+        // the same information properly.
+        .coordinates_formatter(
+            egui_plot::Corner::LeftTop,
+            egui_plot::CoordinatesFormatter::new(|_point, _bounds| String::new()),
+        )
+        .x_axis_formatter(move |mark, _range| format_ts_for(mark.value, spacing))
+        .y_axis_formatter(move |mark, _range| format!("{:.*}", decimals, mark.value))
+}
+
+/// Pins a plot's visible range, overriding remembered zoom/pan state so the
+/// chart always refits the data. Call this first inside `Plot::show`.
+fn pin_bounds(plot_ui: &mut egui_plot::PlotUi, x0: f64, x1: f64, y0: f64, y1: f64) {
+    if x1 > x0 && y1 > y0 {
+        plot_ui.set_plot_bounds(egui_plot::PlotBounds::from_min_max([x0, y0], [x1, y1]));
     }
 }
 
@@ -135,15 +281,21 @@ fn heikin_ashi(candles: &[Candle]) -> Vec<Candle> {
 
 /// Draws a green up-arrow below a bullish candle and a red down-arrow above a
 /// bearish candle, so the direction of every bar is readable at a glance.
+///
+/// `size` is a **price**-space height and `half` is an **x**-space half-width,
+/// keeping the two axes in their own units.
 fn draw_trend_arrow(plot_ui: &mut egui_plot::PlotUi, c: &Candle, half: f64, size: f64) {
     let color = if c.is_bullish() { PROFIT } else { LOSS };
-    let w = half.max(size * 0.9);
+    let w = half.max(f64::MIN_POSITIVE);
+    let gap = 0.25 * size;
     let pts = if c.is_bullish() {
-        let tip = c.low - 1.2 * size;
-        vec![[c.t, tip + size], [c.t - w, tip], [c.t + w, tip]]
+        // Tip points up, sitting just below the candle low.
+        let base = c.low - gap - size;
+        vec![[c.t - w, base], [c.t + w, base], [c.t, base + size]]
     } else {
-        let tip = c.high + 1.2 * size;
-        vec![[c.t, tip - size], [c.t - w, tip], [c.t + w, tip]]
+        // Tip points down, sitting just above the candle high.
+        let base = c.high + gap;
+        vec![[c.t - w, base], [c.t + w, base], [c.t, base - size]]
     };
     plot_ui.polygon(
         egui_plot::Polygon::new(PlotPoints::from(pts))
@@ -807,6 +959,10 @@ struct BharatApp {
     compare_symbols: Vec<String>,
     compare_search: String,
     show_candle_arrows: std::cell::Cell<bool>,
+    /// Height of the central panel viewport, captured before the chart
+    /// ScrollArea inflates the available space. Used to budget multi-pane
+    /// chart layouts so the volume pane is never pushed off-screen.
+    viewport_h: f32,
 }
 
 impl BharatApp {
@@ -865,6 +1021,7 @@ impl BharatApp {
             ],
             compare_search: String::new(),
             show_candle_arrows: std::cell::Cell::new(true),
+            viewport_h: 600.0,
         };
 
         app.trigger_fetch();
@@ -1171,21 +1328,28 @@ impl BharatApp {
             let chart_id = Id::new("chart_area").with(self.tab);
             self.chart_id = Some(chart_id);
 
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                if self.scroll_to_chart {
-                    self.scroll_to_chart = false;
-                    let anchor_rect =
-                        egui::Rect::from_min_size(ui.next_widget_position(), Vec2::new(1.0, 1.0));
-                    let anchor = ui.interact(
-                        anchor_rect,
-                        egui::Id::new("chart_anchor"),
-                        egui::Sense::hover(),
-                    );
-                    anchor.scroll_to_me(Some(egui::Align::Center));
-                }
-                ui.allocate_space(Vec2::new(0.0, 0.0));
-                self.dispatch_tab(ui);
-            });
+            // Capture the true chart viewport: the panel height minus whatever
+            // chrome the header/tab bars already consumed. Multi-pane chart tabs
+            // budget against this so the lower pane is never clipped.
+            let screen = ui.ctx().screen_rect();
+            self.viewport_h = (screen.max.y - ui.next_widget_position().y).max(240.0);
+
+            if self.scroll_to_chart {
+                self.scroll_to_chart = false;
+                let anchor_rect =
+                    egui::Rect::from_min_size(ui.next_widget_position(), Vec2::new(1.0, 1.0));
+                let anchor = ui.interact(
+                    anchor_rect,
+                    egui::Id::new("chart_anchor"),
+                    egui::Sense::hover(),
+                );
+                anchor.scroll_to_me(Some(egui::Align::Center));
+            }
+            // The chart draws its own panes sized to the viewport, so it is
+            // rendered directly rather than inside a ScrollArea. A ScrollArea
+            // reports an unbounded `available_height()`, which let multi-pane
+            // charts grow past the window and clip the lower pane.
+            self.dispatch_tab(ui);
         });
     }
 
@@ -1322,56 +1486,134 @@ impl BharatApp {
 
     fn draw_candlestick(&self, ui: &mut egui::Ui) {
         let candles = &self.data.candles;
+        let series = &candles.candles;
         ui.label(RichText::new(format!("GP — Candlestick — {}", candles.symbol)).strong());
         ui.horizontal(|ui| {
             ui.label(RichText::new("Trend arrows").small());
             let mut arrows = self.show_candle_arrows.get();
-            if ui.checkbox(&mut arrows, "").changed() {
+            if ui
+                .checkbox(&mut arrows, "")
+                .on_hover_text("Green ▲ marks a bullish bar, red ▼ a bearish bar.\nShown when bars are wide enough to read.")
+                .changed()
+            {
                 self.show_candle_arrows.set(arrows);
             }
-            ui.colored_label(PROFIT, "\u{25B2} up = close > open");
-            ui.colored_label(LOSS, "\u{25BC} down = close < open");
+            if arrows && series.len() > 90 {
+                ui.colored_label(
+                    Color32::GRAY,
+                    format!("(hidden: {} bars)", series.len()),
+                )
+                .on_hover_text("Trend arrows are hidden above 90 bars to avoid clutter.\nZoom in or pick a shorter range to see them.");
+            } else {
+                ui.colored_label(PROFIT, "\u{25B2} up = close > open");
+                ui.colored_label(LOSS, "\u{25BC} down = close < open");
+            }
         });
-        let (lo, range) = price_scale(&candles.candles);
+
+        if series.is_empty() {
+            ui.centered_and_justified(|ui| {
+                ui.label("No data for this symbol.");
+            });
+            return;
+        }
+
+        let (_, range) = price_scale(series);
         let min_body = range * MIN_BODY_FRAC;
         let arrow = range * ARROW_FRAC;
+        let half = bar_half(series);
         let show_arrows = self.show_candle_arrows.get();
-        let headroom = 3.0 * arrow;
+        let last_close = series.last().map(|c| c.close).unwrap_or(0.0);
+        let last_is_bull = series.last().map(|c| c.is_bullish()).unwrap_or(true);
+        let price_decimals = price_decimals(last_close);
+        let volume_max = series.iter().map(|c| c.volume).fold(0.0_f64, f64::max);
+
+        // Extra headroom so the trend arrows are never clipped by the frame.
+        let arrow_pad = if show_arrows { 3.0 * arrow } else { 0.0 };
+        let (x0, x1) = x_bounds(series);
+
+        // OHLC legend sits above the price pane so the hover tooltip, which
+        // follows the pointer inside the plot, can never cover it.
+        ui.horizontal(|ui| {
+            let col = if last_is_bull { PROFIT } else { LOSS };
+            ui.colored_label(col, format!("Last {:.*}", price_decimals, last_close));
+            if let Some(c) = series.last() {
+                ui.separator();
+                ui.label(format!(
+                    "O {:.*}  H {:.*}  L {:.*}  C {:.*}",
+                    price_decimals,
+                    c.open,
+                    price_decimals,
+                    c.high,
+                    price_decimals,
+                    c.low,
+                    price_decimals,
+                    c.close
+                ));
+            }
+            ui.separator();
+            ui.label(format!("Vol {}", abbreviate_volume(volume_max)));
+        });
+
         let hover_candle = std::cell::RefCell::new(None::<(f64, f64, f64, f64, f64)>);
-        Plot::new("candlestick_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
-            .height(ui.available_height() * 0.7_f32)
-            .allow_scroll(true)
-            .allow_drag(true)
-            .include_y(lo - headroom)
-            .include_y(lo + range + headroom)
-            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
+        let spacing = bar_spacing(series);
+        // `viewport_h` runs from the top of the chart area, so it still covers
+        // this tab's own title, arrow toggle and OHLC legend. egui_plot also
+        // draws its axis tick labels outside the requested `height`, so the
+        // budget reserves room for those plus the status bar; otherwise the
+        // volume pane is pushed past the bottom of the window.
+        let avail = self.viewport_h.max(280.0);
+        let tab_chrome = 84.0_f32;
+        let axis_h = 46.0_f32;
+        let status_h = 24.0_f32;
+        let body_h = (avail - tab_chrome - axis_h - status_h).max(200.0);
+        let vol_h = (body_h * 0.24).clamp(70.0, 150.0);
+        let price_h = body_h - vol_h;
+
+        // Trend arrows only stay legible when bars are wide enough on screen.
+        // At ~250+ bars a per-bar arrow is visual noise, so it is suppressed.
+        let arrows_legible = show_arrows && series.len() <= 90;
+        let arrow = range * ARROW_FRAC;
+
+        style_time_plot(Plot::new("candlestick_plot"), series, price_h)
+            .include_y(price_scale(series).0 - range * 0.04 - arrow_pad)
+            .include_y(price_scale(series).0 + range * 1.04 + arrow_pad)
+            // Keep the price axis on the right; the x-axis ticks live on the
+            // volume pane directly below, which shares the exact same bounds.
+            .show_axes([false, true])
             .show(ui, |plot_ui| {
-                for c in &candles.candles {
-                    draw_candle(plot_ui, c, BAR_HALF, min_body);
-                    if show_arrows {
-                        draw_trend_arrow(plot_ui, c, BAR_HALF, arrow);
+                // Pin the range so a previously viewed time range cannot leave
+                // this pane zoomed out with the bars squeezed into a sliver.
+                pin_bounds(
+                    plot_ui,
+                    x0,
+                    x1,
+                    price_scale(series).0 - range * 0.04 - arrow_pad,
+                    price_scale(series).0 + range * 1.04 + arrow_pad,
+                );
+                // Current-price guide, drawn first so bars sit on top of it.
+                plot_ui.hline(
+                    egui_plot::HLine::new(last_close)
+                        .color(Color32::from_gray(140))
+                        .style(egui_plot::LineStyle::dashed_loose()),
+                );
+                for c in series {
+                    draw_candle(plot_ui, c, half, min_body);
+                    if arrows_legible {
+                        draw_trend_arrow(plot_ui, c, half, arrow);
                     }
                 }
                 if let Some(hover_pos) = plot_ui.pointer_coordinate() {
-                    let t_min = candles.candles.first().map(|c| c.t).unwrap_or(0.0);
-                    let t_max = candles.candles.last().map(|c| c.t).unwrap_or(0.0);
-                    let bar_width = if candles.candles.len() > 1 {
-                        (t_max - t_min) / (candles.candles.len() - 1) as f64
-                    } else {
-                        DAY_SECS
-                    };
-                    if bar_width > 0.0 {
-                        let idx = (((hover_pos.x - t_min) / bar_width).round() as isize)
-                            .clamp(0, candles.candles.len() as isize - 1)
+                    if spacing > 0.0 && x1 > x0 {
+                        let idx = (((hover_pos.x - x0) / spacing).round() as isize)
+                            .clamp(0, series.len() as isize - 1)
                             as usize;
-                        let c = &candles.candles[idx];
+                        let c = &series[idx];
                         *hover_candle.borrow_mut() =
                             Some((c.open, c.high, c.low, c.close, c.volume));
                     }
                 }
             });
+
         if let Some((o, h, l, c, v)) = hover_candle.borrow().as_ref() {
             egui::show_tooltip_at_pointer(
                 ui.ctx(),
@@ -1379,26 +1621,46 @@ impl BharatApp {
                 egui::Id::new("candle_tooltip"),
                 |ui: &mut egui::Ui| {
                     ui.label(format!(
-                        "O: {:.2} H: {:.2} L: {:.2} C: {:.2} V: {:.0}",
-                        o, h, l, c, v
+                        "O: {:.*}   H: {:.*}   L: {:.*}   C: {:.*}   V: {:.0}",
+                        price_decimals,
+                        o,
+                        price_decimals,
+                        h,
+                        price_decimals,
+                        l,
+                        price_decimals,
+                        c,
+                        v
                     ));
                 },
             );
         }
+
+        // Volume pane, sharing the exact same x-bounds as the price plot
+        // above so the two panes line up vertically.
         Plot::new("candlestick_volume")
-            .auto_bounds_x()
-            .auto_bounds_y()
-            .height(ui.available_height())
-            .allow_scroll(true)
+            .height(vol_h)
             .allow_drag(true)
-            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
+            .allow_scroll(true)
+            .allow_zoom(false)
+            .include_x(x0)
+            .include_x(x1)
+            .include_y(0.0)
+            .y_axis_position(egui_plot::HPlacement::Right)
+            .y_axis_width(9)
+            .show_axes([true, true])
+            .x_axis_formatter(move |mark, _range| format_ts_for(mark.value, spacing))
+            .y_axis_formatter(move |mark, _range| abbreviate_volume(mark.value))
             .show(ui, |plot_ui| {
-                let bars: Vec<Bar> = candles
-                    .candles
+                // Share the price pane's exact x-range so the two align.
+                pin_bounds(plot_ui, x0, x1, 0.0, volume_max.max(1.0) * 1.1);
+                let bars: Vec<Bar> = series
                     .iter()
                     .map(|c| {
                         let color = if c.is_bullish() { PROFIT } else { LOSS };
-                        Bar::new(c.t, c.volume).width(BAR_WIDTH).fill(color)
+                        Bar::new(c.t, c.volume)
+                            .width(spacing * BAR_FILL)
+                            .fill(color.gamma_multiply(0.75))
                     })
                     .collect();
                 plot_ui.bar_chart(BarChart::new(bars));
@@ -1409,15 +1671,21 @@ impl BharatApp {
         let candles = &self.data.candles;
         let ha_series = heikin_ashi(&candles.candles);
         ui.label(RichText::new(format!("GP (HA) — Heikin-Ashi — {}", candles.symbol)).strong());
-        let min_body = price_scale(&candles.candles).1 * MIN_BODY_FRAC;
-        Plot::new("ha_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
-            .height(ui.available_height())
-            .allow_scroll(true)
-            .allow_drag(true)
-            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
+        if ha_series.is_empty() {
+            ui.centered_and_justified(|ui| {
+                ui.label("No data for this symbol.");
+            });
+            return;
+        }
+        let min_body = price_scale(&ha_series).1 * MIN_BODY_FRAC;
+        let half = bar_half(&ha_series);
+        let height = ui.available_height();
+        style_time_plot(Plot::new("ha_plot"), &ha_series, height)
+            .show_axes([true, true])
             .show(ui, |plot_ui| {
+                let (px0, px1) = x_bounds(&ha_series);
+                let (plo, prange) = price_scale(&ha_series);
+                pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
                 for ha in &ha_series {
                     let color = if ha.is_bullish() { PROFIT } else { LOSS };
                     plot_ui.line(
@@ -1428,10 +1696,10 @@ impl BharatApp {
                     let (top, bottom) = candle_body(ha, min_body);
                     plot_ui.polygon(
                         egui_plot::Polygon::new(PlotPoints::from(vec![
-                            [ha.t - BAR_HALF, bottom],
-                            [ha.t + BAR_HALF, bottom],
-                            [ha.t + BAR_HALF, top],
-                            [ha.t - BAR_HALF, top],
+                            [ha.t - half, bottom],
+                            [ha.t + half, bottom],
+                            [ha.t + half, top],
+                            [ha.t - half, top],
                         ]))
                         .fill_color(color)
                         .stroke(Stroke::new(1.0_f32, color)),
@@ -1547,16 +1815,16 @@ impl BharatApp {
         let candles = &self.data.candles;
         ui.label(RichText::new(format!("C3D — Candlestick 3D — {}", candles.symbol)).strong());
         let min_body = price_scale(&candles.candles).1 * MIN_BODY_FRAC;
-        Plot::new("c3d_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
-            .height(ui.available_height())
-            .allow_scroll(true)
-            .allow_drag(true)
-            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
+        let half = bar_half(&candles.candles);
+        let height = ui.available_height();
+        style_time_plot(Plot::new("c3d_plot"), &candles.candles, height)
+            .show_axes([true, true])
             .show(ui, |plot_ui| {
+                let (px0, px1) = x_bounds(&candles.candles);
+                let (plo, prange) = price_scale(&candles.candles);
+                pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
                 for c in &candles.candles {
-                    draw_candle(plot_ui, c, BAR_HALF, min_body);
+                    draw_candle(plot_ui, c, half, min_body);
                 }
             });
     }
@@ -1569,17 +1837,17 @@ impl BharatApp {
         let ema200 = ema(series, 200);
         ui.label(RichText::new(format!("CMA — Candlestick + MA — {}", series.symbol)).strong());
         let min_body = price_scale(&series.candles).1 * MIN_BODY_FRAC;
-        Plot::new("cma_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
-            .height(ui.available_height())
-            .allow_scroll(true)
-            .allow_drag(true)
+        let half = bar_half(&series.candles);
+        let height = ui.available_height();
+        style_time_plot(Plot::new("cma_plot"), &series.candles, height)
+            .show_axes([true, true])
             .legend(Legend::default())
-            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
+                let (px0, px1) = x_bounds(&series.candles);
+                let (plo, prange) = price_scale(&series.candles);
+                pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
                 for c in &series.candles {
-                    draw_candle(plot_ui, c, BAR_HALF, min_body);
+                    draw_candle(plot_ui, c, half, min_body);
                 }
                 let sma20_pts: PlotPoints = series
                     .candles
@@ -1646,16 +1914,16 @@ impl BharatApp {
             RichText::new(format!("CBB — Candlestick + Bollinger — {}", series.symbol)).strong(),
         );
         let min_body = price_scale(&series.candles).1 * MIN_BODY_FRAC;
-        Plot::new("cbb_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
-            .height(ui.available_height())
-            .allow_scroll(true)
-            .allow_drag(true)
-            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
+        let half = bar_half(&series.candles);
+        let height = ui.available_height();
+        style_time_plot(Plot::new("cbb_plot"), &series.candles, height)
+            .show_axes([true, true])
             .show(ui, |plot_ui| {
+                let (px0, px1) = x_bounds(&series.candles);
+                let (plo, prange) = price_scale(&series.candles);
+                pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
                 for c in &series.candles {
-                    draw_candle(plot_ui, c, BAR_HALF, min_body);
+                    draw_candle(plot_ui, c, half, min_body);
                 }
                 let mid_pts: PlotPoints = series
                     .candles
@@ -1715,16 +1983,16 @@ impl BharatApp {
         let rsi_vals = rsi(series, 14);
         ui.label(RichText::new(format!("CRSI — Candlestick + RSI — {}", series.symbol)).strong());
         let min_body = price_scale(&series.candles).1 * MIN_BODY_FRAC;
-        Plot::new("crsi_price")
-            .auto_bounds_x()
-            .auto_bounds_y()
-            .height(ui.available_height() * 0.65_f32)
-            .allow_scroll(true)
-            .allow_drag(true)
-            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
+        let half = bar_half(&series.candles);
+        let height = (ui.available_height() * 0.65_f32).max(120.0);
+        style_time_plot(Plot::new("crsi_price"), &series.candles, height)
+            .show_axes([true, true])
             .show(ui, |plot_ui| {
+                let (px0, px1) = x_bounds(&series.candles);
+                let (plo, prange) = price_scale(&series.candles);
+                pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
                 for c in &series.candles {
-                    draw_candle(plot_ui, c, BAR_HALF, min_body);
+                    draw_candle(plot_ui, c, half, min_body);
                 }
             });
         Plot::new("crsi_rsi")
@@ -1759,16 +2027,16 @@ impl BharatApp {
         let (macd_line, signal_line, _histogram) = macd(series);
         ui.label(RichText::new(format!("CMACD — Candlestick + MACD — {}", series.symbol)).strong());
         let min_body = price_scale(&series.candles).1 * MIN_BODY_FRAC;
-        Plot::new("cmacd_price")
-            .auto_bounds_x()
-            .auto_bounds_y()
-            .height(ui.available_height() * 0.65_f32)
-            .allow_scroll(true)
-            .allow_drag(true)
-            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
+        let half = bar_half(&series.candles);
+        let height = (ui.available_height() * 0.65_f32).max(120.0);
+        style_time_plot(Plot::new("cmacd_price"), &series.candles, height)
+            .show_axes([true, true])
             .show(ui, |plot_ui| {
+                let (px0, px1) = x_bounds(&series.candles);
+                let (plo, prange) = price_scale(&series.candles);
+                pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
                 for c in &series.candles {
-                    draw_candle(plot_ui, c, BAR_HALF, min_body);
+                    draw_candle(plot_ui, c, half, min_body);
                 }
             });
         Plot::new("cmacd_macd")
@@ -1817,18 +2085,24 @@ impl BharatApp {
     fn draw_volume_profile(&self, ui: &mut egui::Ui) {
         let candles = &self.data.candles;
         ui.label(RichText::new(format!("VP — Volume Profile — {}", candles.symbol)).strong());
+        let bar_w = bar_spacing(&candles.candles) * BAR_FILL;
+        let spacing = bar_spacing(&candles.candles);
+        let (x0, x1) = x_bounds(&candles.candles);
         Plot::new("vp_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
             .height(ui.available_height())
-            .allow_scroll(true)
             .allow_drag(true)
-            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
+            .allow_scroll(true)
+            .allow_zoom(false)
+            .include_x(x0)
+            .include_x(x1)
+            .y_axis_position(egui_plot::HPlacement::Right)
+            .x_axis_formatter(move |mark, _range| format_ts_for(mark.value, spacing))
+            .y_axis_formatter(move |mark, _range| abbreviate_volume(mark.value))
             .show(ui, |plot_ui| {
                 for c in &candles.candles {
                     let color = if c.is_bullish() { PROFIT } else { LOSS };
                     plot_ui.bar_chart(BarChart::new(vec![Bar::new(c.t, c.volume)
-                        .width(BAR_WIDTH)
+                        .width(bar_w)
                         .fill(color)]));
                 }
             });
@@ -1947,18 +2221,24 @@ impl BharatApp {
     fn draw_volume_clock(&self, ui: &mut egui::Ui) {
         let candles = &self.data.candles;
         ui.label(RichText::new(format!("VC — Volume Clock — {}", candles.symbol)).strong());
+        let bar_w = bar_spacing(&candles.candles) * BAR_FILL;
+        let spacing = bar_spacing(&candles.candles);
+        let (x0, x1) = x_bounds(&candles.candles);
         Plot::new("vc_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
             .height(ui.available_height())
-            .allow_scroll(true)
             .allow_drag(true)
-            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
+            .allow_scroll(true)
+            .allow_zoom(false)
+            .include_x(x0)
+            .include_x(x1)
+            .y_axis_position(egui_plot::HPlacement::Right)
+            .x_axis_formatter(move |mark, _range| format_ts_for(mark.value, spacing))
+            .y_axis_formatter(move |mark, _range| abbreviate_volume(mark.value))
             .show(ui, |plot_ui| {
                 for c in &candles.candles {
                     let color = if c.is_bullish() { PROFIT } else { LOSS };
                     plot_ui.bar_chart(BarChart::new(vec![Bar::new(c.t, c.volume)
-                        .width(BAR_WIDTH)
+                        .width(bar_w)
                         .fill(color)]));
                 }
             });
@@ -6952,7 +7232,8 @@ impl eframe::App for BharatApp {
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1280.0_f32, 820.0_f32])
+            .with_inner_size([1600.0_f32, 1000.0_f32])
+            .with_min_inner_size([1100.0_f32, 700.0_f32])
             .with_title(format!("{} — Made by {}", APP_NAME, AUTHOR)),
         ..Default::default()
     };
@@ -7077,6 +7358,225 @@ mod tests {
             ARROW_FRAC < 0.2,
             "arrows must stay small relative to the range"
         );
+    }
+
+    /// Regression test for the bug where every candle was drawn
+    /// `0.35 * DAY_SECS` wide, making 1-minute bars overlap into a single blob.
+    #[test]
+    fn test_bar_spacing_uses_real_cadence_not_a_day() {
+        let minute_bars: Vec<Candle> = (0..375)
+            .map(|i| {
+                Candle::new(
+                    1_790_567_100.0 + i as f64 * 60.0,
+                    100.0,
+                    101.0,
+                    99.0,
+                    100.5,
+                    1.0,
+                )
+            })
+            .collect();
+        assert_eq!(bar_spacing(&minute_bars), 60.0);
+
+        let daily_bars: Vec<Candle> = (0..100)
+            .map(|i| {
+                Candle::new(
+                    1_704_067_200.0 + i as f64 * DAY_SECS,
+                    100.0,
+                    101.0,
+                    99.0,
+                    100.5,
+                    1.0,
+                )
+            })
+            .collect();
+        assert_eq!(bar_spacing(&daily_bars), DAY_SECS);
+    }
+
+    #[test]
+    fn test_bar_half_never_exceeds_the_gap_to_the_neighbour() {
+        let minute_bars: Vec<Candle> = (0..375)
+            .map(|i| {
+                Candle::new(
+                    1_790_567_100.0 + i as f64 * 60.0,
+                    100.0,
+                    101.0,
+                    99.0,
+                    100.5,
+                    1.0,
+                )
+            })
+            .collect();
+        let half = bar_half(&minute_bars);
+        assert!(
+            half < 60.0,
+            "candle body must be narrower than the 60s bar gap, got {}",
+            half
+        );
+        let gap = 60.0 - 2.0 * half;
+        assert!(gap > 0.0, "adjacent candle bodies would overlap");
+    }
+
+    #[test]
+    fn test_bar_spacing_is_robust_to_session_gaps() {
+        // A lunch break creates one huge delta; the median must ignore it.
+        let deltas = [60.0, 60.0, 60.0, 60.0, 4.0 * 3600.0, 60.0, 60.0];
+        let mut ts = 1_790_567_100.0;
+        let bars: Vec<Candle> = deltas
+            .iter()
+            .map(|d| {
+                let c = Candle::new(ts, 100.0, 101.0, 99.0, 100.5, 1.0);
+                ts += d;
+                c
+            })
+            .collect();
+        assert_eq!(bar_spacing(&bars), 60.0, "median must reject the gap");
+    }
+
+    #[test]
+    fn test_bar_spacing_edge_cases() {
+        assert_eq!(bar_spacing(&[]), FALLBACK_SPACING);
+        let one = vec![Candle::new(1.0, 1.0, 2.0, 0.5, 1.5, 1.0)];
+        assert_eq!(bar_spacing(&one), FALLBACK_SPACING);
+        // Duplicate timestamps must not yield a zero or negative spacing.
+        let dupes = vec![
+            Candle::new(5.0, 1.0, 2.0, 0.5, 1.5, 1.0),
+            Candle::new(5.0, 1.0, 2.0, 0.5, 1.5, 1.0),
+        ];
+        assert_eq!(bar_spacing(&dupes), FALLBACK_SPACING);
+    }
+
+    #[test]
+    fn test_x_bounds_wrap_the_data_with_padding() {
+        let bars: Vec<Candle> = (0..10)
+            .map(|i| Candle::new(1000.0 + i as f64 * 60.0, 1.0, 2.0, 0.5, 1.5, 1.0))
+            .collect();
+        let (lo, hi) = x_bounds(&bars);
+        assert!(lo < 1000.0, "x range must start before the first bar");
+        assert!(
+            hi > 1000.0 + 9.0 * 60.0,
+            "x range must end after the last bar"
+        );
+    }
+
+    #[test]
+    fn test_x_bounds_empty_series_is_finite() {
+        let (lo, hi) = x_bounds(&[]);
+        assert!(lo.is_finite() && hi.is_finite());
+        assert!(hi > lo);
+    }
+
+    #[test]
+    fn test_x_bounds_ignores_non_finite_timestamps() {
+        let bars = vec![
+            Candle::new(1000.0, 1.0, 2.0, 0.5, 1.5, 1.0),
+            Candle::new(f64::NAN, 1.0, 2.0, 0.5, 1.5, 1.0),
+            Candle::new(2000.0, 1.0, 2.0, 0.5, 1.5, 1.0),
+        ];
+        let (lo, hi) = x_bounds(&bars);
+        assert!(lo.is_finite() && hi.is_finite());
+        assert!(lo < 2000.0 && hi > 2000.0);
+    }
+
+    #[test]
+    fn test_format_ts_for_picks_a_format_from_the_cadence() {
+        // 1_704_110_100 == 2024-01-01 11:55 UTC
+        let t = 1_704_110_100.0_f64;
+        assert_eq!(
+            format_ts_for(t, 60.0),
+            "11:55",
+            "intraday shows a clock time"
+        );
+        assert_eq!(format_ts_for(t, DAY_SECS), "01 Jan", "daily shows a date");
+        assert_eq!(
+            format_ts_for(t, 90.0 * DAY_SECS),
+            "Jan 2024",
+            "long range shows month"
+        );
+    }
+
+    #[test]
+    fn test_price_decimals_scales_with_magnitude() {
+        assert_eq!(price_decimals(12_345.0), 0);
+        assert_eq!(price_decimals(1_500.0), 1);
+        assert_eq!(price_decimals(975.25), 2);
+        assert_eq!(price_decimals(1.75), 3);
+        assert_eq!(price_decimals(0.0123), 4);
+    }
+
+    #[test]
+    fn test_abbreviate_volume() {
+        assert_eq!(abbreviate_volume(999.0), "999");
+        assert_eq!(abbreviate_volume(1_500.0), "1.5K");
+        assert_eq!(abbreviate_volume(2_500_000.0), "2.5M");
+        assert_eq!(abbreviate_volume(3_200_000_000.0), "3.2B");
+        assert_eq!(abbreviate_volume(4_100_000_000_000.0), "4.1T");
+    }
+
+    #[test]
+    fn test_intraday_bars_tile_the_visible_x_range() {
+        let series = synthetic_ohlcv("SBIN", 375, 21, 975.0);
+        let half = bar_half(&series.candles);
+        let spacing = bar_spacing(&series.candles);
+        assert!(half > 0.0 && half < spacing);
+        let (x0, x1) = x_bounds(&series.candles);
+        assert!(x1 > x0);
+        assert!(
+            (x1 - x0) < (series.candles.len() as f64 * spacing * 1.5),
+            "x range must stay proportional to the bar count"
+        );
+    }
+
+    /// Regression test: egui_plot remembers each plot's zoom window, so after
+    /// viewing 1Y the 1D intraday series was drawn into that stale window and
+    /// collapsed to a sliver. The panes now pin bounds from the data every
+    /// frame, so the plotted range must always hug the actual series.
+    #[test]
+    fn test_bounds_hug_the_series_not_a_stale_longer_window() {
+        // 75 five-minute bars = one trading day.
+        let intraday: Vec<Candle> = (0..75)
+            .map(|i| {
+                Candle::new(
+                    1_790_567_100.0 + i as f64 * 300.0,
+                    1200.0,
+                    1202.0,
+                    1198.0,
+                    1201.0,
+                    1.0,
+                )
+            })
+            .collect();
+        let (x0, x1) = x_bounds(&intraday);
+        // The bounds must bracket the series with only small padding, proving
+        // they were derived from these bars rather than a wider remembered range.
+        assert!(x0 < 1_790_567_100.0, "must start before the first bar");
+        assert!(
+            x1 > 1_790_567_100.0 + 74.0 * 300.0,
+            "must end after the last"
+        );
+        let padding = (x1 - x0) - (74.0 * 300.0);
+        assert!(
+            padding < 74.0 * 300.0,
+            "padding must stay small relative to the series span"
+        );
+        // A stale 365-day window is orders of magnitude wider, which is exactly
+        // why the pane has to pin bounds instead of trusting remembered zoom.
+        let stale_window = 365.0 * DAY_SECS;
+        assert!((x1 - x0) * 100.0 < stale_window);
+    }
+
+    #[test]
+    fn test_pin_bounds_is_a_noop_for_degenerate_ranges() {
+        // Guards the `x1 > x0 && y1 > y0` precondition: a single flat price
+        // must not produce an inverted or zero-height range.
+        let flat = vec![Candle::new(1.0, 100.0, 100.0, 100.0, 100.0, 1.0)];
+        let (_, range) = price_scale(&flat);
+        assert!(
+            range > 0.0,
+            "price_scale keeps range positive for flat data"
+        );
+        let (x0, x1) = x_bounds(&flat);
+        assert!(x1 > x0, "x_bounds must stay ordered even for a single bar");
     }
 
     #[test]

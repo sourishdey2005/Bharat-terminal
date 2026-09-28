@@ -1,0 +1,20 @@
+# Rust build output
+target/
+**/target/
+
+# Runtime state written by the app
+bharat-terminal/data/cache.db
+bharat-terminal/data/prefs.json
+bharat-terminal/crates/bt-data/data/
+*.db
+prefs.json
+
+# egui / eframe persistence
+*.ron
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+*.tmp

@@ -66,8 +66,16 @@ impl DataService {
     ) -> Result<OhlcvSeries> {
         let interval_str = interval.as_str();
 
-        // Try cache first
-        if let Ok(Some(candles)) = self.cache.get_ohlcv(symbol, interval_str) {
+        // Try cache first, restricted to the requested window. The cache is
+        // keyed by symbol and interval, so a range check is required: without
+        // it a long-range entry (1Y) would also answer a short-range request
+        // (1D) and the chart would render far more bars than were asked for.
+        let start_ts = Some(start.timestamp());
+        let end_ts = Some(end.timestamp());
+        if let Ok(Some(candles)) =
+            self.cache
+                .get_ohlcv_in_range(symbol, interval_str, start_ts, end_ts)
+        {
             let series = OhlcvSeries::new(symbol, candles);
             if series.validate().is_ok() {
                 return Ok(series);

@@ -46,10 +46,23 @@ impl Cache {
         })
     }
 
-    /// Get cached OHLCV data for symbol and interval.
-    /// Returns None if cache miss or data expired.
+    /// Get cached OHLCV data for symbol, interval and an optional time window.
+    ///
+    /// `start_ts`/`end_ts` bound the requested range in Unix seconds. The cache
+    /// is keyed by symbol and interval, so without this filter a cache entry
+    /// fetched for a long range (e.g. 1Y) would also be served for a short one
+    /// (e.g. 1D), and the chart would draw the wrong number of bars. Pass
+    /// `None` to accept the whole cached series.
+    ///
+    /// Returns None on cache miss or when the cached data is expired.
     #[instrument(skip(self))]
-    pub fn get_ohlcv(&self, symbol: &str, interval: &str) -> Result<Option<Vec<Candle>>> {
+    pub fn get_ohlcv_in_range(
+        &self,
+        symbol: &str,
+        interval: &str,
+        start_ts: Option<i64>,
+        end_ts: Option<i64>,
+    ) -> Result<Option<Vec<Candle>>> {
         let ttl_secs = self.ttl_for_interval(interval);
         let cutoff = (Utc::now() - Duration::seconds(ttl_secs)).timestamp();
 
@@ -58,12 +71,14 @@ impl Cache {
             .prepare(
                 "SELECT ts, o, h, l, c, v FROM ohlcv
                  WHERE symbol = ?1 AND interval = ?2 AND fetched_at > ?3
+                   AND (?4 IS NULL OR ts >= ?4)
+                   AND (?5 IS NULL OR ts <= ?5)
                  ORDER BY ts",
             )
             .map_err(to_bt_err)?;
 
         let rows = stmt
-            .query_map(params![symbol, interval, cutoff], |row| {
+            .query_map(params![symbol, interval, cutoff, start_ts, end_ts], |row| {
                 Ok(Candle {
                     t: row.get::<_, i64>(0)? as f64,
                     open: row.get(1)?,
@@ -85,6 +100,13 @@ impl Cache {
         } else {
             Ok(Some(candles))
         }
+    }
+
+    /// Get cached OHLCV data for symbol and interval, ignoring any time window.
+    /// Returns None if cache miss or data expired.
+    #[instrument(skip(self))]
+    pub fn get_ohlcv(&self, symbol: &str, interval: &str) -> Result<Option<Vec<Candle>>> {
+        self.get_ohlcv_in_range(symbol, interval, None, None)
     }
 
     /// Store OHLCV data in cache.
@@ -208,6 +230,96 @@ mod tests {
 
         let result = cache.get_ohlcv("NONEXISTENT", "1d").unwrap();
         assert!(result.is_none());
+    }
+
+    /// Regression test: the cache is keyed by (symbol, interval) only, so a
+    /// long-range entry was also served for a short-range request and the chart
+    /// drew the wrong number of bars. The time window must be honoured.
+    #[test]
+    fn test_cache_range_filter_excludes_out_of_window_bars() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test_cache_range.db");
+        let cache = Cache::new(&path).unwrap();
+
+        let day = 86_400_i64;
+        let base = 1_700_000_000_i64;
+        // A year of daily bars, as a 1Y request would cache.
+        let year: Vec<Candle> = (0..365)
+            .map(|i| {
+                Candle::new(
+                    (base + i as i64 * day) as f64,
+                    100.0,
+                    105.0,
+                    99.0,
+                    103.0,
+                    1000.0,
+                )
+            })
+            .collect();
+        cache.put_ohlcv("RANGE", "1d", &year).unwrap();
+
+        // A 1D request at the very end of that year must not get all 365 bars.
+        let one_day_start = base + 360 * day;
+        let one_day_end = one_day_start + day;
+        let intraday = cache
+            .get_ohlcv_in_range("RANGE", "1d", Some(one_day_start), Some(one_day_end))
+            .unwrap()
+            .unwrap();
+        assert!(
+            intraday.len() < 10,
+            "1D request returned {} bars, expected only the in-window ones",
+            intraday.len()
+        );
+        for c in &intraday {
+            assert!(
+                c.t >= one_day_start as f64 && c.t <= one_day_end as f64,
+                "bar {} escaped the requested window",
+                c.t
+            );
+        }
+
+        // The unfiltered accessor still returns the whole cached series.
+        let all = cache.get_ohlcv("RANGE", "1d").unwrap().unwrap();
+        assert_eq!(all.len(), 365);
+
+        // A window that contains no data must report a miss, not stale rows.
+        let outside = cache
+            .get_ohlcv_in_range("RANGE", "1d", Some(0), Some(1000))
+            .unwrap();
+        assert!(outside.is_none(), "window outside the data must miss");
+    }
+
+    #[test]
+    fn test_cache_range_filter_keeps_overlapping_bars() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test_cache_range2.db");
+        let cache = Cache::new(&path).unwrap();
+
+        let day = 86_400_i64;
+        let base = 1_700_000_000_i64;
+        let year: Vec<Candle> = (0..100)
+            .map(|i| {
+                Candle::new(
+                    (base + i as i64 * day) as f64,
+                    100.0,
+                    105.0,
+                    99.0,
+                    103.0,
+                    1000.0,
+                )
+            })
+            .collect();
+        cache.put_ohlcv("RANGE2", "1d", &year).unwrap();
+
+        let from = base + 10 * day;
+        let to = base + 19 * day;
+        let window = cache
+            .get_ohlcv_in_range("RANGE2", "1d", Some(from), Some(to))
+            .unwrap()
+            .unwrap();
+        assert_eq!(window.len(), 10, "inclusive bounds should return 10 bars");
+        assert_eq!(window[0].t, from as f64);
+        assert_eq!(window[9].t, to as f64);
     }
 
     #[test]

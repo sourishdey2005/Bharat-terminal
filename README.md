@@ -114,11 +114,25 @@ The `GP — Candlestick` tab renders professional Japanese candles:
 | Doji | `open == close` bodies expand to a visible minimum height |
 | Trend arrows | Green ▲ below bullish bars, red ▼ above bearish bars (toggleable) |
 | Hover | Tooltip with `O / H / L / C / V` snapped to the nearest bar |
-| X-axis | Formatted as month and year |
+| Price axis | Right-hand side, precision chosen from the price magnitude |
+| X-axis | Auto-formatted: clock time intraday, `DD Mon` daily, `Mon YYYY` longer |
+| Volume | Separate pane sharing the exact same x-range as the price pane |
+| Legend | `Last` price plus `O / H / L / C` and total volume above the chart |
+| Current price | Dashed horizontal guide at the last close |
 
-Arrow and body sizes scale with the visible high/low range, so the chart stays
-readable across instruments and price magnitudes. The same renderer backs the
-`GP (HA)`, `C3D`, `CMA`, `CBB`, `CRSI` and `CMACD` candle tabs.
+**Bar width is derived from the data.** The median gap between consecutive
+timestamps sets the body width, so 1-minute, 5-minute, daily and weekly series
+all render at the correct density instead of overlapping. Bars are never wider
+than the gap that separates them.
+
+**Trend arrows auto-hide above 90 bars**, where a per-bar marker is visual
+noise. The header shows `(hidden: N bars)` so the state is never silent; pick a
+shorter range to see them.
+
+The same renderer backs the `GP (HA)`, `C3D`, `CMA`, `CBB`, `CRSI` and `CMACD`
+candle tabs, and all of them pin their visible range to the data so a
+previously viewed time range cannot leave them zoomed out.
+
 
 #### Alternative Bar Styles
 
