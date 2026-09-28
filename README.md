@@ -101,6 +101,25 @@
 | **HS** | Historical Spread/Performance | Side-by-side or normalized ratio charts |
 | **COMP** | Comparative Return | Normalized total return from base date |
 
+#### Candlestick Rendering
+
+The `GP — Candlestick` tab renders professional Japanese candles:
+
+| Element | Behaviour |
+|:--------|:----------|
+| Wick | Thin high-to-low line behind each body |
+| Body | Filled open-to-close rectangle, centred and never collapsed |
+| Bullish | Green (`#00FF88`) when `close > open` |
+| Bearish | Red (`#FF3B3B`) when `close < open` |
+| Doji | `open == close` bodies expand to a visible minimum height |
+| Trend arrows | Green ▲ below bullish bars, red ▼ above bearish bars (toggleable) |
+| Hover | Tooltip with `O / H / L / C / V` snapped to the nearest bar |
+| X-axis | Formatted as month and year |
+
+Arrow and body sizes scale with the visible high/low range, so the chart stays
+readable across instruments and price magnitudes. The same renderer backs the
+`GP (HA)`, `C3D`, `CMA`, `CBB`, `CRSI` and `CMACD` candle tabs.
+
 #### Alternative Bar Styles
 
 | Style | Description |

@@ -224,25 +224,32 @@ impl Default for FMPProvider {
 mod tests {
     use super::*;
 
+    /// Live FMP quote test. Requires network access and a valid API key.
+    /// Run with: cargo test -p bt-data -- --ignored
     #[tokio::test]
+    #[ignore = "requires network access and a valid FMP API key"]
     async fn test_fetch_quote() {
-        let provider = FMPProvider::new("demo");
+        let provider = FMPProvider::new(std::env::var("FMP_API_KEY").unwrap_or_else(|_| "demo".into()));
         let quote = provider.fetch_quote("AAPL").await;
         assert!(quote.is_ok());
         let q = quote.unwrap();
         assert_eq!(q.symbol, "AAPL");
     }
 
+    /// Live FMP profile test. Run with: cargo test -p bt-data -- --ignored
     #[tokio::test]
+    #[ignore = "requires network access and a valid FMP API key"]
     async fn test_fetch_profile() {
-        let provider = FMPProvider::new("demo");
+        let provider = FMPProvider::new(std::env::var("FMP_API_KEY").unwrap_or_else(|_| "demo".into()));
         let profile = provider.fetch_profile("AAPL").await;
         assert!(profile.is_ok());
     }
 
+    /// Live FMP income statement test. Run with: cargo test -p bt-data -- --ignored
     #[tokio::test]
+    #[ignore = "requires network access and a valid FMP API key"]
     async fn test_fetch_income_statement() {
-        let provider = FMPProvider::new("demo");
+        let provider = FMPProvider::new(std::env::var("FMP_API_KEY").unwrap_or_else(|_| "demo".into()));
         let statements = provider.fetch_income_statement("AAPL", "annual", 5).await;
         assert!(statements.is_ok());
     }

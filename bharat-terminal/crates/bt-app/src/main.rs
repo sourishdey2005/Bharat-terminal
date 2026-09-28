@@ -40,6 +40,124 @@ fn format_ts(ts: f64) -> String {
     dt.format("%b %Y").to_string()
 }
 
+/// Smallest visible body height, as a fraction of the series high/low range.
+/// Keeps doji candles (open == close) from collapsing into an invisible line.
+const MIN_BODY_FRAC: f64 = 0.004;
+
+/// Vertical size of the trend arrow, as a fraction of the series high/low range.
+const ARROW_FRAC: f64 = 0.022;
+
+/// Returns `(min_low, range)` for the series, used to scale candle geometry.
+fn price_scale(candles: &[Candle]) -> (f64, f64) {
+    let mut lo = f64::INFINITY;
+    let mut hi = f64::NEG_INFINITY;
+    for c in candles {
+        lo = lo.min(c.low);
+        hi = hi.max(c.high);
+    }
+    if !lo.is_finite() || !hi.is_finite() {
+        return (0.0, 1.0);
+    }
+    let range = hi - lo;
+    if range <= 0.0 {
+        (lo, 1.0)
+    } else {
+        (lo, range)
+    }
+}
+
+/// Returns the `(top, bottom)` of the candle body, guaranteeing a visible body
+/// for doji candles by expanding around the midpoint when open == close.
+fn candle_body(c: &Candle, min_body: f64) -> (f64, f64) {
+    let (mut top, mut bottom) = if c.is_bullish() {
+        (c.close, c.open)
+    } else {
+        (c.open, c.close)
+    };
+    if (top - bottom).abs() < min_body {
+        let mid = 0.5 * (top + bottom);
+        top = mid + 0.5 * min_body;
+        bottom = mid - 0.5 * min_body;
+    }
+    (top, bottom)
+}
+
+/// Draws a professional candlestick: thin high/low wick behind a filled
+/// open/close body, coloured green when bullish and red when bearish.
+fn draw_candle(plot_ui: &mut egui_plot::PlotUi, c: &Candle, half: f64, min_body: f64) {
+    let color = if c.is_bullish() { PROFIT } else { LOSS };
+    plot_ui.line(
+        Line::new(PlotPoints::from(vec![[c.t, c.low], [c.t, c.high]]))
+            .color(color)
+            .width(1.0_f32),
+    );
+    let (top, bottom) = candle_body(c, min_body);
+    plot_ui.polygon(
+        egui_plot::Polygon::new(PlotPoints::from(vec![
+            [c.t - half, bottom],
+            [c.t + half, bottom],
+            [c.t + half, top],
+            [c.t - half, top],
+        ]))
+        .fill_color(color)
+        .stroke(Stroke::new(1.0_f32, color)),
+    );
+}
+
+/// Converts a series into a true Heikin-Ashi series.
+///
+/// `ha_close = (o + h + l + c) / 4`, `ha_open[i] = (ha_open[i-1] + ha_close[i-1]) / 2`
+/// (seeded with `(o[0] + c[0]) / 2`), and the high/low are widened to contain
+/// the synthetic open and close.
+fn heikin_ashi(candles: &[Candle]) -> Vec<Candle> {
+    let mut out: Vec<Candle> = Vec::with_capacity(candles.len());
+    let mut prev: Option<(f64, f64)> = None;
+    for c in candles {
+        let ha_close = (c.open + c.high + c.low + c.close) / 4.0;
+        let ha_open = match prev {
+            Some((po, pc)) => 0.5 * (po + pc),
+            None => 0.5 * (c.open + c.close),
+        };
+        out.push(Candle::new(
+            c.t,
+            ha_open,
+            c.high.max(ha_open).max(ha_close),
+            c.low.min(ha_open).min(ha_close),
+            ha_close,
+            c.volume,
+        ));
+        prev = Some((ha_open, ha_close));
+    }
+    out
+}
+
+/// Draws a green up-arrow below a bullish candle and a red down-arrow above a
+/// bearish candle, so the direction of every bar is readable at a glance.
+fn draw_trend_arrow(plot_ui: &mut egui_plot::PlotUi, c: &Candle, half: f64, size: f64) {
+    let color = if c.is_bullish() { PROFIT } else { LOSS };
+    let w = half.max(size * 0.9);
+    let pts = if c.is_bullish() {
+        let tip = c.low - 1.2 * size;
+        vec![
+            [c.t, tip + size],
+            [c.t - w, tip],
+            [c.t + w, tip],
+        ]
+    } else {
+        let tip = c.high + 1.2 * size;
+        vec![
+            [c.t, tip - size],
+            [c.t - w, tip],
+            [c.t + w, tip],
+        ]
+    };
+    plot_ui.polygon(
+        egui_plot::Polygon::new(PlotPoints::from(pts))
+            .fill_color(color.gamma_multiply(0.9))
+            .stroke(Stroke::new(0.5_f32, color)),
+    );
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Tab {
     Candlestick, HeikinAshi, Renko, Kagi, PointFigure,
@@ -535,6 +653,7 @@ struct BharatApp {
     market_last_refresh: Option<Instant>,
     compare_symbols: Vec<String>,
     compare_search: String,
+    show_candle_arrows: std::cell::Cell<bool>,
 }
 
 impl BharatApp {
@@ -586,6 +705,7 @@ impl BharatApp {
                 "INFY.NS".to_string(),
             ],
             compare_search: String::new(),
+            show_candle_arrows: std::cell::Cell::new(true),
         };
 
         app.trigger_fetch();
@@ -979,28 +1099,35 @@ impl BharatApp {
     fn draw_candlestick(&self, ui: &mut egui::Ui) {
         let candles = &self.data.candles;
         ui.label(RichText::new(format!("GP — Candlestick — {}", candles.symbol)).strong());
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Trend arrows").small());
+            let mut arrows = self.show_candle_arrows.get();
+            if ui.checkbox(&mut arrows, "").changed() {
+                self.show_candle_arrows.set(arrows);
+            }
+            ui.colored_label(PROFIT, "\u{25B2} up = close > open");
+            ui.colored_label(LOSS, "\u{25BC} down = close < open");
+        });
+        let (lo, range) = price_scale(&candles.candles);
+        let min_body = range * MIN_BODY_FRAC;
+        let arrow = range * ARROW_FRAC;
+        let show_arrows = self.show_candle_arrows.get();
+        let headroom = 3.0 * arrow;
         let hover_candle = std::cell::RefCell::new(None::<(f64, f64, f64, f64, f64)>);
         Plot::new("candlestick_plot")
             .auto_bounds_x().auto_bounds_y()
             .height(ui.available_height() * 0.7_f32)
             .allow_scroll(true)
             .allow_drag(true)
+            .include_y(lo - headroom)
+            .include_y(lo + range + headroom)
             .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &candles.candles {
-                    let color = if c.is_bullish() { PROFIT } else { LOSS };
-                    plot_ui.line(
-                        Line::new(PlotPoints::from(vec![[c.t, c.low], [c.t, c.high]]))
-                            .color(color).width(1.0_f32),
-                    );
-                    let (top, bottom) = if c.is_bullish() { (c.close, c.open) } else { (c.open, c.close) };
-                    plot_ui.polygon(
-                        egui_plot::Polygon::new(PlotPoints::from(vec![
-                            [c.t - BAR_HALF, bottom], [c.t + BAR_HALF, bottom],
-                            [c.t + BAR_HALF, top], [c.t - BAR_HALF, top],
-                        ]))
-                        .fill_color(color).stroke(Stroke::new(1.0_f32, color)),
-                    );
+                    draw_candle(plot_ui, c, BAR_HALF, min_body);
+                    if show_arrows {
+                        draw_trend_arrow(plot_ui, c, BAR_HALF, arrow);
+                    }
                 }
                 if let Some(hover_pos) = plot_ui.pointer_coordinate() {
                     let t_min = candles.candles.first().map(|c| c.t).unwrap_or(0.0);
@@ -1010,10 +1137,13 @@ impl BharatApp {
                     } else {
                         DAY_SECS
                     };
-                    let idx = ((hover_pos.x - t_min) / bar_width) as usize;
-                    if idx < candles.candles.len() {
+                    if bar_width > 0.0 {
+                        let idx = (((hover_pos.x - t_min) / bar_width).round() as isize)
+                            .clamp(0, candles.candles.len() as isize - 1)
+                            as usize;
                         let c = &candles.candles[idx];
-                        *hover_candle.borrow_mut() = Some((c.open, c.high, c.low, c.close, c.volume));
+                        *hover_candle.borrow_mut() =
+                            Some((c.open, c.high, c.low, c.close, c.volume));
                     }
                 }
             });
@@ -1040,7 +1170,9 @@ impl BharatApp {
 
     fn draw_heikin_ashi(&self, ui: &mut egui::Ui) {
         let candles = &self.data.candles;
+        let ha_series = heikin_ashi(&candles.candles);
         ui.label(RichText::new(format!("GP (HA) — Heikin-Ashi — {}", candles.symbol)).strong());
+        let min_body = price_scale(&candles.candles).1 * MIN_BODY_FRAC;
         Plot::new("ha_plot")
             .auto_bounds_x().auto_bounds_y()
             .height(ui.available_height())
@@ -1048,15 +1180,18 @@ impl BharatApp {
             .allow_drag(true)
             .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
-                for c in &candles.candles {
-                    let ha_close = (c.open + c.high + c.low + c.close) / 4.0;
-                    let ha_open = (c.open + c.close) / 2.0;
-                    let color = if ha_close >= ha_open { PROFIT } else { LOSS };
-                    let (top, bottom) = if ha_close >= ha_open { (ha_close, ha_open) } else { (ha_open, ha_close) };
+                for ha in &ha_series {
+                    let color = if ha.is_bullish() { PROFIT } else { LOSS };
+                    plot_ui.line(
+                        Line::new(PlotPoints::from(vec![[ha.t, ha.low], [ha.t, ha.high]]))
+                            .color(color)
+                            .width(1.0_f32),
+                    );
+                    let (top, bottom) = candle_body(ha, min_body);
                     plot_ui.polygon(
                         egui_plot::Polygon::new(PlotPoints::from(vec![
-                            [c.t - BAR_HALF, bottom], [c.t + BAR_HALF, bottom],
-                            [c.t + BAR_HALF, top], [c.t - BAR_HALF, top],
+                            [ha.t - BAR_HALF, bottom], [ha.t + BAR_HALF, bottom],
+                            [ha.t + BAR_HALF, top], [ha.t - BAR_HALF, top],
                         ]))
                         .fill_color(color).stroke(Stroke::new(1.0_f32, color)),
                     );
@@ -1140,6 +1275,7 @@ impl BharatApp {
     fn draw_candlestick_3d(&self, ui: &mut egui::Ui) {
         let candles = &self.data.candles;
         ui.label(RichText::new(format!("C3D — Candlestick 3D — {}", candles.symbol)).strong());
+        let min_body = price_scale(&candles.candles).1 * MIN_BODY_FRAC;
         Plot::new("c3d_plot")
             .auto_bounds_x().auto_bounds_y()
             .height(ui.available_height())
@@ -1148,15 +1284,7 @@ impl BharatApp {
             .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &candles.candles {
-                    let color = if c.is_bullish() { PROFIT } else { LOSS };
-                    let (top, bottom) = if c.is_bullish() { (c.close, c.open) } else { (c.open, c.close) };
-                    plot_ui.polygon(
-                        egui_plot::Polygon::new(PlotPoints::from(vec![
-                            [c.t - BAR_HALF, bottom], [c.t + BAR_HALF, bottom],
-                            [c.t + BAR_HALF, top], [c.t - BAR_HALF, top],
-                        ]))
-                        .fill_color(color).stroke(Stroke::new(1.0_f32, color)),
-                    );
+                    draw_candle(plot_ui, c, BAR_HALF, min_body);
                 }
             });
     }
@@ -1168,6 +1296,7 @@ impl BharatApp {
         let sma50 = sma(series, 50);
         let ema200 = ema(series, 200);
         ui.label(RichText::new(format!("CMA — Candlestick + MA — {}", series.symbol)).strong());
+        let min_body = price_scale(&series.candles).1 * MIN_BODY_FRAC;
         Plot::new("cma_plot")
             .auto_bounds_x().auto_bounds_y()
             .height(ui.available_height())
@@ -1177,15 +1306,7 @@ impl BharatApp {
             .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &series.candles {
-                    let color = if c.is_bullish() { PROFIT } else { LOSS };
-                    let (top, bottom) = if c.is_bullish() { (c.close, c.open) } else { (c.open, c.close) };
-                    plot_ui.polygon(
-                        egui_plot::Polygon::new(PlotPoints::from(vec![
-                            [c.t - BAR_HALF, bottom], [c.t + BAR_HALF, bottom],
-                            [c.t + BAR_HALF, top], [c.t - BAR_HALF, top],
-                        ]))
-                        .fill_color(color).stroke(Stroke::new(1.0_f32, color)),
-                    );
+                    draw_candle(plot_ui, c, BAR_HALF, min_body);
                 }
                 let sma20_pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !sma20[i].is_nan() { Some([c.t, sma20[i]]) } else { None })
@@ -1207,6 +1328,7 @@ impl BharatApp {
         let series = &self.data.candles;
         let (mid, upper, lower) = bollinger(series, 20, 2.0);
         ui.label(RichText::new(format!("CBB — Candlestick + Bollinger — {}", series.symbol)).strong());
+        let min_body = price_scale(&series.candles).1 * MIN_BODY_FRAC;
         Plot::new("cbb_plot")
             .auto_bounds_x().auto_bounds_y()
             .height(ui.available_height())
@@ -1215,15 +1337,7 @@ impl BharatApp {
             .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &series.candles {
-                    let color = if c.is_bullish() { PROFIT } else { LOSS };
-                    let (top, bottom) = if c.is_bullish() { (c.close, c.open) } else { (c.open, c.close) };
-                    plot_ui.polygon(
-                        egui_plot::Polygon::new(PlotPoints::from(vec![
-                            [c.t - BAR_HALF, bottom], [c.t + BAR_HALF, bottom],
-                            [c.t + BAR_HALF, top], [c.t - BAR_HALF, top],
-                        ]))
-                        .fill_color(color).stroke(Stroke::new(1.0_f32, color)),
-                    );
+                    draw_candle(plot_ui, c, BAR_HALF, min_body);
                 }
                 let mid_pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !mid[i].is_nan() { Some([c.t, mid[i]]) } else { None })
@@ -1245,6 +1359,7 @@ impl BharatApp {
         let series = &self.data.candles;
         let rsi_vals = rsi(series, 14);
         ui.label(RichText::new(format!("CRSI — Candlestick + RSI — {}", series.symbol)).strong());
+        let min_body = price_scale(&series.candles).1 * MIN_BODY_FRAC;
         Plot::new("crsi_price")
             .auto_bounds_x().auto_bounds_y()
             .height(ui.available_height() * 0.65_f32)
@@ -1253,15 +1368,7 @@ impl BharatApp {
             .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &series.candles {
-                    let color = if c.is_bullish() { PROFIT } else { LOSS };
-                    let (top, bottom) = if c.is_bullish() { (c.close, c.open) } else { (c.open, c.close) };
-                    plot_ui.polygon(
-                        egui_plot::Polygon::new(PlotPoints::from(vec![
-                            [c.t - BAR_HALF, bottom], [c.t + BAR_HALF, bottom],
-                            [c.t + BAR_HALF, top], [c.t - BAR_HALF, top],
-                        ]))
-                        .fill_color(color).stroke(Stroke::new(1.0_f32, color)),
-                    );
+                    draw_candle(plot_ui, c, BAR_HALF, min_body);
                 }
             });
         Plot::new("crsi_rsi")
@@ -1285,6 +1392,7 @@ impl BharatApp {
         let series = &self.data.candles;
         let (macd_line, signal_line, _histogram) = macd(series);
         ui.label(RichText::new(format!("CMACD — Candlestick + MACD — {}", series.symbol)).strong());
+        let min_body = price_scale(&series.candles).1 * MIN_BODY_FRAC;
         Plot::new("cmacd_price")
             .auto_bounds_x().auto_bounds_y()
             .height(ui.available_height() * 0.65_f32)
@@ -1293,15 +1401,7 @@ impl BharatApp {
             .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &series.candles {
-                    let color = if c.is_bullish() { PROFIT } else { LOSS };
-                    let (top, bottom) = if c.is_bullish() { (c.close, c.open) } else { (c.open, c.close) };
-                    plot_ui.polygon(
-                        egui_plot::Polygon::new(PlotPoints::from(vec![
-                            [c.t - BAR_HALF, bottom], [c.t + BAR_HALF, bottom],
-                            [c.t + BAR_HALF, top], [c.t - BAR_HALF, top],
-                        ]))
-                        .fill_color(color).stroke(Stroke::new(1.0_f32, color)),
-                    );
+                    draw_candle(plot_ui, c, BAR_HALF, min_body);
                 }
             });
         Plot::new("cmacd_macd")
@@ -4621,5 +4721,112 @@ mod tests {
         assert!(!APP_NAME.is_empty());
         assert!(!AUTHOR.is_empty());
         assert!(!TAGLINE.is_empty());
+    }
+
+    #[test]
+    fn test_price_scale_uses_low_and_high() {
+        let series = synthetic_ohlcv("SCALE", 10, 7, 100.0);
+        let (lo, range) = price_scale(&series.candles);
+        let expect_lo = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
+        let expect_hi = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
+        assert!((lo - expect_lo).abs() < 1e-9);
+        assert!((range - (expect_hi - expect_lo)).abs() < 1e-9);
+        assert!(range > 0.0);
+    }
+
+    #[test]
+    fn test_price_scale_empty_series_is_safe() {
+        let (lo, range) = price_scale(&[]);
+        assert!(lo.is_finite());
+        assert!(range > 0.0);
+    }
+
+    #[test]
+    fn test_candle_body_bullish_is_close_on_top() {
+        let c = Candle::new(1.0, 100.0, 110.0, 95.0, 105.0, 1_000.0);
+        let (top, bottom) = candle_body(&c, 0.0);
+        assert!((top - 105.0).abs() < 1e-9);
+        assert!((bottom - 100.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_candle_body_bearish_is_open_on_top() {
+        let c = Candle::new(1.0, 105.0, 110.0, 95.0, 100.0, 1_000.0);
+        let (top, bottom) = candle_body(&c, 0.0);
+        assert!((top - 105.0).abs() < 1e-9);
+        assert!((bottom - 100.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_candle_body_doji_gets_visible_height() {
+        let c = Candle::new(1.0, 100.0, 110.0, 95.0, 100.0, 1_000.0);
+        let min_body = 2.0;
+        let (top, bottom) = candle_body(&c, min_body);
+        assert!(top > bottom, "doji body must remain visible");
+        assert!(((top - bottom) - min_body).abs() < 1e-9);
+        let mid = 0.5 * (top + bottom);
+        assert!((mid - 100.0).abs() < 1e-9, "expansion stays centred on the price");
+    }
+
+    #[test]
+    fn test_candle_body_never_collapses_for_tiny_ranges() {
+        let series = synthetic_ohlcv("TINY", 50, 3, 10.0);
+        let (_, range) = price_scale(&series.candles);
+        let min_body = range * MIN_BODY_FRAC;
+        for c in &series.candles {
+            let (top, bottom) = candle_body(c, min_body);
+            assert!(top > bottom, "every candle must have a positive body height");
+            assert!(top.is_finite() && bottom.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_arrow_and_body_fractions_are_sane() {
+        assert!(MIN_BODY_FRAC > 0.0 && MIN_BODY_FRAC < 0.1);
+        assert!(ARROW_FRAC > MIN_BODY_FRAC, "arrows must be taller than a body");
+        assert!(ARROW_FRAC < 0.2, "arrows must stay small relative to the range");
+    }
+
+    #[test]
+    fn test_heikin_ashi_seeds_first_open_from_raw_candle() {
+        let c = Candle::new(1.0, 100.0, 110.0, 95.0, 105.0, 1_000.0);
+        let ha = heikin_ashi(&[c]);
+        assert_eq!(ha.len(), 1);
+        assert!((ha[0].open - 102.5).abs() < 1e-9, "seed open is (o + c) / 2");
+        assert!((ha[0].close - 102.5).abs() < 1e-9, "close is the 4-way average");
+    }
+
+    #[test]
+    fn test_heikin_ashi_is_recursive() {
+        let candles = vec![
+            Candle::new(1.0, 100.0, 110.0, 95.0, 105.0, 1_000.0),
+            Candle::new(2.0, 105.0, 115.0, 100.0, 110.0, 1_000.0),
+        ];
+        let ha = heikin_ashi(&candles);
+        let first_close = (100.0 + 110.0 + 95.0 + 105.0) / 4.0;
+        let first_open = (100.0 + 105.0) / 2.0;
+        let expect_open = 0.5 * (first_open + first_close);
+        assert!(
+            (ha[1].open - expect_open).abs() < 1e-9,
+            "second open must average the previous HA open and close"
+        );
+    }
+
+    #[test]
+    fn test_heikin_ashi_range_contains_open_and_close() {
+        let series = synthetic_ohlcv("HA", 60, 11, 250.0);
+        for (src, ha) in series.candles.iter().zip(heikin_ashi(&series.candles)) {
+            assert!(ha.high >= ha.open.max(ha.close), "HA high must contain body");
+            assert!(ha.low <= ha.open.min(ha.close), "HA low must contain body");
+            assert!(ha.high >= src.high, "HA high must not drop below raw high");
+            assert!(ha.low <= src.low, "HA low must not rise above raw low");
+            assert_eq!(ha.t, src.t);
+            assert_eq!(ha.volume, src.volume);
+        }
+    }
+
+    #[test]
+    fn test_heikin_ashi_empty_series() {
+        assert!(heikin_ashi(&[]).is_empty());
     }
 }

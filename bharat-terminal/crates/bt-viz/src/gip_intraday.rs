@@ -50,11 +50,28 @@ where DB::ErrorType: 'static,
     series.validate()?;
     fill_background(&root, cfg.theme)?;
 
-    let t_min = cfg.session_start;
-    let t_max = cfg.session_end.max(cfg.session_start + 0.1);
     let low = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
     let high = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
     let pad = (high - low).max(1.0) * 0.05;
+
+    // Candle timestamps are Unix seconds, so the x-axis must be built from the
+    // data range. `session_start`/`session_end` are clock hours and are only
+    // applied when the series is genuinely intraday (spans under two days).
+    let data_t_min = series.candles.first().map(|c| c.t).unwrap_or(0.0);
+    let data_t_max = series.candles.last().map(|c| c.t).unwrap_or(0.0);
+    let span = data_t_max - data_t_min;
+    let (t_min, t_max) = if span > 0.0 && span < 2.0 * 86_400.0 {
+        let frac = |h: f64| (h / 24.0 * 86_400.0).min(86_400.0);
+        let lo = data_t_min + frac(cfg.session_start);
+        let hi = data_t_min + frac(cfg.session_end);
+        if hi > lo {
+            (lo, hi)
+        } else {
+            (data_t_min, data_t_max)
+        }
+    } else {
+        (data_t_min, data_t_max.max(data_t_min + 1.0))
+    };
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
@@ -77,7 +94,8 @@ where DB::ErrorType: 'static,
         .draw()
         .map_err(|e| BtError::Render(e.to_string()))?;
 
-    let candle_width = ((t_max - t_min) / series.candles.len().max(1) as f64).max(0.01) * 0.4;
+    let slot = ((t_max - t_min) / series.candles.len().max(1) as f64).max(1.0);
+    let candle_width = ((slot * 0.6) as u32).max(1);
 
     chart
         .draw_series(series.candles.iter().map(|c| {
@@ -90,7 +108,7 @@ where DB::ErrorType: 'static,
                 c.close,
                 color.filled(),
                 color.filled(),
-                (candle_width * 10.0) as u32,
+                candle_width,
             )
         }))
         .map_err(|e| BtError::Render(e.to_string()))?;

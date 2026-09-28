@@ -228,14 +228,19 @@ impl Default for NSEProvider {
 mod tests {
     use super::*;
 
+    /// Live NSE session test. Requires network access to nseindia.com.
+    /// Run with: cargo test -p bt-data -- --ignored
     #[tokio::test]
+    #[ignore = "requires live network access to nseindia.com"]
     async fn test_init_session() {
         let provider = NSEProvider::new();
         let result = provider.init_session().await;
         assert!(result.is_ok());
     }
 
+    /// Live NSE option-chain test. Run with: cargo test -p bt-data -- --ignored
     #[tokio::test]
+    #[ignore = "requires live network access to nseindia.com"]
     async fn test_fetch_option_chain() {
         let provider = NSEProvider::new();
         provider.init_session().await.unwrap();
@@ -244,7 +249,9 @@ mod tests {
         assert!(!chain.unwrap().is_empty());
     }
 
+    /// Live NSE index quote test. Run with: cargo test -p bt-data -- --ignored
     #[tokio::test]
+    #[ignore = "requires live network access to nseindia.com"]
     async fn test_fetch_index() {
         let provider = NSEProvider::new();
         provider.init_session().await.unwrap();

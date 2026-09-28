@@ -140,6 +140,9 @@ pub struct GSecData {
     pub yields: Vec<f64>,
 }
 
+/// Sample Indian G-Sec yield curve. Yields near 6.28% are real market data,
+/// not an approximation of TAU.
+#[allow(clippy::approx_constant)]
 pub fn sample_gsec_curve() -> GSecData {
     let tenors = vec![0.25_f64, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0];
     let yields = vec![5.62_f64, 5.78, 6.05, 6.28, 6.42, 6.55, 6.62, 6.71, 6.85, 6.92, 7.05];
@@ -310,6 +313,9 @@ pub struct YieldCurvePoint {
     pub corporate_aa: Vec<f64>,
 }
 
+/// Sample India sovereign yield curve. The 6.28% tenor is real market data,
+/// not an approximation of TAU.
+#[allow(clippy::approx_constant)]
 pub fn sample_yield_india() -> YieldCurvePoint {
     let tenors = vec![0.25_f64, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0];
     let sovereign = vec![5.62_f64, 5.78, 6.05, 6.28, 6.42, 6.55, 6.62, 6.71, 6.85, 6.92, 7.05];
