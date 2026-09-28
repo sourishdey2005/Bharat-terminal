@@ -87,7 +87,9 @@ where
 
     let brick_prices: Vec<f64> = bricks.iter().map(|b| b.0).collect();
     let low = brick_prices.iter().fold(f64::MAX, |a, &b| a.min(b));
-    let high = brick_prices.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+    let high = brick_prices
+        .iter()
+        .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
     let pad = (high - low).max(1.0) * 0.1;
 
     let mut chart = ChartBuilder::on(&root)

@@ -22,18 +22,90 @@ pub struct WorldIndex {
 /// Sample world indices data.
 fn sample_indices() -> Vec<WorldIndex> {
     vec![
-        WorldIndex { name: "S&P 500".to_string(), region: "Americas".to_string(), value: 5650.0, change_pct: 0.45, ytd_pct: 18.2 },
-        WorldIndex { name: "NASDAQ".to_string(), region: "Americas".to_string(), value: 18200.0, change_pct: 0.72, ytd_pct: 20.5 },
-        WorldIndex { name: "Dow Jones".to_string(), region: "Americas".to_string(), value: 41200.0, change_pct: -0.12, ytd_pct: 12.8 },
-        WorldIndex { name: "FTSE 100".to_string(), region: "Europe".to_string(), value: 8250.0, change_pct: 0.18, ytd_pct: 6.4 },
-        WorldIndex { name: "DAX".to_string(), region: "Europe".to_string(), value: 19400.0, change_pct: -0.35, ytd_pct: 14.1 },
-        WorldIndex { name: "CAC 40".to_string(), region: "Europe".to_string(), value: 7950.0, change_pct: 0.08, ytd_pct: 3.2 },
-        WorldIndex { name: "Nikkei 225".to_string(), region: "Asia".to_string(), value: 39100.0, change_pct: 1.15, ytd_pct: 16.7 },
-        WorldIndex { name: "Hang Seng".to_string(), region: "Asia".to_string(), value: 20100.0, change_pct: -0.85, ytd_pct: 8.9 },
-        WorldIndex { name: "Shanghai".to_string(), region: "Asia".to_string(), value: 3250.0, change_pct: 0.22, ytd_pct: 4.5 },
-        WorldIndex { name: "Nifty 50".to_string(), region: "Asia".to_string(), value: 24800.0, change_pct: 0.55, ytd_pct: 13.6 },
-        WorldIndex { name: "Sensex".to_string(), region: "Asia".to_string(), value: 81500.0, change_pct: 0.48, ytd_pct: 11.2 },
-        WorldIndex { name: "ASX 200".to_string(), region: "Oceania".to_string(), value: 8100.0, change_pct: 0.30, ytd_pct: 7.8 },
+        WorldIndex {
+            name: "S&P 500".to_string(),
+            region: "Americas".to_string(),
+            value: 5650.0,
+            change_pct: 0.45,
+            ytd_pct: 18.2,
+        },
+        WorldIndex {
+            name: "NASDAQ".to_string(),
+            region: "Americas".to_string(),
+            value: 18200.0,
+            change_pct: 0.72,
+            ytd_pct: 20.5,
+        },
+        WorldIndex {
+            name: "Dow Jones".to_string(),
+            region: "Americas".to_string(),
+            value: 41200.0,
+            change_pct: -0.12,
+            ytd_pct: 12.8,
+        },
+        WorldIndex {
+            name: "FTSE 100".to_string(),
+            region: "Europe".to_string(),
+            value: 8250.0,
+            change_pct: 0.18,
+            ytd_pct: 6.4,
+        },
+        WorldIndex {
+            name: "DAX".to_string(),
+            region: "Europe".to_string(),
+            value: 19400.0,
+            change_pct: -0.35,
+            ytd_pct: 14.1,
+        },
+        WorldIndex {
+            name: "CAC 40".to_string(),
+            region: "Europe".to_string(),
+            value: 7950.0,
+            change_pct: 0.08,
+            ytd_pct: 3.2,
+        },
+        WorldIndex {
+            name: "Nikkei 225".to_string(),
+            region: "Asia".to_string(),
+            value: 39100.0,
+            change_pct: 1.15,
+            ytd_pct: 16.7,
+        },
+        WorldIndex {
+            name: "Hang Seng".to_string(),
+            region: "Asia".to_string(),
+            value: 20100.0,
+            change_pct: -0.85,
+            ytd_pct: 8.9,
+        },
+        WorldIndex {
+            name: "Shanghai".to_string(),
+            region: "Asia".to_string(),
+            value: 3250.0,
+            change_pct: 0.22,
+            ytd_pct: 4.5,
+        },
+        WorldIndex {
+            name: "Nifty 50".to_string(),
+            region: "Asia".to_string(),
+            value: 24800.0,
+            change_pct: 0.55,
+            ytd_pct: 13.6,
+        },
+        WorldIndex {
+            name: "Sensex".to_string(),
+            region: "Asia".to_string(),
+            value: 81500.0,
+            change_pct: 0.48,
+            ytd_pct: 11.2,
+        },
+        WorldIndex {
+            name: "ASX 200".to_string(),
+            region: "Oceania".to_string(),
+            value: 8100.0,
+            change_pct: 0.30,
+            ytd_pct: 7.8,
+        },
     ]
 }
 
@@ -167,7 +239,10 @@ where
         // Value
         root.draw(&Text::new(
             format!("{:.0}", idx.value),
-            (label_w as i32 + bar_area_w as i32 + 10, (y + bar_h / 2.0) as i32),
+            (
+                label_w as i32 + bar_area_w as i32 + 10,
+                (y + bar_h / 2.0) as i32,
+            ),
             (LABEL_FONT, 11).into_font().color(&cfg.theme.text()),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?;
@@ -176,7 +251,10 @@ where
         let change_str = format!("{:+.2}%", idx.change_pct);
         root.draw(&Text::new(
             change_str,
-            (label_w as i32 + bar_area_w as i32 + 10, (y + bar_h / 2.0 + 14.0) as i32),
+            (
+                label_w as i32 + bar_area_w as i32 + 10,
+                (y + bar_h / 2.0 + 14.0) as i32,
+            ),
             (LABEL_FONT, 10).into_font().color(&color),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?;

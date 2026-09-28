@@ -102,19 +102,16 @@ where
     let (filtered, _) = kalman_filter(&closes, cfg.process_var, cfg.measurement_var);
 
     let all_vals: Vec<f64> = closes.iter().chain(filtered.iter()).copied().collect();
-    let y_lo = all_vals
-        .iter()
-        .cloned()
-        .fold(f64::INFINITY, f64::min);
-    let y_hi = all_vals
-        .iter()
-        .cloned()
-        .fold(f64::NEG_INFINITY, f64::max);
+    let y_lo = all_vals.iter().cloned().fold(f64::INFINITY, f64::min);
+    let y_hi = all_vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
     let pad = (y_hi - y_lo) * 0.05;
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
-            format!("{} (Q={:.4}, Q={:.4})", cfg.title, cfg.process_var, cfg.measurement_var),
+            format!(
+                "{} (Q={:.4}, Q={:.4})",
+                cfg.title, cfg.process_var, cfg.measurement_var
+            ),
             (TITLE_FONT, 20).into_font().color(&cfg.theme.text()),
         )
         .margin(15)
@@ -137,7 +134,10 @@ where
         .collect();
 
     chart
-        .draw_series(LineSeries::new(obs_pts, cfg.theme.text().mix(0.3).stroke_width(1)))
+        .draw_series(LineSeries::new(
+            obs_pts,
+            cfg.theme.text().mix(0.3).stroke_width(1),
+        ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Observed")
         .legend(|(x, y)| {
@@ -154,12 +154,13 @@ where
         .collect();
 
     chart
-        .draw_series(LineSeries::new(filt_pts, cfg.theme.accent().stroke_width(2)))
+        .draw_series(LineSeries::new(
+            filt_pts,
+            cfg.theme.accent().stroke_width(2),
+        ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Filtered")
-        .legend(|(x, y)| {
-            Rectangle::new([(x, y), (x + 10, y + 10)], cfg.theme.accent().filled())
-        });
+        .legend(|(x, y)| Rectangle::new([(x, y), (x + 10, y + 10)], cfg.theme.accent().filled()));
 
     chart
         .configure_series_labels()

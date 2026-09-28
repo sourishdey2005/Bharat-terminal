@@ -29,18 +29,33 @@ impl Default for TermStructureConfig {
 }
 
 impl TermStructureConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn tenors(mut self, t: Vec<f64>) -> Self { self.tenors = t; self }
-    pub fn curves(mut self, c: Vec<(String, Vec<f64>)>) -> Self { self.curves = c; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn tenors(mut self, t: Vec<f64>) -> Self {
+        self.tenors = t;
+        self
+    }
+    pub fn curves(mut self, c: Vec<(String, Vec<f64>)>) -> Self {
+        self.curves = c;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
     root: plotters::drawing::DrawingArea<DB, plotters::coord::Shift>,
     cfg: &TermStructureConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if cfg.curves.is_empty() || cfg.tenors.is_empty() {
         return Err(BtError::EmptySeries("term structure data".into()));
@@ -62,7 +77,10 @@ where DB::ErrorType: 'static,
     let pad = (y_max - y_min).max(0.01) * 0.15;
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(15)
         .x_label_area_size(35)
         .y_label_area_size(60)
@@ -91,10 +109,16 @@ where DB::ErrorType: 'static,
             .draw_series(LineSeries::new(points.clone(), color.stroke_width(2)))
             .map_err(|e| BtError::Render(e.to_string()))?
             .label(label.clone())
-            .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], color.stroke_width(2)));
+            .legend(move |(x, y)| {
+                PathElement::new(vec![(x, y), (x + 20, y)], color.stroke_width(2))
+            });
 
         chart
-            .draw_series(points.iter().map(|&(x, y)| Circle::new((x, y), 3, color.filled())))
+            .draw_series(
+                points
+                    .iter()
+                    .map(|&(x, y)| Circle::new((x, y), 3, color.filled())),
+            )
             .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
@@ -132,7 +156,11 @@ mod tests {
                 ("Current".to_string(), vec![4.5, 4.6, 4.7, 4.8, 4.9, 5.0]),
                 ("Previous".to_string(), vec![4.3, 4.4, 4.5, 4.6, 4.7, 4.8]),
             ]);
-        let path = std::env::temp_dir().join("bt_test_term_structure.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_term_structure.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&cfg, &path).unwrap();
     }
 }

@@ -95,11 +95,17 @@ fn wedge_points(
     let mut pts = Vec::with_capacity(segments * 2 + 2);
     for s in 0..=segments {
         let t = theta0 + (theta1 - theta0) * (s as f64 / segments as f64);
-        pts.push(((cx + r_outer * t.cos()) as i32, (cy + r_outer * t.sin()) as i32));
+        pts.push((
+            (cx + r_outer * t.cos()) as i32,
+            (cy + r_outer * t.sin()) as i32,
+        ));
     }
     for s in (0..=segments).rev() {
         let t = theta0 + (theta1 - theta0) * (s as f64 / segments as f64);
-        pts.push(((cx + r_inner * t.cos()) as i32, (cy + r_inner * t.sin()) as i32));
+        pts.push((
+            (cx + r_inner * t.cos()) as i32,
+            (cy + r_inner * t.sin()) as i32,
+        ));
     }
     pts
 }
@@ -144,11 +150,19 @@ where
             let r_inner = r_min + ring_step * d as f64;
             let r_outer = r_inner + ring_step * 0.92;
             let t = (v / max_abs).clamp(-1.0, 1.0);
-            let target = if t >= 0.0 { cfg.theme.profit() } else { cfg.theme.loss() };
+            let target = if t >= 0.0 {
+                cfg.theme.profit()
+            } else {
+                cfg.theme.loss()
+            };
             let bg = cfg.theme.background();
             let alpha = t.abs();
             let lerp = |a: u8, b: u8| (a as f64 + (b as f64 - a as f64) * alpha).round() as u8;
-            let color = RGBColor(lerp(bg.0, target.0), lerp(bg.1, target.1), lerp(bg.2, target.2));
+            let color = RGBColor(
+                lerp(bg.0, target.0),
+                lerp(bg.1, target.1),
+                lerp(bg.2, target.2),
+            );
 
             let pts = wedge_points(cx, cy, r_inner, r_outer, theta0, theta1, 10);
             root.draw(&Polygon::new(pts, color.filled()))

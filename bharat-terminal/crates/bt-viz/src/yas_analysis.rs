@@ -40,28 +40,62 @@ impl Default for YasAnalysisConfig {
 }
 
 impl YasAnalysisConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn spread_tenor(mut self, t: f64) -> Self { self.spread_tenor = t.max(0.1); self }
-    pub fn show_duration(mut self, s: bool) -> Self { self.show_duration = s; self }
-    pub fn show_convexity(mut self, s: bool) -> Self { self.show_convexity = s; self }
-    pub fn bond_yield(mut self, y: f64) -> Self { self.bond_yield = y; self }
-    pub fn benchmark_yield(mut self, y: f64) -> Self { self.benchmark_yield = y; self }
-    pub fn duration(mut self, d: f64) -> Self { self.duration = d.max(0.0); self }
-    pub fn convexity(mut self, c: f64) -> Self { self.convexity = c.max(0.0); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn spread_tenor(mut self, t: f64) -> Self {
+        self.spread_tenor = t.max(0.1);
+        self
+    }
+    pub fn show_duration(mut self, s: bool) -> Self {
+        self.show_duration = s;
+        self
+    }
+    pub fn show_convexity(mut self, s: bool) -> Self {
+        self.show_convexity = s;
+        self
+    }
+    pub fn bond_yield(mut self, y: f64) -> Self {
+        self.bond_yield = y;
+        self
+    }
+    pub fn benchmark_yield(mut self, y: f64) -> Self {
+        self.benchmark_yield = y;
+        self
+    }
+    pub fn duration(mut self, d: f64) -> Self {
+        self.duration = d.max(0.0);
+        self
+    }
+    pub fn convexity(mut self, c: f64) -> Self {
+        self.convexity = c.max(0.0);
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
     root: plotters::drawing::DrawingArea<DB, plotters::coord::Shift>,
     cfg: &YasAnalysisConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     fill_background(&root, cfg.theme)?;
 
     let spread = cfg.bond_yield - cfg.benchmark_yield;
-    let spread_color = if spread >= 0.0 { cfg.theme.profit() } else { cfg.theme.loss() };
+    let spread_color = if spread >= 0.0 {
+        cfg.theme.profit()
+    } else {
+        cfg.theme.loss()
+    };
 
     let (title_area, body_area) = root.split_vertically(50);
     title_area
@@ -166,7 +200,11 @@ mod tests {
     #[test]
     fn renders() {
         let cfg = YasAnalysisConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_yas_analysis.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_yas_analysis.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&cfg, &path).unwrap();
     }
 }

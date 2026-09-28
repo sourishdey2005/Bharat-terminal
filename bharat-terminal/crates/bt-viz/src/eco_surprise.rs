@@ -21,7 +21,12 @@ pub struct EcoDataPoint {
 impl EcoDataPoint {
     pub fn new(period: impl Into<String>, actual: f64, forecast: f64) -> Self {
         let surprise = actual - forecast;
-        Self { period: period.into(), actual, forecast, surprise }
+        Self {
+            period: period.into(),
+            actual,
+            forecast,
+            surprise,
+        }
     }
 }
 
@@ -43,10 +48,21 @@ impl Default for EcoSurpriseConfig {
 }
 
 impl EcoSurpriseConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn show_forecast(mut self, s: bool) -> Self { self.show_forecast = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn show_forecast(mut self, s: bool) -> Self {
+        self.show_forecast = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -54,15 +70,22 @@ fn render<DB: DrawingBackend>(
     data: &[EcoDataPoint],
     cfg: &EcoSurpriseConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if data.is_empty() {
         return Err(BtError::EmptySeries("economic data".into()));
     }
     fill_background(&root, cfg.theme)?;
 
-    let s_min = data.iter().map(|d| d.surprise).fold(f64::INFINITY, f64::min);
-    let s_max = data.iter().map(|d| d.surprise).fold(f64::NEG_INFINITY, f64::max);
+    let s_min = data
+        .iter()
+        .map(|d| d.surprise)
+        .fold(f64::INFINITY, f64::min);
+    let s_max = data
+        .iter()
+        .map(|d| d.surprise)
+        .fold(f64::NEG_INFINITY, f64::max);
     let pad = (s_max - s_min).max(0.1) * 0.1;
 
     let mut chart = ChartBuilder::on(&root)
@@ -95,8 +118,15 @@ where DB::ErrorType: 'static,
 
     chart
         .draw_series(data.iter().enumerate().map(|(i, d)| {
-            let color = if d.surprise >= 0.0 { cfg.theme.profit() } else { cfg.theme.loss() };
-            Rectangle::new([(i, 0.0_f64.max(s_min - pad)), (i + 1, d.surprise)], color.filled())
+            let color = if d.surprise >= 0.0 {
+                cfg.theme.profit()
+            } else {
+                cfg.theme.loss()
+            };
+            Rectangle::new(
+                [(i, 0.0_f64.max(s_min - pad)), (i + 1, d.surprise)],
+                color.filled(),
+            )
         }))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
@@ -109,7 +139,10 @@ where DB::ErrorType: 'static,
             .map_err(|e| BtError::Render(e.to_string()))?
             .label("Forecast")
             .legend(|(x, y)| {
-                PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().mix(0.5).stroke_width(1))
+                PathElement::new(
+                    vec![(x, y), (x + 20, y)],
+                    cfg.theme.info().mix(0.5).stroke_width(1),
+                )
             });
 
         chart
@@ -141,10 +174,20 @@ mod tests {
     #[test]
     fn renders() {
         let data: Vec<EcoDataPoint> = (0..10)
-            .map(|i| EcoDataPoint::new(format!("M{}", i + 1), 5.0 + (i as f64 * 0.3), 5.0 + (i as f64 * 0.2)))
+            .map(|i| {
+                EcoDataPoint::new(
+                    format!("M{}", i + 1),
+                    5.0 + (i as f64 * 0.3),
+                    5.0 + (i as f64 * 0.2),
+                )
+            })
             .collect();
         let cfg = EcoSurpriseConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_eco_surprise.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_eco_surprise.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&data, &cfg, &path).unwrap();
     }
 }

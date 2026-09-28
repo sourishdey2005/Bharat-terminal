@@ -28,10 +28,21 @@ impl Default for RollingMaxDdConfig {
 }
 
 impl RollingMaxDdConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn window(mut self, w: usize) -> Self { self.window = w; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn window(mut self, w: usize) -> Self {
+        self.window = w;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -39,7 +50,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &RollingMaxDdConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -53,7 +65,10 @@ where DB::ErrorType: 'static,
     let n = rdd.len() as f64;
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(15)
         .x_label_area_size(35)
         .y_label_area_size(60)
@@ -77,11 +92,10 @@ where DB::ErrorType: 'static,
         .collect();
 
     chart
-        .draw_series(AreaSeries::new(
-            points.clone(),
-            0.0,
-            cfg.theme.loss().mix(0.35),
-        ).border_style(cfg.theme.loss().stroke_width(2)))
+        .draw_series(
+            AreaSeries::new(points.clone(), 0.0, cfg.theme.loss().mix(0.35))
+                .border_style(cfg.theme.loss().stroke_width(2)),
+        )
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     draw_footer(&root, cfg.theme)?;
@@ -106,7 +120,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = RollingMaxDdConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_rolling_max_dd.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_rolling_max_dd.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

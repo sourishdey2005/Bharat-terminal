@@ -134,10 +134,7 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Upper")
         .legend(|(x, y)| {
-            PathElement::new(
-                vec![(x, y), (x + 20, y)],
-                cfg.theme.info().stroke_width(1),
-            )
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(1))
         });
 
     chart
@@ -154,10 +151,7 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Lower")
         .legend(|(x, y)| {
-            PathElement::new(
-                vec![(x, y), (x + 20, y)],
-                cfg.theme.info().stroke_width(1),
-            )
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(1))
         });
 
     chart

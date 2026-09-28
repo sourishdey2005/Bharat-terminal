@@ -13,7 +13,8 @@ use crate::palette::Theme;
 pub fn pseudo_observations(a: &[f64], b: &[f64]) -> Vec<(f64, f64)> {
     fn rank_uniform(data: &[f64]) -> Vec<f64> {
         let n = data.len();
-        let mut indexed: Vec<(usize, f64)> = data.iter().enumerate().map(|(i, &v)| (i, v)).collect();
+        let mut indexed: Vec<(usize, f64)> =
+            data.iter().enumerate().map(|(i, &v)| (i, v)).collect();
         indexed.sort_by(|x, y| x.1.partial_cmp(&y.1).unwrap_or(std::cmp::Ordering::Equal));
         let mut ranks = vec![0.0; n];
         for (rank, (orig_idx, _)) in indexed.iter().enumerate() {
@@ -95,7 +96,10 @@ where
     root.draw(&PathElement::new(
         vec![
             (side_pad as i32, (top_pad as f64 + plot_h) as i32),
-            ((side_pad as f64 + plot_w) as i32, (top_pad as f64 + plot_h) as i32),
+            (
+                (side_pad as f64 + plot_w) as i32,
+                (top_pad as f64 + plot_h) as i32,
+            ),
         ],
         cfg.theme.border().stroke_width(1),
     ))
@@ -113,7 +117,10 @@ where
     // Axis labels
     root.draw(&Text::new(
         "Series A (uniform)",
-        (side_pad as i32 + 40, (top_pad as f64 + plot_h + 20.0) as i32),
+        (
+            side_pad as i32 + 40,
+            (top_pad as f64 + plot_h + 20.0) as i32,
+        ),
         (LABEL_FONT, 12).into_font().color(&cfg.theme.text()),
     ))
     .map_err(|e| BtError::Render(e.to_string()))?;
@@ -152,12 +159,8 @@ where
             cfg.theme.text().mix(0.4)
         };
 
-        root.draw(&Circle::new(
-            (x as i32, y as i32),
-            3,
-            color.filled(),
-        ))
-        .map_err(|e| BtError::Render(e.to_string()))?;
+        root.draw(&Circle::new((x as i32, y as i32), 3, color.filled()))
+            .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
     // Legend

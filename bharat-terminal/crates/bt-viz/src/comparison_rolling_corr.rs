@@ -28,10 +28,21 @@ impl Default for ComparisonRollingCorrConfig {
 }
 
 impl ComparisonRollingCorrConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, title: impl Into<String>) -> Self { self.title = title.into(); self }
-    pub fn theme(mut self, theme: Theme) -> Self { self.theme = theme; self }
-    pub fn window(mut self, v: usize) -> Self { self.window = v.max(2); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
+        self
+    }
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
+    pub fn window(mut self, v: usize) -> Self {
+        self.window = v.max(2);
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -57,7 +68,10 @@ where
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
-            format!("{} — {} vs {} (window={})", cfg.title, series_a.symbol, series_b.symbol, cfg.window),
+            format!(
+                "{} — {} vs {} (window={})",
+                cfg.title, series_a.symbol, series_b.symbol, cfg.window
+            ),
             (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
         )
         .margin(10)
@@ -83,7 +97,13 @@ where
 
     chart
         .draw_series(LineSeries::new(
-            (0..n).filter_map(|i| if !rc[i].is_nan() { Some((i as f64, rc[i])) } else { None }),
+            (0..n).filter_map(|i| {
+                if !rc[i].is_nan() {
+                    Some((i as f64, rc[i]))
+                } else {
+                    None
+                }
+            }),
             cfg.theme.info().stroke_width(2),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?;
@@ -93,11 +113,21 @@ where
     Ok(())
 }
 
-pub fn render_png(series_a: &OhlcvSeries, series_b: &OhlcvSeries, cfg: &ComparisonRollingCorrConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    series_a: &OhlcvSeries,
+    series_b: &OhlcvSeries,
+    cfg: &ComparisonRollingCorrConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, series_a, series_b, cfg)
 }
 
-pub fn render_svg(series_a: &OhlcvSeries, series_b: &OhlcvSeries, cfg: &ComparisonRollingCorrConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    series_a: &OhlcvSeries,
+    series_b: &OhlcvSeries,
+    cfg: &ComparisonRollingCorrConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, series_a, series_b, cfg)
 }
 
@@ -111,7 +141,11 @@ mod tests {
         let a = synthetic_ohlcv("AAA", 100, 1, 100.0);
         let b = synthetic_ohlcv("BBB", 100, 2, 100.0);
         let cfg = ComparisonRollingCorrConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_comparison_rolling_corr.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_comparison_rolling_corr.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&a, &b, &cfg, &path).unwrap();
     }
 }

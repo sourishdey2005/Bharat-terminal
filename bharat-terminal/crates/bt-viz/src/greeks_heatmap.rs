@@ -33,20 +33,41 @@ impl Default for GreeksHeatmapConfig {
 }
 
 impl GreeksHeatmapConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn strikes(mut self, s: Vec<f64>) -> Self { self.strikes = s; self }
-    pub fn expiries(mut self, e: Vec<f64>) -> Self { self.expiries = e; self }
-    pub fn greek_name(mut self, n: impl Into<String>) -> Self { self.greek_name = n.into(); self }
-    pub fn values(mut self, v: Vec<Vec<f64>>) -> Self { self.values = v; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn strikes(mut self, s: Vec<f64>) -> Self {
+        self.strikes = s;
+        self
+    }
+    pub fn expiries(mut self, e: Vec<f64>) -> Self {
+        self.expiries = e;
+        self
+    }
+    pub fn greek_name(mut self, n: impl Into<String>) -> Self {
+        self.greek_name = n.into();
+        self
+    }
+    pub fn values(mut self, v: Vec<Vec<f64>>) -> Self {
+        self.values = v;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
     root: plotters::drawing::DrawingArea<DB, plotters::coord::Shift>,
     cfg: &GreeksHeatmapConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if cfg.values.is_empty() || cfg.strikes.is_empty() || cfg.expiries.is_empty() {
         return Err(BtError::EmptySeries("greeks heatmap data".into()));
@@ -67,7 +88,10 @@ where DB::ErrorType: 'static,
         .fold(f64::MIN, f64::max);
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(15)
         .x_label_area_size(35)
         .y_label_area_size(60)
@@ -81,10 +105,16 @@ where DB::ErrorType: 'static,
         .x_labels(n_strikes)
         .y_labels(n_expiries)
         .x_label_formatter(&|idx| {
-            cfg.strikes.get(*idx).map(|v| format!("{:.0}", v)).unwrap_or_default()
+            cfg.strikes
+                .get(*idx)
+                .map(|v| format!("{:.0}", v))
+                .unwrap_or_default()
         })
         .y_label_formatter(&|idx| {
-            cfg.expiries.get(*idx).map(|v| format!("{:.2}", v)).unwrap_or_default()
+            cfg.expiries
+                .get(*idx)
+                .map(|v| format!("{:.2}", v))
+                .unwrap_or_default()
         })
         .draw()
         .map_err(|e| BtError::Render(e.to_string()))?;
@@ -157,7 +187,11 @@ mod tests {
                 vec![0.5, 0.5, 0.5],
                 vec![0.2, 0.3, 0.4],
             ]);
-        let path = std::env::temp_dir().join("bt_test_greeks_heatmap.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_greeks_heatmap.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&cfg, &path).unwrap();
     }
 }

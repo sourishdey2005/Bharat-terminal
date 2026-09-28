@@ -19,15 +19,30 @@ pub struct Copula3DConfig {
 
 impl Default for Copula3DConfig {
     fn default() -> Self {
-        Self { title: "3D Copula Surface".to_string(), theme: Theme::Dark, rho: 0.6 }
+        Self {
+            title: "3D Copula Surface".to_string(),
+            theme: Theme::Dark,
+            rho: 0.6,
+        }
     }
 }
 
 impl Copula3DConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn rho(mut self, v: f64) -> Self { self.rho = v.clamp(-0.95, 0.95); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn rho(mut self, v: f64) -> Self {
+        self.rho = v.clamp(-0.95, 0.95);
+        self
+    }
 }
 
 fn project(x: f64, y: f64, z: f64, cx: f64, cy: f64) -> (i32, i32) {
@@ -47,10 +62,35 @@ fn shade(c: RGBAColor, f: f64) -> RGBColor {
 
 fn norm_inv(p: f64) -> f64 {
     let p = p.clamp(1e-9, 1.0 - 1e-9);
-    let a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
-    let b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
-    let c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
-    let d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+    let a = [
+        -3.969683028665376e+01,
+        2.209460984245205e+02,
+        -2.759285104469687e+02,
+        1.383577518672690e+02,
+        -3.066479806614716e+01,
+        2.506628277459239e+00,
+    ];
+    let b = [
+        -5.447609879822406e+01,
+        1.615858368580409e+02,
+        -1.556989798598866e+02,
+        6.680131188771972e+01,
+        -1.328068155288572e+01,
+    ];
+    let c = [
+        -7.784894002430293e-03,
+        -3.223964580411365e-01,
+        -2.400758277161838e+00,
+        -2.549732539343734e+00,
+        4.374664141464968e+00,
+        2.938163982698783e+00,
+    ];
+    let d = [
+        7.784695709041462e-03,
+        3.224671290700398e-01,
+        2.445134137142996e+00,
+        3.754408661907416e+00,
+    ];
     let plow = 0.02425;
     let phigh = 1.0 - plow;
     if p < plow {
@@ -82,7 +122,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &Copula3DConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -123,7 +164,11 @@ where DB::ErrorType: 'static,
         vals.push(vrow);
     }
 
-    let max_d = vals.iter().flat_map(|r| r.iter().copied()).fold(0.0_f64, f64::max).max(1e-9);
+    let max_d = vals
+        .iter()
+        .flat_map(|r| r.iter().copied())
+        .fold(0.0_f64, f64::max)
+        .max(1e-9);
 
     for j in (0..n.saturating_sub(1)).rev() {
         for i in (0..n.saturating_sub(1)).rev() {
@@ -137,7 +182,12 @@ where DB::ErrorType: 'static,
                 cfg.theme.info().mix(0.7)
             };
             let depth_f = 0.4 + 0.6 * (j as f64 / n as f64);
-            let pts = vec![grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]];
+            let pts = vec![
+                grid[j][i],
+                grid[j][i + 1],
+                grid[j + 1][i + 1],
+                grid[j + 1][i],
+            ];
             root.draw(&Polygon::new(pts, shade(color, depth_f).filled()))
                 .map_err(|e| BtError::Render(e.to_string()))?;
         }
@@ -157,7 +207,9 @@ where DB::ErrorType: 'static,
     root.draw(&Text::new(
         "X: u  Y: density  Z: v — tail dependence visible at corners",
         (w as i32 / 2 - 170, h as i32 - 40),
-        (LABEL_FONT, 11).into_font().color(&cfg.theme.text().mix(0.6)),
+        (LABEL_FONT, 11)
+            .into_font()
+            .color(&cfg.theme.text().mix(0.6)),
     ))
     .map_err(|e| BtError::Render(e.to_string()))?;
 
@@ -183,7 +235,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = Copula3DConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_3d_copula.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_3d_copula.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

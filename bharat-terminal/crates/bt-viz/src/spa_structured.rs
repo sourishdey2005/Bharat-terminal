@@ -19,7 +19,11 @@ pub struct CashFlow {
 
 impl CashFlow {
     pub fn new(time: f64, amount: f64, flow_type: impl Into<String>) -> Self {
-        Self { time, amount, flow_type: flow_type.into() }
+        Self {
+            time,
+            amount,
+            flow_type: flow_type.into(),
+        }
     }
 }
 
@@ -45,12 +49,29 @@ impl Default for SpaStructuredConfig {
 }
 
 impl SpaStructuredConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn notional(mut self, n: f64) -> Self { self.notional = n.max(0.0); self }
-    pub fn coupon_rate(mut self, r: f64) -> Self { self.coupon_rate = r.max(0.0); self }
-    pub fn maturity(mut self, m: f64) -> Self { self.maturity = m.max(0.1); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn notional(mut self, n: f64) -> Self {
+        self.notional = n.max(0.0);
+        self
+    }
+    pub fn coupon_rate(mut self, r: f64) -> Self {
+        self.coupon_rate = r.max(0.0);
+        self
+    }
+    pub fn maturity(mut self, m: f64) -> Self {
+        self.maturity = m.max(0.1);
+        self
+    }
 }
 
 fn generate_cash_flows(cfg: &SpaStructuredConfig) -> Vec<CashFlow> {
@@ -68,7 +89,8 @@ fn render<DB: DrawingBackend>(
     root: plotters::drawing::DrawingArea<DB, plotters::coord::Shift>,
     cfg: &SpaStructuredConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     fill_background(&root, cfg.theme)?;
 
@@ -139,7 +161,11 @@ mod tests {
     #[test]
     fn renders() {
         let cfg = SpaStructuredConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_spa_structured.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_spa_structured.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&cfg, &path).unwrap();
     }
 }

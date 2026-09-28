@@ -66,14 +66,54 @@ pub struct SectorMomentum {
 
 fn sample_sectors() -> Vec<SectorMomentum> {
     vec![
-        SectorMomentum { name: "IT".to_string(), momentum: 2.1, relative_strength: 1.08, rank: 1 },
-        SectorMomentum { name: "Banking".to_string(), momentum: 1.5, relative_strength: 1.03, rank: 2 },
-        SectorMomentum { name: "Auto".to_string(), momentum: 1.2, relative_strength: 1.01, rank: 3 },
-        SectorMomentum { name: "Metals".to_string(), momentum: 0.8, relative_strength: 0.99, rank: 4 },
-        SectorMomentum { name: "FMCG".to_string(), momentum: 0.3, relative_strength: 0.97, rank: 5 },
-        SectorMomentum { name: "Pharma".to_string(), momentum: -0.2, relative_strength: 0.95, rank: 6 },
-        SectorMomentum { name: "Oil & Gas".to_string(), momentum: -0.5, relative_strength: 0.93, rank: 7 },
-        SectorMomentum { name: "Realty".to_string(), momentum: -1.1, relative_strength: 0.90, rank: 8 },
+        SectorMomentum {
+            name: "IT".to_string(),
+            momentum: 2.1,
+            relative_strength: 1.08,
+            rank: 1,
+        },
+        SectorMomentum {
+            name: "Banking".to_string(),
+            momentum: 1.5,
+            relative_strength: 1.03,
+            rank: 2,
+        },
+        SectorMomentum {
+            name: "Auto".to_string(),
+            momentum: 1.2,
+            relative_strength: 1.01,
+            rank: 3,
+        },
+        SectorMomentum {
+            name: "Metals".to_string(),
+            momentum: 0.8,
+            relative_strength: 0.99,
+            rank: 4,
+        },
+        SectorMomentum {
+            name: "FMCG".to_string(),
+            momentum: 0.3,
+            relative_strength: 0.97,
+            rank: 5,
+        },
+        SectorMomentum {
+            name: "Pharma".to_string(),
+            momentum: -0.2,
+            relative_strength: 0.95,
+            rank: 6,
+        },
+        SectorMomentum {
+            name: "Oil & Gas".to_string(),
+            momentum: -0.5,
+            relative_strength: 0.93,
+            rank: 7,
+        },
+        SectorMomentum {
+            name: "Realty".to_string(),
+            momentum: -1.1,
+            relative_strength: 0.90,
+            rank: 8,
+        },
     ]
 }
 
@@ -263,11 +303,19 @@ where
     Ok(())
 }
 
-pub fn render_png(sectors: &[SectorMomentum], cfg: &SectorRotationConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    sectors: &[SectorMomentum],
+    cfg: &SectorRotationConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, sectors, cfg)
 }
 
-pub fn render_svg(sectors: &[SectorMomentum], cfg: &SectorRotationConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    sectors: &[SectorMomentum],
+    cfg: &SectorRotationConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, sectors, cfg)
 }
 

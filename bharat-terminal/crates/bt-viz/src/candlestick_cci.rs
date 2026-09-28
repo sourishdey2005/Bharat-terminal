@@ -64,14 +64,30 @@ where
 
     let t_min = series.candles.first().unwrap().t;
     let t_max = series.candles.last().unwrap().t;
-    let low = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
-    let high = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
+    let low = series
+        .candles
+        .iter()
+        .map(|c| c.low)
+        .fold(f64::MAX, f64::min);
+    let high = series
+        .candles
+        .iter()
+        .map(|c| c.high)
+        .fold(f64::MIN, f64::max);
     let pad = (high - low) * 0.05;
 
     let cci_vals = cci(series, cfg.period);
 
-    let cci_min = cci_vals.iter().filter(|v| !v.is_nan()).copied().fold(f64::MAX, f64::min);
-    let cci_max = cci_vals.iter().filter(|v| !v.is_nan()).copied().fold(f64::MIN, f64::max);
+    let cci_min = cci_vals
+        .iter()
+        .filter(|v| !v.is_nan())
+        .copied()
+        .fold(f64::MAX, f64::min);
+    let cci_max = cci_vals
+        .iter()
+        .filter(|v| !v.is_nan())
+        .copied()
+        .fold(f64::MIN, f64::max);
     let cci_range = (cci_max - cci_min).max(1.0);
 
     let mut chart = ChartBuilder::on(&top)
@@ -103,8 +119,14 @@ where
                 cfg.theme.loss()
             };
             CandleStick::new(
-                c.t, c.open, c.high, c.low, c.close,
-                color.filled(), color.filled(), (candle_width * 10.0) as u32,
+                c.t,
+                c.open,
+                c.high,
+                c.low,
+                c.close,
+                color.filled(),
+                color.filled(),
+                (candle_width * 10.0) as u32,
             )
         }))
         .map_err(|e| BtError::Render(e.to_string()))?;
@@ -117,7 +139,10 @@ where
         .margin(10)
         .x_label_area_size(30)
         .y_label_area_size(50)
-        .build_cartesian_2d(t_min..t_max, (cci_min - cci_range * 0.1)..(cci_max + cci_range * 0.1))
+        .build_cartesian_2d(
+            t_min..t_max,
+            (cci_min - cci_range * 0.1)..(cci_max + cci_range * 0.1),
+        )
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     cci_chart
@@ -152,7 +177,11 @@ where
     cci_chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !cci_vals[i].is_nan() { Some((c.t, cci_vals[i])) } else { None }
+                if !cci_vals[i].is_nan() {
+                    Some((c.t, cci_vals[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.info().stroke_width(2),
         ))
@@ -180,7 +209,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = CandlestickCciConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_candlestick_cci.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_candlestick_cci.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

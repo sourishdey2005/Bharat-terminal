@@ -13,35 +13,27 @@ use crate::palette::Theme;
 #[derive(Debug, Clone)]
 pub struct FlowPoint {
     pub date: String,
-    pub fii: f64,  // crores, +ve = buying
-    pub dii: f64,  // crores, +ve = buying
+    pub fii: f64, // crores, +ve = buying
+    pub dii: f64, // crores, +ve = buying
 }
 
 /// Sample FII/DII flow data (30 days).
 fn sample_flow() -> Vec<FlowPoint> {
     let dates = [
-        "01 Sep", "02 Sep", "03 Sep", "04 Sep", "05 Sep",
-        "08 Sep", "09 Sep", "10 Sep", "11 Sep", "12 Sep",
-        "15 Sep", "16 Sep", "17 Sep", "18 Sep", "19 Sep",
-        "22 Sep", "23 Sep", "24 Sep", "25 Sep", "26 Sep",
-        "29 Sep", "30 Sep", "01 Oct", "02 Oct", "03 Oct",
-        "06 Oct", "07 Oct", "08 Oct", "09 Oct", "10 Oct",
+        "01 Sep", "02 Sep", "03 Sep", "04 Sep", "05 Sep", "08 Sep", "09 Sep", "10 Sep", "11 Sep",
+        "12 Sep", "15 Sep", "16 Sep", "17 Sep", "18 Sep", "19 Sep", "22 Sep", "23 Sep", "24 Sep",
+        "25 Sep", "26 Sep", "29 Sep", "30 Sep", "01 Oct", "02 Oct", "03 Oct", "06 Oct", "07 Oct",
+        "08 Oct", "09 Oct", "10 Oct",
     ];
     let fii_vals = [
-        -1250.0, -890.0, 450.0, 1200.0, -340.0,
-        -2100.0, -1500.0, 800.0, 1600.0, 950.0,
-        -670.0, -1100.0, 300.0, 780.0, 1450.0,
-        -450.0, -920.0, 1100.0, 1800.0, 650.0,
-        -1300.0, -780.0, 500.0, 900.0, 1300.0,
-        -550.0, -1000.0, 700.0, 1150.0, 850.0,
+        -1250.0, -890.0, 450.0, 1200.0, -340.0, -2100.0, -1500.0, 800.0, 1600.0, 950.0, -670.0,
+        -1100.0, 300.0, 780.0, 1450.0, -450.0, -920.0, 1100.0, 1800.0, 650.0, -1300.0, -780.0,
+        500.0, 900.0, 1300.0, -550.0, -1000.0, 700.0, 1150.0, 850.0,
     ];
     let dii_vals = [
-        800.0, 650.0, -200.0, -500.0, 300.0,
-        1200.0, 900.0, -400.0, -700.0, -350.0,
-        500.0, 750.0, -150.0, -400.0, -600.0,
-        350.0, 600.0, -500.0, -800.0, -300.0,
-        850.0, 500.0, -250.0, -450.0, -600.0,
-        400.0, 650.0, -350.0, -550.0, -400.0,
+        800.0, 650.0, -200.0, -500.0, 300.0, 1200.0, 900.0, -400.0, -700.0, -350.0, 500.0, 750.0,
+        -150.0, -400.0, -600.0, 350.0, 600.0, -500.0, -800.0, -300.0, 850.0, 500.0, -250.0, -450.0,
+        -600.0, 400.0, 650.0, -350.0, -550.0, -400.0,
     ];
     dates
         .iter()
@@ -145,16 +137,11 @@ where
             } else {
                 cfg.theme.loss().mix(0.7).filled()
             };
-            Rectangle::new(
-                [(x - bar_w, 0.0), (x, p.fii)],
-                color,
-            )
+            Rectangle::new([(x - bar_w, 0.0), (x, p.fii)], color)
         }))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("FII")
-        .legend(|(x, y)| {
-            Rectangle::new([(x, y), (x + 10, y + 10)], cfg.theme.profit().filled())
-        });
+        .legend(|(x, y)| Rectangle::new([(x, y), (x + 10, y + 10)], cfg.theme.profit().filled()));
 
     // DII bars
     chart
@@ -165,16 +152,11 @@ where
             } else {
                 cfg.theme.accent().mix(0.7).filled()
             };
-            Rectangle::new(
-                [(x, 0.0), (x + bar_w, p.dii)],
-                color,
-            )
+            Rectangle::new([(x, 0.0), (x + bar_w, p.dii)], color)
         }))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("DII")
-        .legend(|(x, y)| {
-            Rectangle::new([(x, y), (x + 10, y + 10)], cfg.theme.info().filled())
-        });
+        .legend(|(x, y)| Rectangle::new([(x, y), (x + 10, y + 10)], cfg.theme.info().filled()));
 
     chart
         .configure_series_labels()

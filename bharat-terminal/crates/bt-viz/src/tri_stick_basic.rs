@@ -99,11 +99,7 @@ where
 
         chart
             .draw_series(std::iter::once(PathElement::new(
-                vec![
-                    (base_x, c.open),
-                    (apex_x, c.close),
-                    (base_x, c.close),
-                ],
+                vec![(base_x, c.open), (apex_x, c.close), (base_x, c.close)],
                 color.filled(),
             )))
             .map_err(|e| BtError::Render(e.to_string()))?;

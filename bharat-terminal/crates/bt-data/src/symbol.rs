@@ -130,7 +130,6 @@ pub const COMPANY_LIST: &[(&str, &str, &str)] = &[
     ("BHEL", "BHEL.NS", "NSE"),
     ("Can Fin Homes", "CANFINHOME.NS", "NSE"),
     ("Cholamandalam Investment", "CHOLAFIN.NS", "NSE"),
-
     ("L&T Technology Services", "LTTS.NS", "NSE"),
     ("Mphasis", "MPHASIS.NS", "NSE"),
     ("Coforge", "COFORGE.NS", "NSE"),
@@ -173,8 +172,6 @@ pub const COMPANY_LIST: &[(&str, &str, &str)] = &[
     ("Apollo Hospitals", "APOLLOHOSP.NS", "NSE"),
     ("Ashok Leyland", "ASHOKLEY.NS", "NSE"),
     ("Balkrishna Industries", "BALKRISIND.NS", "NSE"),
-
-
     // US — Mega Cap Tech
     ("Apple", "AAPL", "NASDAQ"),
     ("Microsoft", "MSFT", "NASDAQ"),
@@ -227,7 +224,6 @@ pub const COMPANY_LIST: &[(&str, &str, &str)] = &[
     ("Fiserv", "FI", "NASDAQ"),
     ("Global Payments", "GPN", "NYSE"),
     ("Fidelity National Information", "FIS", "NYSE"),
-
     // US — Blue Chip & Finance
     ("JPMorgan Chase", "JPM", "NYSE"),
     ("Berkshire Hathaway", "BRK-B", "NYSE"),
@@ -262,7 +258,6 @@ pub const COMPANY_LIST: &[(&str, &str, &str)] = &[
     ("PepsiCo", "PEP", "NASDAQ"),
     ("Boeing", "BA", "NYSE"),
     ("Lockheed Martin", "LMT", "NYSE"),
-
     // Crypto (Coinbase / Yahoo)
     ("Bitcoin", "BTC-USD", "Crypto"),
     ("Ethereum", "ETH-USD", "Crypto"),
@@ -286,7 +281,6 @@ pub const COMPANY_LIST: &[(&str, &str, &str)] = &[
     ("Shiba Inu", "SHIB-USD", "Crypto"),
     ("Aave", "AAVE-USD", "Crypto"),
     ("Compound", "COMP-USD", "Crypto"),
-
     // Major Indices
     ("Nifty 50", "^NSEI", "Index"),
     ("Sensex", "^BSESN", "Index"),
@@ -298,7 +292,6 @@ pub const COMPANY_LIST: &[(&str, &str, &str)] = &[
     ("US 10Y Treasury", "^TNX", "Index"),
     ("US Dollar Index", "DX-Y.NYB", "Index"),
     ("FTSE 100", "^FTSE", "Index"),
-
     // Commodities
     ("Gold", "GC=F", "Commodity"),
     ("Crude Oil WTI", "CL=F", "Commodity"),
@@ -318,8 +311,7 @@ pub const COMPANY_LIST: &[(&str, &str, &str)] = &[
 /// Falls back to returning the input as-is if not found.
 pub fn resolve(name_or_ticker: &str) -> String {
     for (name, ticker, _) in COMPANY_LIST {
-        if name.eq_ignore_ascii_case(name_or_ticker)
-            || ticker.eq_ignore_ascii_case(name_or_ticker)
+        if name.eq_ignore_ascii_case(name_or_ticker) || ticker.eq_ignore_ascii_case(name_or_ticker)
         {
             return ticker.to_string();
         }
@@ -349,10 +341,7 @@ pub fn exchange(ticker: &str) -> &str {
 
 /// Get all unique exchanges.
 pub fn all_exchanges() -> Vec<&'static str> {
-    let mut exchanges: Vec<&'static str> = COMPANY_LIST
-        .iter()
-        .map(|(_, _, ex)| *ex)
-        .collect();
+    let mut exchanges: Vec<&'static str> = COMPANY_LIST.iter().map(|(_, _, ex)| *ex).collect();
     exchanges.sort();
     exchanges.dedup();
     exchanges
@@ -384,7 +373,13 @@ pub const DEFAULT_COMPANY: (&str, &str, &str) = ("Reliance Industries", "RELIANC
 
 /// Application metadata constants.
 pub fn app_info() -> String {
-    format!("{} v{} — Made by {}. {}", APP_NAME, env!("CARGO_PKG_VERSION"), AUTHOR, TAGLINE)
+    format!(
+        "{} v{} — Made by {}. {}",
+        APP_NAME,
+        env!("CARGO_PKG_VERSION"),
+        AUTHOR,
+        TAGLINE
+    )
 }
 
 #[cfg(test)]

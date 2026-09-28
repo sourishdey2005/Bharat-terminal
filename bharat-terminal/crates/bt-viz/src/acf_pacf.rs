@@ -1,4 +1,4 @@
-﻿//! Tier 4 #24 â€” Autocorrelation (ACF/PACF) lollipop chart with confidence
+//! Tier 4 #24 â€” Autocorrelation (ACF/PACF) lollipop chart with confidence
 //! bands. Made by Sourish Dey.
 
 use bt_core::{BtError, Result};
@@ -132,7 +132,11 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     for (lag, &v) in values.iter().enumerate() {
-        let color = if v.abs() > conf { theme.accent() } else { theme.text() };
+        let color = if v.abs() > conf {
+            theme.accent()
+        } else {
+            theme.text()
+        };
         chart
             .draw_series(std::iter::once(PathElement::new(
                 vec![(lag as f64, 0.0), (lag as f64, v)],
@@ -140,7 +144,11 @@ where
             )))
             .map_err(|e| BtError::Render(e.to_string()))?;
         chart
-            .draw_series(std::iter::once(Circle::new((lag as f64, v), 4, color.filled())))
+            .draw_series(std::iter::once(Circle::new(
+                (lag as f64, v),
+                4,
+                color.filled(),
+            )))
             .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
@@ -169,8 +177,20 @@ where
     let conf = 1.96 / (series.len() as f64).sqrt();
 
     let (top, bottom) = root.split_vertically((50).percent());
-    draw_lollipop_panel(&top, &format!("{} â€” ACF", cfg.title), &acf_vals, conf, cfg.theme)?;
-    draw_lollipop_panel(&bottom, &format!("{} â€” PACF", cfg.title), &pacf_vals, conf, cfg.theme)?;
+    draw_lollipop_panel(
+        &top,
+        &format!("{} â€” ACF", cfg.title),
+        &acf_vals,
+        conf,
+        cfg.theme,
+    )?;
+    draw_lollipop_panel(
+        &bottom,
+        &format!("{} â€” PACF", cfg.title),
+        &pacf_vals,
+        conf,
+        cfg.theme,
+    )?;
 
     draw_footer(&root, cfg.theme)?;
     root.present().map_err(|e| BtError::Render(e.to_string()))?;

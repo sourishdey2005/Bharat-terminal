@@ -1,4 +1,4 @@
-﻿// crates/bt-viz/src/volume_profile.rs
+// crates/bt-viz/src/volume_profile.rs
 // Author: Sourish Dey
 
 //! Tier 2 #13 â€” Volume Profile (Horizontal volume-by-price histogram).
@@ -70,8 +70,16 @@ where
     let t_max = series.candles.last().unwrap().t;
 
     // Calculate price range
-    let high = series.candles.iter().map(|c| c.high).fold(f64::NEG_INFINITY, f64::max);
-    let low = series.candles.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
+    let high = series
+        .candles
+        .iter()
+        .map(|c| c.high)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let low = series
+        .candles
+        .iter()
+        .map(|c| c.low)
+        .fold(f64::INFINITY, f64::min);
 
     // Create price bins
     let bin_size = (high - low) / cfg.num_bins as f64;
@@ -105,8 +113,16 @@ where
     let mut va_vol = volume_at_price[poc_idx];
 
     while va_vol / total_vol < cfg.value_area_pct {
-        let vol_low = if value_area_low > 0 { volume_at_price[value_area_low - 1] } else { 0.0 };
-        let vol_high = if value_area_high + 1 < cfg.num_bins { volume_at_price[value_area_high + 1] } else { 0.0 };
+        let vol_low = if value_area_low > 0 {
+            volume_at_price[value_area_low - 1]
+        } else {
+            0.0
+        };
+        let vol_high = if value_area_high + 1 < cfg.num_bins {
+            volume_at_price[value_area_high + 1]
+        } else {
+            0.0
+        };
 
         if vol_low >= vol_high && value_area_low > 0 {
             value_area_low -= 1;
@@ -220,8 +236,14 @@ where
                 cfg.theme.loss()
             };
             CandleStick::new(
-                c.t, c.open, c.high, c.low, c.close,
-                color.filled(), color.filled(), (candle_width * 10.0) as u32,
+                c.t,
+                c.open,
+                c.high,
+                c.low,
+                c.close,
+                color.filled(),
+                color.filled(),
+                (candle_width * 10.0) as u32,
             )
         }))
         .map_err(|e| BtError::Render(e.to_string()))?;

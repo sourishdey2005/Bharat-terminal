@@ -19,7 +19,11 @@ pub struct ForwardCurve {
 
 impl ForwardCurve {
     pub fn new(name: impl Into<String>, start_times: Vec<f64>, forward_rates: Vec<f64>) -> Self {
-        Self { name: name.into(), start_times, forward_rates }
+        Self {
+            name: name.into(),
+            start_times,
+            forward_rates,
+        }
     }
 }
 
@@ -41,10 +45,21 @@ impl Default for FwcvForwardConfig {
 }
 
 impl FwcvForwardConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn show_zero_line(mut self, s: bool) -> Self { self.show_zero_line = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn show_zero_line(mut self, s: bool) -> Self {
+        self.show_zero_line = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -52,7 +67,8 @@ fn render<DB: DrawingBackend>(
     curves: &[ForwardCurve],
     cfg: &FwcvForwardConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if curves.is_empty() {
         return Err(BtError::EmptySeries("forward curves".into()));
@@ -167,11 +183,23 @@ mod tests {
     #[test]
     fn renders() {
         let curves = vec![
-            ForwardCurve::new("1Y Forward", vec![0.0, 1.0, 2.0, 3.0, 5.0], vec![3.5, 3.8, 4.1, 4.3, 4.5]),
-            ForwardCurve::new("2Y Forward", vec![0.0, 1.0, 2.0, 3.0, 5.0], vec![3.6, 3.9, 4.2, 4.4, 4.6]),
+            ForwardCurve::new(
+                "1Y Forward",
+                vec![0.0, 1.0, 2.0, 3.0, 5.0],
+                vec![3.5, 3.8, 4.1, 4.3, 4.5],
+            ),
+            ForwardCurve::new(
+                "2Y Forward",
+                vec![0.0, 1.0, 2.0, 3.0, 5.0],
+                vec![3.6, 3.9, 4.2, 4.4, 4.6],
+            ),
         ];
         let cfg = FwcvForwardConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_fwcv_forward.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_fwcv_forward.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&curves, &cfg, &path).unwrap();
     }
 }

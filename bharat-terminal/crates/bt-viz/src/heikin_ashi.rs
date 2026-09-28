@@ -1,4 +1,4 @@
-﻿// crates/bt-viz/src/heikin_ashi.rs
+// crates/bt-viz/src/heikin_ashi.rs
 // Author: Sourish Dey
 
 //! Tier 1 #6 â€” Heikin-Ashi Candles (smoothed candle variant).
@@ -98,24 +98,32 @@ where
     let candle_width = ((t_max - t_min) / series.candles.len() as f64).max(0.3) * 0.6;
 
     chart
-        .draw_series(
-            (0..series.candles.len()).map(|i| {
-                let c = &series.candles[i];
-                let color = if ha_close[i] >= ha_open[i] {
-                    cfg.theme.profit()
-                } else {
-                    cfg.theme.loss()
-                };
-                CandleStick::new(
-                    c.t, ha_open[i], ha_high[i], ha_low[i], ha_close[i],
-                    color.filled(), color.filled(), (candle_width * 10.0) as u32,
-                )
-            }),
-        )
+        .draw_series((0..series.candles.len()).map(|i| {
+            let c = &series.candles[i];
+            let color = if ha_close[i] >= ha_open[i] {
+                cfg.theme.profit()
+            } else {
+                cfg.theme.loss()
+            };
+            CandleStick::new(
+                c.t,
+                ha_open[i],
+                ha_high[i],
+                ha_low[i],
+                ha_close[i],
+                color.filled(),
+                color.filled(),
+                (candle_width * 10.0) as u32,
+            )
+        }))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     if let Some(vol_area) = volume_area {
-        let max_vol = series.candles.iter().map(|c| c.volume).fold(0.0_f64, f64::max);
+        let max_vol = series
+            .candles
+            .iter()
+            .map(|c| c.volume)
+            .fold(0.0_f64, f64::max);
         let mut vol_chart = ChartBuilder::on(&vol_area)
             .margin(10)
             .x_label_area_size(20)

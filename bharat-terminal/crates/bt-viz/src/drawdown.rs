@@ -1,4 +1,4 @@
-﻿//! Tier 3 #16 â€” Drawdown underwater chart. Made by Sourish Dey.
+//! Tier 3 #16 â€” Drawdown underwater chart. Made by Sourish Dey.
 
 use bt_core::{BtError, Result};
 use plotters::prelude::*;
@@ -69,7 +69,10 @@ where
     let n = dd.len() as f64;
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(10)
         .x_label_area_size(30)
         .y_label_area_size(60)
@@ -86,11 +89,14 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart
-        .draw_series(AreaSeries::new(
-            dd.iter().enumerate().map(|(i, &v)| (i as f64, v)),
-            0.0,
-            cfg.theme.loss().mix(0.35),
-        ).border_style(cfg.theme.loss().stroke_width(2)))
+        .draw_series(
+            AreaSeries::new(
+                dd.iter().enumerate().map(|(i, &v)| (i as f64, v)),
+                0.0,
+                cfg.theme.loss().mix(0.35),
+            )
+            .border_style(cfg.theme.loss().stroke_width(2)),
+        )
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     // Mark recovery points: where drawdown returns to (near) zero after

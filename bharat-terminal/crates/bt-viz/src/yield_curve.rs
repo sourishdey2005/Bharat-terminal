@@ -1,4 +1,4 @@
-﻿//! Tier 6 #43 â€” Yield Curve Family (multi-day overlaid curves). Made by
+//! Tier 6 #43 â€” Yield Curve Family (multi-day overlaid curves). Made by
 //! Sourish Dey.
 
 use bt_core::{BtError, Result};
@@ -105,7 +105,10 @@ where
     let pad = (y_max - y_min).max(0.1) * 0.15;
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(15)
         .x_label_area_size(35)
         .y_label_area_size(60)
@@ -125,12 +128,22 @@ where
     for (idx, curve) in curves.iter().enumerate() {
         let color = palette[idx % palette.len()];
         let alpha = 0.4 + 0.6 * (idx as f64 + 1.0) / curves.len() as f64;
-        let points: Vec<(f64, f64)> = curve.tenors.iter().cloned().zip(curve.yields.iter().cloned()).collect();
+        let points: Vec<(f64, f64)> = curve
+            .tenors
+            .iter()
+            .cloned()
+            .zip(curve.yields.iter().cloned())
+            .collect();
         chart
-            .draw_series(LineSeries::new(points.clone(), color.mix(alpha).stroke_width(2)))
+            .draw_series(LineSeries::new(
+                points.clone(),
+                color.mix(alpha).stroke_width(2),
+            ))
             .map_err(|e| BtError::Render(e.to_string()))?
             .label(curve.date_label.clone())
-            .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], color.stroke_width(2)));
+            .legend(move |(x, y)| {
+                PathElement::new(vec![(x, y), (x + 20, y)], color.stroke_width(2))
+            });
     }
 
     chart

@@ -68,11 +68,7 @@ struct Breakout {
     price: f64,
 }
 
-fn find_breakouts(
-    series: &OhlcvSeries,
-    upper: &[f64],
-    lower: &[f64],
-) -> Vec<Breakout> {
+fn find_breakouts(series: &OhlcvSeries, upper: &[f64], lower: &[f64]) -> Vec<Breakout> {
     let mut breakouts = Vec::new();
 
     for i in 1..series.candles.len() {
@@ -182,10 +178,7 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Upper")
         .legend(|(x, y)| {
-            PathElement::new(
-                vec![(x, y), (x + 20, y)],
-                cfg.theme.info().stroke_width(1),
-            )
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(1))
         });
 
     chart
@@ -202,10 +195,7 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Lower")
         .legend(|(x, y)| {
-            PathElement::new(
-                vec![(x, y), (x + 20, y)],
-                cfg.theme.info().stroke_width(1),
-            )
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(1))
         });
 
     chart

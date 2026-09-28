@@ -19,7 +19,11 @@ pub struct WeiIndex {
 
 impl WeiIndex {
     pub fn new(name: impl Into<String>, values: Vec<f64>, change_pct: f64) -> Self {
-        Self { name: name.into(), values, change_pct }
+        Self {
+            name: name.into(),
+            values,
+            change_pct,
+        }
     }
 }
 
@@ -43,11 +47,25 @@ impl Default for WeiMonitorConfig {
 }
 
 impl WeiMonitorConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn sparkline_width(mut self, w: usize) -> Self { self.sparkline_width = w.max(5).min(50); self }
-    pub fn sparkline_height(mut self, h: usize) -> Self { self.sparkline_height = h.max(20).min(100); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn sparkline_width(mut self, w: usize) -> Self {
+        self.sparkline_width = w.max(5).min(50);
+        self
+    }
+    pub fn sparkline_height(mut self, h: usize) -> Self {
+        self.sparkline_height = h.max(20).min(100);
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -55,7 +73,8 @@ fn render<DB: DrawingBackend>(
     indices: &[WeiIndex],
     cfg: &WeiMonitorConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if indices.is_empty() {
         return Err(BtError::EmptySeries("world indices".into()));
@@ -91,7 +110,11 @@ where DB::ErrorType: 'static,
             ))
             .map_err(|e| BtError::Render(e.to_string()))?;
 
-        let change_color = if index.change_pct >= 0.0 { cfg.theme.profit() } else { cfg.theme.loss() };
+        let change_color = if index.change_pct >= 0.0 {
+            cfg.theme.profit()
+        } else {
+            cfg.theme.loss()
+        };
         body_area
             .draw(&Text::new(
                 format!("{:+.2}%", index.change_pct),
@@ -102,7 +125,11 @@ where DB::ErrorType: 'static,
 
         if index.values.len() >= 2 {
             let v_min = index.values.iter().cloned().fold(f64::INFINITY, f64::min);
-            let v_max = index.values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let v_max = index
+                .values
+                .iter()
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max);
             let v_range = (v_max - v_min).max(1e-6);
             let spark_w = cell_w - 20;
             let spark_h = cfg.sparkline_height;
@@ -120,9 +147,7 @@ where DB::ErrorType: 'static,
 
             let path_points: Vec<(i32, i32)> = points
                 .iter()
-                .map(|&(x, y)| {
-                    ((x0 + 10) as i32 + x as i32, (y0 + 35) as i32 + y as i32)
-                })
+                .map(|&(x, y)| ((x0 + 10) as i32 + x as i32, (y0 + 35) as i32 + y as i32))
                 .collect();
 
             body_area
@@ -152,12 +177,18 @@ mod tests {
     fn renders() {
         let indices: Vec<WeiIndex> = (0..8)
             .map(|i| {
-                let values: Vec<f64> = (0..20).map(|j| 100.0 + (j as f64 * (i as f64 + 1.0) * 0.5)).collect();
+                let values: Vec<f64> = (0..20)
+                    .map(|j| 100.0 + (j as f64 * (i as f64 + 1.0) * 0.5))
+                    .collect();
                 WeiIndex::new(format!("IDX{}", i), values, (i as f64 - 4.0) * 0.5)
             })
             .collect();
         let cfg = WeiMonitorConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_wei_monitor.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_wei_monitor.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&indices, &cfg, &path).unwrap();
     }
 }

@@ -30,11 +30,25 @@ impl Default for GpoOhlcConfig {
 }
 
 impl GpoOhlcConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn bar_width(mut self, w: f64) -> Self { self.bar_width = w.max(0.1).min(1.0); self }
-    pub fn show_volatility(mut self, s: bool) -> Self { self.show_volatility = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn bar_width(mut self, w: f64) -> Self {
+        self.bar_width = w.max(0.1).min(1.0);
+        self
+    }
+    pub fn show_volatility(mut self, s: bool) -> Self {
+        self.show_volatility = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -42,15 +56,24 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &GpoOhlcConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
 
     let t_min = series.candles.first().map(|c| c.t).unwrap_or(0.0);
     let t_max = series.candles.last().map(|c| c.t).unwrap_or(1.0);
-    let low = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
-    let high = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
+    let low = series
+        .candles
+        .iter()
+        .map(|c| c.low)
+        .fold(f64::MAX, f64::min);
+    let high = series
+        .candles
+        .iter()
+        .map(|c| c.high)
+        .fold(f64::MIN, f64::max);
     let pad = (high - low).max(1.0) * 0.05;
 
     let (price_area, vol_area) = if cfg.show_volatility {
@@ -82,7 +105,11 @@ where DB::ErrorType: 'static,
     let bw = cfg.bar_width;
     price_chart
         .draw_series(series.candles.iter().map(|c| {
-            let color = if c.is_bullish() { cfg.theme.profit() } else { cfg.theme.loss() };
+            let color = if c.is_bullish() {
+                cfg.theme.profit()
+            } else {
+                cfg.theme.loss()
+            };
             Rectangle::new(
                 [(c.t - bw / 2.0, c.open), (c.t + bw / 2.0, c.close)],
                 color.filled(),
@@ -92,17 +119,21 @@ where DB::ErrorType: 'static,
 
     price_chart
         .draw_series(series.candles.iter().map(|c| {
-            let color = if c.is_bullish() { cfg.theme.profit() } else { cfg.theme.loss() };
-            PathElement::new(
-                vec![(c.t, c.high), (c.t, c.low)],
-                color.stroke_width(1),
-            )
+            let color = if c.is_bullish() {
+                cfg.theme.profit()
+            } else {
+                cfg.theme.loss()
+            };
+            PathElement::new(vec![(c.t, c.high), (c.t, c.low)], color.stroke_width(1))
         }))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     if let Some(vol_area) = vol_area {
         let mut vol_chart = ChartBuilder::on(&vol_area)
-            .caption("Volatility", (TITLE_FONT, 16).into_font().color(&cfg.theme.text()))
+            .caption(
+                "Volatility",
+                (TITLE_FONT, 16).into_font().color(&cfg.theme.text()),
+            )
             .margin(10)
             .x_label_area_size(20)
             .y_label_area_size(60)
@@ -117,7 +148,11 @@ where DB::ErrorType: 'static,
             .draw()
             .map_err(|e| BtError::Render(e.to_string()))?;
 
-        let max_vol = series.candles.iter().map(|c| c.volume).fold(0.0_f64, f64::max);
+        let max_vol = series
+            .candles
+            .iter()
+            .map(|c| c.volume)
+            .fold(0.0_f64, f64::max);
         if max_vol > 0.0 {
             vol_chart
                 .draw_series(series.candles.iter().map(|c| {
@@ -152,7 +187,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = GpoOhlcConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_gpo_ohlc.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_gpo_ohlc.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

@@ -20,7 +20,12 @@ pub struct RvPoint {
 
 impl RvPoint {
     pub fn new(symbol: impl Into<String>, x_value: f64, y_value: f64, size: f64) -> Self {
-        Self { symbol: symbol.into(), x_value, y_value, size: size.max(1.0) }
+        Self {
+            symbol: symbol.into(),
+            x_value,
+            y_value,
+            size: size.max(1.0),
+        }
     }
 }
 
@@ -46,12 +51,29 @@ impl Default for RvRelativeConfig {
 }
 
 impl RvRelativeConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn x_label(mut self, l: impl Into<String>) -> Self { self.x_label = l.into(); self }
-    pub fn y_label(mut self, l: impl Into<String>) -> Self { self.y_label = l.into(); self }
-    pub fn show_regression(mut self, s: bool) -> Self { self.show_regression = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn x_label(mut self, l: impl Into<String>) -> Self {
+        self.x_label = l.into();
+        self
+    }
+    pub fn y_label(mut self, l: impl Into<String>) -> Self {
+        self.y_label = l.into();
+        self
+    }
+    pub fn show_regression(mut self, s: bool) -> Self {
+        self.show_regression = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -59,17 +81,30 @@ fn render<DB: DrawingBackend>(
     points: &[RvPoint],
     cfg: &RvRelativeConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if points.is_empty() {
         return Err(BtError::EmptySeries("scatter points".into()));
     }
     fill_background(&root, cfg.theme)?;
 
-    let x_min = points.iter().map(|p| p.x_value).fold(f64::INFINITY, f64::min);
-    let x_max = points.iter().map(|p| p.x_value).fold(f64::NEG_INFINITY, f64::max);
-    let y_min = points.iter().map(|p| p.y_value).fold(f64::INFINITY, f64::min);
-    let y_max = points.iter().map(|p| p.y_value).fold(f64::NEG_INFINITY, f64::max);
+    let x_min = points
+        .iter()
+        .map(|p| p.x_value)
+        .fold(f64::INFINITY, f64::min);
+    let x_max = points
+        .iter()
+        .map(|p| p.x_value)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let y_min = points
+        .iter()
+        .map(|p| p.y_value)
+        .fold(f64::INFINITY, f64::min);
+    let y_max = points
+        .iter()
+        .map(|p| p.y_value)
+        .fold(f64::NEG_INFINITY, f64::max);
     let x_pad = (x_max - x_min).max(1.0) * 0.1;
     let y_pad = (y_max - y_min).max(1.0) * 0.1;
 
@@ -81,7 +116,10 @@ where DB::ErrorType: 'static,
         .margin(10)
         .x_label_area_size(40)
         .y_label_area_size(60)
-        .build_cartesian_2d((x_min - x_pad)..(x_max + x_pad), (y_min - y_pad)..(y_max + y_pad))
+        .build_cartesian_2d(
+            (x_min - x_pad)..(x_max + x_pad),
+            (y_min - y_pad)..(y_max + y_pad),
+        )
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart
@@ -97,7 +135,11 @@ where DB::ErrorType: 'static,
     chart
         .draw_series(points.iter().map(|p| {
             let radius = (p.size.sqrt() / 10.0).max(3.0) as i32;
-            Circle::new((p.x_value, p.y_value), radius, cfg.theme.info().mix(0.6).filled())
+            Circle::new(
+                (p.x_value, p.y_value),
+                radius,
+                cfg.theme.info().mix(0.6).filled(),
+            )
         }))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
@@ -157,10 +199,21 @@ mod tests {
     #[test]
     fn renders() {
         let points: Vec<RvPoint> = (0..10)
-            .map(|i| RvPoint::new(format!("S{}", i), 10.0 + i as f64 * 2.0, 5.0 + i as f64 * 1.5, (i + 1) as f64 * 100.0))
+            .map(|i| {
+                RvPoint::new(
+                    format!("S{}", i),
+                    10.0 + i as f64 * 2.0,
+                    5.0 + i as f64 * 1.5,
+                    (i + 1) as f64 * 100.0,
+                )
+            })
             .collect();
         let cfg = RvRelativeConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_rv_relative.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_rv_relative.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&points, &cfg, &path).unwrap();
     }
 }

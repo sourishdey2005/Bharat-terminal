@@ -139,10 +139,7 @@ where
             .map_err(|e| BtError::Render(e.to_string()))?
             .label("MACD")
             .legend(|(x, y)| {
-                PathElement::new(
-                    vec![(x, y), (x + 20, y)],
-                    cfg.theme.info().stroke_width(2),
-                )
+                PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(2))
             });
 
         chart

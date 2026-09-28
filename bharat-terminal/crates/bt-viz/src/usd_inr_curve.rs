@@ -17,14 +17,25 @@ pub struct UsdInrCurveConfig {
 
 impl Default for UsdInrCurveConfig {
     fn default() -> Self {
-        Self { title: "USD/INR Forward Curve".to_string(), theme: Theme::Dark }
+        Self {
+            title: "USD/INR Forward Curve".to_string(),
+            theme: Theme::Dark,
+        }
     }
 }
 
 impl UsdInrCurveConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
 }
 
 fn sample_forwards() -> Vec<(String, f64, f64)> {
@@ -47,7 +58,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &UsdInrCurveConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -70,28 +82,49 @@ where DB::ErrorType: 'static,
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     let mut chart = chart;
-    chart.configure_mesh()
+    chart
+        .configure_mesh()
         .label_style((LABEL_FONT, 11).into_font().color(&cfg.theme.text()))
         .axis_style(&cfg.theme.border())
         .x_labels(data.len())
         .x_label_formatter(&|x| {
             let idx = *x as usize;
-            if idx < data.len() { data[idx].0.clone() } else { String::new() }
+            if idx < data.len() {
+                data[idx].0.clone()
+            } else {
+                String::new()
+            }
         })
         .y_desc("INR per USD")
         .draw()
         .map_err(|e| BtError::Render(e.to_string()))?;
 
-    let points: Vec<(f64, f64)> = data.iter().enumerate().map(|(i, (_, px, _))| (i as f64, *px)).collect();
-    chart.draw_series(LineSeries::new(points.clone(), cfg.theme.accent().stroke_width(3)))
+    let points: Vec<(f64, f64)> = data
+        .iter()
+        .enumerate()
+        .map(|(i, (_, px, _))| (i as f64, *px))
+        .collect();
+    chart
+        .draw_series(LineSeries::new(
+            points.clone(),
+            cfg.theme.accent().stroke_width(3),
+        ))
         .map_err(|e| BtError::Render(e.to_string()))?;
-    chart.draw_series(points.iter().map(|&(x, y)| {
-        Circle::new((x, y), 5, cfg.theme.profit().filled())
-    }))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+    chart
+        .draw_series(
+            points
+                .iter()
+                .map(|&(x, y)| Circle::new((x, y), 5, cfg.theme.profit().filled())),
+        )
+        .map_err(|e| BtError::Render(e.to_string()))?;
 
-    let prem: Vec<(f64, f64)> = data.iter().enumerate().map(|(i, (_, _, p))| (i as f64, *p)).collect();
-    chart.draw_series(LineSeries::new(prem, cfg.theme.info().stroke_width(2)))
+    let prem: Vec<(f64, f64)> = data
+        .iter()
+        .enumerate()
+        .map(|(i, (_, _, p))| (i as f64, *p))
+        .collect();
+    chart
+        .draw_series(LineSeries::new(prem, cfg.theme.info().stroke_width(2)))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     for (i, (label, px, prem)) in data.iter().enumerate() {
@@ -100,7 +133,7 @@ where DB::ErrorType: 'static,
             (60 + i as i32 * ((w as i32 - 120) / data.len() as i32), 50),
             (LABEL_FONT, 10).into_font().color(&cfg.theme.text()),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
         let _ = (label, prem);
     }
 
@@ -126,7 +159,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("USDINR", 100, 1, 100.0);
         let cfg = UsdInrCurveConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_usd_inr_curve.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_usd_inr_curve.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

@@ -85,25 +85,49 @@ fn compute_kagi(series: &OhlcvSeries, reversal_pct: f64) -> Vec<KagiPoint> {
             KagiDir::Up => {
                 if close > extreme {
                     extreme = close;
-                    points.push(KagiPoint { x, price: close, dir: direction });
+                    points.push(KagiPoint {
+                        x,
+                        price: close,
+                        dir: direction,
+                    });
                 } else if (extreme - close) / extreme > reversal_factor {
                     direction = KagiDir::Down;
-                    points.push(KagiPoint { x, price: extreme, dir: KagiDir::Up });
+                    points.push(KagiPoint {
+                        x,
+                        price: extreme,
+                        dir: KagiDir::Up,
+                    });
                     prev_price = extreme;
                     extreme = close;
-                    points.push(KagiPoint { x, price: close, dir: KagiDir::Down });
+                    points.push(KagiPoint {
+                        x,
+                        price: close,
+                        dir: KagiDir::Down,
+                    });
                 }
             }
             KagiDir::Down => {
                 if close < extreme {
                     extreme = close;
-                    points.push(KagiPoint { x, price: close, dir: direction });
+                    points.push(KagiPoint {
+                        x,
+                        price: close,
+                        dir: direction,
+                    });
                 } else if (close - prev_price) / prev_price > reversal_factor {
                     direction = KagiDir::Up;
-                    points.push(KagiPoint { x, price: extreme, dir: KagiDir::Down });
+                    points.push(KagiPoint {
+                        x,
+                        price: extreme,
+                        dir: KagiDir::Down,
+                    });
                     prev_price = extreme;
                     extreme = close;
-                    points.push(KagiPoint { x, price: close, dir: KagiDir::Up });
+                    points.push(KagiPoint {
+                        x,
+                        price: close,
+                        dir: KagiDir::Up,
+                    });
                 }
             }
         }

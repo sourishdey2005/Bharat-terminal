@@ -30,11 +30,25 @@ impl Default for CompReturnConfig {
 }
 
 impl CompReturnConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn base_date(mut self, d: f64) -> Self { self.base_date = d.max(0.0); self }
-    pub fn show_benchmark(mut self, s: bool) -> Self { self.show_benchmark = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn base_date(mut self, d: f64) -> Self {
+        self.base_date = d.max(0.0);
+        self
+    }
+    pub fn show_benchmark(mut self, s: bool) -> Self {
+        self.show_benchmark = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -42,7 +56,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &CompReturnConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -68,7 +83,10 @@ where DB::ErrorType: 'static,
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
-            format!("{} — {} (Base: {:.0})", cfg.title, series.symbol, cfg.base_date),
+            format!(
+                "{} — {} (Base: {:.0})",
+                cfg.title, series.symbol, cfg.base_date
+            ),
             (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
         )
         .margin(10)
@@ -95,13 +113,20 @@ where DB::ErrorType: 'static,
 
     chart
         .draw_series(LineSeries::new(
-            series.candles.iter().enumerate().map(|(i, c)| (c.t, returns[i])),
+            series
+                .candles
+                .iter()
+                .enumerate()
+                .map(|(i, c)| (c.t, returns[i])),
             cfg.theme.accent().stroke_width(2),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label(&series.symbol)
         .legend(|(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(2))
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.accent().stroke_width(2),
+            )
         });
 
     if cfg.show_benchmark {
@@ -112,13 +137,20 @@ where DB::ErrorType: 'static,
             .collect();
         chart
             .draw_series(LineSeries::new(
-                series.candles.iter().enumerate().map(|(i, c)| (c.t, bench_returns[i])),
+                series
+                    .candles
+                    .iter()
+                    .enumerate()
+                    .map(|(i, c)| (c.t, bench_returns[i])),
                 cfg.theme.info().mix(0.5).stroke_width(1),
             ))
             .map_err(|e| BtError::Render(e.to_string()))?
             .label("Benchmark (50%)")
             .legend(|(x, y)| {
-                PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().mix(0.5).stroke_width(1))
+                PathElement::new(
+                    vec![(x, y), (x + 20, y)],
+                    cfg.theme.info().mix(0.5).stroke_width(1),
+                )
             });
     }
 
@@ -152,7 +184,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = CompReturnConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_comp_return.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_comp_return.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

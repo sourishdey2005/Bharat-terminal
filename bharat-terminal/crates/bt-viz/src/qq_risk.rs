@@ -32,11 +32,25 @@ impl Default for QqRiskConfig {
 }
 
 impl QqRiskConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn confidence(mut self, c: f64) -> Self { self.confidence = c.clamp(0.5, 0.999); self }
-    pub fn returns(mut self, r: Vec<f64>) -> Self { self.returns = r; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn confidence(mut self, c: f64) -> Self {
+        self.confidence = c.clamp(0.5, 0.999);
+        self
+    }
+    pub fn returns(mut self, r: Vec<f64>) -> Self {
+        self.returns = r;
+        self
+    }
 }
 
 fn normal_quantile(p: f64) -> f64 {
@@ -78,17 +92,17 @@ fn normal_quantile(p: f64) -> f64 {
 
     if p < p_low {
         let q = (-2.0 * p.ln()).sqrt();
-        (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
-            ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0)
+        (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
+            / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0)
     } else if p <= p_high {
         let q = p - 0.5;
         let r = q * q;
-        (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q /
-            (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1.0)
+        (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q
+            / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1.0)
     } else {
         let q = (-2.0 * (1.0 - p).ln()).sqrt();
-        -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
-            ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0)
+        -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
+            / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0)
     }
 }
 
@@ -96,22 +110,27 @@ fn render<DB: DrawingBackend>(
     root: plotters::drawing::DrawingArea<DB, plotters::coord::Shift>,
     cfg: &QqRiskConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     fill_background(&root, cfg.theme)?;
 
     let returns = if cfg.returns.is_empty() {
         let mut rng = rand::rngs::StdRng::seed_from_u64(42);
-        (0..100).map(|_| {
-            let shock: f64 = rng.gen_range(-1.0..1.0);
-            -0.01 + shock * 0.012
-        }).collect()
+        (0..100)
+            .map(|_| {
+                let shock: f64 = rng.gen_range(-1.0..1.0);
+                -0.01 + shock * 0.012
+            })
+            .collect()
     } else {
         cfg.returns.clone()
     };
 
     if returns.len() < 10 {
-        return Err(BtError::InvalidInput("Need at least 10 returns for Q-Q plot".into()));
+        return Err(BtError::InvalidInput(
+            "Need at least 10 returns for Q-Q plot".into(),
+        ));
     }
 
     let mut sorted = returns.clone();
@@ -132,9 +151,15 @@ where DB::ErrorType: 'static,
         .collect();
 
     let t_min = points.iter().map(|(t, _)| *t).fold(f64::INFINITY, f64::min);
-    let t_max = points.iter().map(|(t, _)| *t).fold(f64::NEG_INFINITY, f64::max);
+    let t_max = points
+        .iter()
+        .map(|(t, _)| *t)
+        .fold(f64::NEG_INFINITY, f64::max);
     let a_min = points.iter().map(|(_, a)| *a).fold(f64::INFINITY, f64::min);
-    let a_max = points.iter().map(|(_, a)| *a).fold(f64::NEG_INFINITY, f64::max);
+    let a_max = points
+        .iter()
+        .map(|(_, a)| *a)
+        .fold(f64::NEG_INFINITY, f64::max);
 
     let x_min = t_min.min(a_min);
     let x_max = t_max.max(a_max);
@@ -169,13 +194,18 @@ where DB::ErrorType: 'static,
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Normal")
         .legend(|(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.border().mix(0.5).stroke_width(1))
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.border().mix(0.5).stroke_width(1),
+            )
         });
 
     chart
-        .draw_series(points.iter().map(|(t, a)| {
-            Circle::new((*t, *a), 3, cfg.theme.info().filled())
-        }))
+        .draw_series(
+            points
+                .iter()
+                .map(|(t, a)| Circle::new((*t, *a), 3, cfg.theme.info().filled())),
+        )
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart
@@ -206,7 +236,11 @@ mod tests {
     #[test]
     fn renders() {
         let cfg = QqRiskConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_qq_risk.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_qq_risk.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&cfg, &path).unwrap();
     }
 }

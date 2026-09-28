@@ -21,26 +21,126 @@ pub struct TickerEntry {
 /// Sample ticker tape data.
 fn sample_tape() -> Vec<TickerEntry> {
     vec![
-        TickerEntry { symbol: "RELIANCE".to_string(), price: 2985.50, change_pct: 1.25, volume: 15_200_000.0 },
-        TickerEntry { symbol: "HDFCBANK".to_string(), price: 1720.30, change_pct: 0.82, volume: 12_800_000.0 },
-        TickerEntry { symbol: "INFY".to_string(), price: 1545.75, change_pct: -0.45, volume: 8_500_000.0 },
-        TickerEntry { symbol: "TCS".to_string(), price: 3890.00, change_pct: 0.35, volume: 3_200_000.0 },
-        TickerEntry { symbol: "ICICIBANK".to_string(), price: 1085.60, change_pct: 1.55, volume: 18_400_000.0 },
-        TickerEntry { symbol: "SBIN".to_string(), price: 625.40, change_pct: 2.10, volume: 25_600_000.0 },
-        TickerEntry { symbol: "BHARTIARTL".to_string(), price: 1580.25, change_pct: 0.95, volume: 9_800_000.0 },
-        TickerEntry { symbol: "ITC".to_string(), price: 435.80, change_pct: -0.22, volume: 14_200_000.0 },
-        TickerEntry { symbol: "LT".to_string(), price: 3650.00, change_pct: 1.80, volume: 4_500_000.0 },
-        TickerEntry { symbol: "KOTAKBANK".to_string(), price: 1785.90, change_pct: 0.65, volume: 7_800_000.0 },
-        TickerEntry { symbol: "HINDUNILVR".to_string(), price: 2450.30, change_pct: -0.85, volume: 2_100_000.0 },
-        TickerEntry { symbol: "BAJFINANCE".to_string(), price: 7150.00, change_pct: 1.10, volume: 1_800_000.0 },
-        TickerEntry { symbol: "MARUTI".to_string(), price: 12450.00, change_pct: 0.45, volume: 1_200_000.0 },
-        TickerEntry { symbol: "SUNPHARMA".to_string(), price: 1890.75, change_pct: -1.20, volume: 5_600_000.0 },
-        TickerEntry { symbol: "TITAN".to_string(), price: 3450.00, change_pct: 0.70, volume: 3_400_000.0 },
-        TickerEntry { symbol: "ULTRACEMCO".to_string(), price: 10850.00, change_pct: 1.05, volume: 800_000.0 },
-        TickerEntry { symbol: "NTPC".to_string(), price: 385.50, change_pct: 0.30, volume: 11_500_000.0 },
-        TickerEntry { symbol: "TATAMOTORS".to_string(), price: 985.25, change_pct: 2.50, volume: 22_300_000.0 },
-        TickerEntry { symbol: "WIPRO".to_string(), price: 485.60, change_pct: -0.60, volume: 6_700_000.0 },
-        TickerEntry { symbol: "ADANIENT".to_string(), price: 3150.00, change_pct: 3.20, volume: 16_800_000.0 },
+        TickerEntry {
+            symbol: "RELIANCE".to_string(),
+            price: 2985.50,
+            change_pct: 1.25,
+            volume: 15_200_000.0,
+        },
+        TickerEntry {
+            symbol: "HDFCBANK".to_string(),
+            price: 1720.30,
+            change_pct: 0.82,
+            volume: 12_800_000.0,
+        },
+        TickerEntry {
+            symbol: "INFY".to_string(),
+            price: 1545.75,
+            change_pct: -0.45,
+            volume: 8_500_000.0,
+        },
+        TickerEntry {
+            symbol: "TCS".to_string(),
+            price: 3890.00,
+            change_pct: 0.35,
+            volume: 3_200_000.0,
+        },
+        TickerEntry {
+            symbol: "ICICIBANK".to_string(),
+            price: 1085.60,
+            change_pct: 1.55,
+            volume: 18_400_000.0,
+        },
+        TickerEntry {
+            symbol: "SBIN".to_string(),
+            price: 625.40,
+            change_pct: 2.10,
+            volume: 25_600_000.0,
+        },
+        TickerEntry {
+            symbol: "BHARTIARTL".to_string(),
+            price: 1580.25,
+            change_pct: 0.95,
+            volume: 9_800_000.0,
+        },
+        TickerEntry {
+            symbol: "ITC".to_string(),
+            price: 435.80,
+            change_pct: -0.22,
+            volume: 14_200_000.0,
+        },
+        TickerEntry {
+            symbol: "LT".to_string(),
+            price: 3650.00,
+            change_pct: 1.80,
+            volume: 4_500_000.0,
+        },
+        TickerEntry {
+            symbol: "KOTAKBANK".to_string(),
+            price: 1785.90,
+            change_pct: 0.65,
+            volume: 7_800_000.0,
+        },
+        TickerEntry {
+            symbol: "HINDUNILVR".to_string(),
+            price: 2450.30,
+            change_pct: -0.85,
+            volume: 2_100_000.0,
+        },
+        TickerEntry {
+            symbol: "BAJFINANCE".to_string(),
+            price: 7150.00,
+            change_pct: 1.10,
+            volume: 1_800_000.0,
+        },
+        TickerEntry {
+            symbol: "MARUTI".to_string(),
+            price: 12450.00,
+            change_pct: 0.45,
+            volume: 1_200_000.0,
+        },
+        TickerEntry {
+            symbol: "SUNPHARMA".to_string(),
+            price: 1890.75,
+            change_pct: -1.20,
+            volume: 5_600_000.0,
+        },
+        TickerEntry {
+            symbol: "TITAN".to_string(),
+            price: 3450.00,
+            change_pct: 0.70,
+            volume: 3_400_000.0,
+        },
+        TickerEntry {
+            symbol: "ULTRACEMCO".to_string(),
+            price: 10850.00,
+            change_pct: 1.05,
+            volume: 800_000.0,
+        },
+        TickerEntry {
+            symbol: "NTPC".to_string(),
+            price: 385.50,
+            change_pct: 0.30,
+            volume: 11_500_000.0,
+        },
+        TickerEntry {
+            symbol: "TATAMOTORS".to_string(),
+            price: 985.25,
+            change_pct: 2.50,
+            volume: 22_300_000.0,
+        },
+        TickerEntry {
+            symbol: "WIPRO".to_string(),
+            price: 485.60,
+            change_pct: -0.60,
+            volume: 6_700_000.0,
+        },
+        TickerEntry {
+            symbol: "ADANIENT".to_string(),
+            price: 3150.00,
+            change_pct: 3.20,
+            volume: 16_800_000.0,
+        },
     ]
 }
 
@@ -145,10 +245,7 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?;
 
         // Volume bar
-        let max_vol = data
-            .iter()
-            .map(|e| e.volume)
-            .fold(0.0_f64, f64::max);
+        let max_vol = data.iter().map(|e| e.volume).fold(0.0_f64, f64::max);
         let bar_w = (entry.volume / max_vol) * 200.0;
         root.draw(&Rectangle::new(
             [

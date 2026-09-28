@@ -54,10 +54,7 @@ struct DepthLevel {
     ask_size: f64,
 }
 
-fn compute_depth(
-    series: &OhlcvSeries,
-    depth_levels: usize,
-) -> Vec<(f64, Vec<DepthLevel>)> {
+fn compute_depth(series: &OhlcvSeries, depth_levels: usize) -> Vec<(f64, Vec<DepthLevel>)> {
     let mut result = Vec::new();
 
     for candle in &series.candles {
@@ -119,9 +116,7 @@ where
 
     let max_size = depth
         .iter()
-        .flat_map(|(_, levels)| {
-            levels.iter().map(|l| l.bid_size.max(l.ask_size))
-        })
+        .flat_map(|(_, levels)| levels.iter().map(|l| l.bid_size.max(l.ask_size)))
         .fold(0.0_f64, f64::max);
 
     let mut chart = ChartBuilder::on(&root)

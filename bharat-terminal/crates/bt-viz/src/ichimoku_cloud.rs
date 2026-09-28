@@ -95,19 +95,28 @@ fn compute_ichimoku(
     for i in 0..n {
         if i >= tenkan_p - 1 {
             let window = &series.candles[i + 1 - tenkan_p..=i];
-            let hh = window.iter().map(|c| c.high).fold(f64::NEG_INFINITY, f64::max);
+            let hh = window
+                .iter()
+                .map(|c| c.high)
+                .fold(f64::NEG_INFINITY, f64::max);
             let ll = window.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
             tenkan[i] = (hh + ll) / 2.0;
         }
         if i >= kijun_p - 1 {
             let window = &series.candles[i + 1 - kijun_p..=i];
-            let hh = window.iter().map(|c| c.high).fold(f64::NEG_INFINITY, f64::max);
+            let hh = window
+                .iter()
+                .map(|c| c.high)
+                .fold(f64::NEG_INFINITY, f64::max);
             let ll = window.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
             kijun[i] = (hh + ll) / 2.0;
         }
         if i >= senkou_b_p - 1 {
             let window = &series.candles[i + 1 - senkou_b_p..=i];
-            let hh = window.iter().map(|c| c.high).fold(f64::NEG_INFINITY, f64::max);
+            let hh = window
+                .iter()
+                .map(|c| c.high)
+                .fold(f64::NEG_INFINITY, f64::max);
             let ll = window.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
             senkou_b[i] = (hh + ll) / 2.0;
         }
@@ -139,7 +148,12 @@ where
     series.validate()?;
     fill_background(&root, cfg.theme)?;
 
-    let ichi = compute_ichimoku(series, cfg.tenkan_period, cfg.kijun_period, cfg.senkou_b_period);
+    let ichi = compute_ichimoku(
+        series,
+        cfg.tenkan_period,
+        cfg.kijun_period,
+        cfg.senkou_b_period,
+    );
 
     let t_min = series.candles.first().unwrap().t;
     let t_max = series.candles.last().unwrap().t;
@@ -218,7 +232,10 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Tenkan")
         .legend(|(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.profit().stroke_width(2))
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.profit().stroke_width(2),
+            )
         });
 
     chart
@@ -269,7 +286,10 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Senkou B")
         .legend(|(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(1))
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.accent().stroke_width(1),
+            )
         });
 
     if cfg.show_chikou {

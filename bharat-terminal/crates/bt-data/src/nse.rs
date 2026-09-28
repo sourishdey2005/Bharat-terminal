@@ -133,9 +133,10 @@ impl NSEProvider {
             urlencoding::encode(symbol)
         );
         let resp = self.fetch_with_retry(&url).await?;
-        let data: NSEOptionChainResponse = resp.json().await.map_err(|e| {
-            BtError::InvalidInput(format!("JSON parse error: {}", e))
-        })?;
+        let data: NSEOptionChainResponse = resp
+            .json()
+            .await
+            .map_err(|e| BtError::InvalidInput(format!("JSON parse error: {}", e)))?;
 
         let chains: Vec<NSEOptionChain> = data
             .records
@@ -164,9 +165,10 @@ impl NSEProvider {
             urlencoding::encode(index)
         );
         let resp = self.fetch_with_retry(&url).await?;
-        let data: NSEIndexResponse = resp.json().await.map_err(|e| {
-            BtError::InvalidInput(format!("JSON parse error: {}", e))
-        })?;
+        let data: NSEIndexResponse = resp
+            .json()
+            .await
+            .map_err(|e| BtError::InvalidInput(format!("JSON parse error: {}", e)))?;
 
         let indices: Vec<NSEIndex> = data
             .data
@@ -187,9 +189,12 @@ impl NSEProvider {
         const MAX_RETRIES: u32 = 3;
 
         loop {
-            let resp = self.client.get(url).send().await.map_err(|e| {
-                BtError::DataFetch(format!("Network error: {}", e))
-            })?;
+            let resp = self
+                .client
+                .get(url)
+                .send()
+                .await
+                .map_err(|e| BtError::DataFetch(format!("Network error: {}", e)))?;
 
             if resp.status() == 429 || resp.status() == 401 {
                 attempts += 1;

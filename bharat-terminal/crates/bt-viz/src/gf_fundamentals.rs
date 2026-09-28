@@ -20,8 +20,20 @@ pub struct FundamentalPoint {
 }
 
 impl FundamentalPoint {
-    pub fn new(period: impl Into<String>, revenue: f64, net_income: f64, eps: f64, pe_ratio: f64) -> Self {
-        Self { period: period.into(), revenue, net_income, eps, pe_ratio }
+    pub fn new(
+        period: impl Into<String>,
+        revenue: f64,
+        net_income: f64,
+        eps: f64,
+        pe_ratio: f64,
+    ) -> Self {
+        Self {
+            period: period.into(),
+            revenue,
+            net_income,
+            eps,
+            pe_ratio,
+        }
     }
 }
 
@@ -43,10 +55,21 @@ impl Default for GfFundamentalsConfig {
 }
 
 impl GfFundamentalsConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn metrics(mut self, m: Vec<String>) -> Self { self.metrics = m; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn metrics(mut self, m: Vec<String>) -> Self {
+        self.metrics = m;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -54,7 +77,8 @@ fn render<DB: DrawingBackend>(
     data: &[FundamentalPoint],
     cfg: &GfFundamentalsConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if data.is_empty() {
         return Err(BtError::EmptySeries("fundamental data".into()));
@@ -108,13 +132,16 @@ where DB::ErrorType: 'static,
 
     for (mi, metric) in cfg.metrics.iter().enumerate() {
         let color = colors[mi % colors.len()];
-        let values: Vec<f64> = data.iter().map(|p| match metric.as_str() {
-            "revenue" => p.revenue,
-            "net_income" => p.net_income,
-            "eps" => p.eps,
-            "pe_ratio" => p.pe_ratio,
-            _ => 0.0,
-        }).collect();
+        let values: Vec<f64> = data
+            .iter()
+            .map(|p| match metric.as_str() {
+                "revenue" => p.revenue,
+                "net_income" => p.net_income,
+                "eps" => p.eps,
+                "pe_ratio" => p.pe_ratio,
+                _ => 0.0,
+            })
+            .collect();
 
         chart
             .draw_series(LineSeries::new(
@@ -156,10 +183,22 @@ mod tests {
     #[test]
     fn renders() {
         let data: Vec<FundamentalPoint> = (0..8)
-            .map(|i| FundamentalPoint::new(format!("Q{}", i + 1), 1000.0 + i as f64 * 100.0, 200.0 + i as f64 * 20.0, 10.0 + i as f64 * 2.0, 15.0 + i as f64 * 0.5))
+            .map(|i| {
+                FundamentalPoint::new(
+                    format!("Q{}", i + 1),
+                    1000.0 + i as f64 * 100.0,
+                    200.0 + i as f64 * 20.0,
+                    10.0 + i as f64 * 2.0,
+                    15.0 + i as f64 * 0.5,
+                )
+            })
             .collect();
         let cfg = GfFundamentalsConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_gf_fundamentals.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_gf_fundamentals.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&data, &cfg, &path).unwrap();
     }
 }

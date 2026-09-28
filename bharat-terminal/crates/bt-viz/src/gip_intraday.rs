@@ -32,12 +32,29 @@ impl Default for GipIntradayConfig {
 }
 
 impl GipIntradayConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn session_start(mut self, s: f64) -> Self { self.session_start = s.max(0.0); self }
-    pub fn session_end(mut self, e: f64) -> Self { self.session_end = e.max(0.0); self }
-    pub fn show_vwap(mut self, s: bool) -> Self { self.show_vwap = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn session_start(mut self, s: f64) -> Self {
+        self.session_start = s.max(0.0);
+        self
+    }
+    pub fn session_end(mut self, e: f64) -> Self {
+        self.session_end = e.max(0.0);
+        self
+    }
+    pub fn show_vwap(mut self, s: bool) -> Self {
+        self.show_vwap = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -45,13 +62,22 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &GipIntradayConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
 
-    let low = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
-    let high = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
+    let low = series
+        .candles
+        .iter()
+        .map(|c| c.low)
+        .fold(f64::MAX, f64::min);
+    let high = series
+        .candles
+        .iter()
+        .map(|c| c.high)
+        .fold(f64::MIN, f64::max);
     let pad = (high - low).max(1.0) * 0.05;
 
     // Candle timestamps are Unix seconds, so the x-axis must be built from the
@@ -99,7 +125,11 @@ where DB::ErrorType: 'static,
 
     chart
         .draw_series(series.candles.iter().map(|c| {
-            let color = if c.is_bullish() { cfg.theme.profit() } else { cfg.theme.loss() };
+            let color = if c.is_bullish() {
+                cfg.theme.profit()
+            } else {
+                cfg.theme.loss()
+            };
             CandleStick::new(
                 c.t,
                 c.open,
@@ -118,14 +148,21 @@ where DB::ErrorType: 'static,
         chart
             .draw_series(LineSeries::new(
                 series.candles.iter().enumerate().filter_map(|(i, c)| {
-                    if !vwap[i].is_nan() { Some((c.t, vwap[i])) } else { None }
+                    if !vwap[i].is_nan() {
+                        Some((c.t, vwap[i]))
+                    } else {
+                        None
+                    }
                 }),
                 cfg.theme.accent().stroke_width(2),
             ))
             .map_err(|e| BtError::Render(e.to_string()))?
             .label("VWAP")
             .legend(|(x, y)| {
-                PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(2))
+                PathElement::new(
+                    vec![(x, y), (x + 20, y)],
+                    cfg.theme.accent().stroke_width(2),
+                )
             });
 
         chart
@@ -159,7 +196,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = GipIntradayConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_gip_intraday.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_gip_intraday.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

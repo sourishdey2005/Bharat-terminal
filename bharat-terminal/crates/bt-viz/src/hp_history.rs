@@ -30,11 +30,25 @@ impl Default for HpHistoryConfig {
 }
 
 impl HpHistoryConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn rows(mut self, r: usize) -> Self { self.rows = r.max(5).min(100); self }
-    pub fn columns(mut self, c: usize) -> Self { self.columns = c.max(3).min(10); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn rows(mut self, r: usize) -> Self {
+        self.rows = r.max(5).min(100);
+        self
+    }
+    pub fn columns(mut self, c: usize) -> Self {
+        self.columns = c.max(3).min(10);
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -42,7 +56,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &HpHistoryConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -72,7 +87,11 @@ where DB::ErrorType: 'static,
     }
 
     let start_idx = series.candles.len().saturating_sub(cfg.rows);
-    for (ri, ci) in series.candles[start_idx..].iter().enumerate().take(cfg.rows) {
+    for (ri, ci) in series.candles[start_idx..]
+        .iter()
+        .enumerate()
+        .take(cfg.rows)
+    {
         let c = series.candles[start_idx + ri];
         let y = 25 + ri * row_h;
         let row_color = if c.is_bullish() {
@@ -128,7 +147,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = HpHistoryConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_hp_history.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_hp_history.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

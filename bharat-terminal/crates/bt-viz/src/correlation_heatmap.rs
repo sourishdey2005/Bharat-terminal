@@ -1,4 +1,4 @@
-﻿//! Tier 3 #17 â€” Rolling correlation matrix heatmap. Made by Sourish Dey.
+//! Tier 3 #17 â€” Rolling correlation matrix heatmap. Made by Sourish Dey.
 
 use bt_core::{BtError, Result};
 use plotters::prelude::*;
@@ -79,7 +79,11 @@ fn lerp_channel(bg: u8, fg: u8, t: f64) -> u8 {
 fn corr_color(theme: Theme, v: f64) -> RGBColor {
     let v = v.clamp(-1.0, 1.0);
     let bg = theme.background();
-    let target = if v >= 0.0 { theme.profit() } else { theme.loss() };
+    let target = if v >= 0.0 {
+        theme.profit()
+    } else {
+        theme.loss()
+    };
     let t = v.abs();
     RGBColor(
         lerp_channel(bg.0, target.0, t),
@@ -104,7 +108,10 @@ where
     let n = series.len();
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(20)
         .x_label_area_size(40)
         .y_label_area_size(80)
@@ -158,11 +165,19 @@ where
     Ok(())
 }
 
-pub fn render_png(series: &[(String, Vec<f64>)], cfg: &CorrelationHeatmapConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    series: &[(String, Vec<f64>)],
+    cfg: &CorrelationHeatmapConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, series, cfg)
 }
 
-pub fn render_svg(series: &[(String, Vec<f64>)], cfg: &CorrelationHeatmapConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    series: &[(String, Vec<f64>)],
+    cfg: &CorrelationHeatmapConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, series, cfg)
 }
 

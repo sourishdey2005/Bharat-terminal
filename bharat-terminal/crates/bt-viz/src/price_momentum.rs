@@ -109,13 +109,19 @@ where
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
-            format!("{} — {} (Lookback: {})", cfg.title, series.symbol, cfg.lookback),
+            format!(
+                "{} — {} (Lookback: {})",
+                cfg.title, series.symbol, cfg.lookback
+            ),
             (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
         )
         .margin(10)
         .x_label_area_size(30)
         .y_label_area_size(60)
-        .build_cartesian_2d(t_min..t_max, (mom_min - range * 0.1)..(mom_max + range * 0.1))
+        .build_cartesian_2d(
+            t_min..t_max,
+            (mom_min - range * 0.1)..(mom_max + range * 0.1),
+        )
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart

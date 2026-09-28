@@ -19,15 +19,30 @@ pub struct VolSurface3DConfig {
 
 impl Default for VolSurface3DConfig {
     fn default() -> Self {
-        Self { title: "3D Vol Surface".to_string(), theme: Theme::Dark, skew: 0.3 }
+        Self {
+            title: "3D Vol Surface".to_string(),
+            theme: Theme::Dark,
+            skew: 0.3,
+        }
     }
 }
 
 impl VolSurface3DConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn skew(mut self, v: f64) -> Self { self.skew = v.clamp(-1.0, 1.0); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn skew(mut self, v: f64) -> Self {
+        self.skew = v.clamp(-1.0, 1.0);
+        self
+    }
 }
 
 fn project(x: f64, y: f64, z: f64, cx: f64, cy: f64) -> (i32, i32) {
@@ -55,7 +70,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &VolSurface3DConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -78,7 +94,9 @@ where DB::ErrorType: 'static,
         let n = returns.len() as f64;
         let mean = returns.iter().sum::<f64>() / n;
         returns.iter().map(|r| (r - mean).powi(2)).sum::<f64>() / n
-    }.sqrt() * 100.0;
+    }
+    .sqrt()
+        * 100.0;
 
     let n_k = 14;
     let n_t = 10;
@@ -116,7 +134,12 @@ where DB::ErrorType: 'static,
                 cfg.theme.info().mix(0.7)
             };
             let depth_f = 0.4 + 0.6 * (j as f64 / n_t as f64);
-            let pts = vec![grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]];
+            let pts = vec![
+                grid[j][i],
+                grid[j][i + 1],
+                grid[j + 1][i + 1],
+                grid[j + 1][i],
+            ];
             root.draw(&Polygon::new(pts, shade(color, depth_f).filled()))
                 .map_err(|e| BtError::Render(e.to_string()))?;
         }
@@ -136,7 +159,9 @@ where DB::ErrorType: 'static,
     root.draw(&Text::new(
         "X: strike  Y: IV  Z: expiry",
         (w as i32 / 2 - 90, h as i32 - 40),
-        (LABEL_FONT, 11).into_font().color(&cfg.theme.text().mix(0.6)),
+        (LABEL_FONT, 11)
+            .into_font()
+            .color(&cfg.theme.text().mix(0.6)),
     ))
     .map_err(|e| BtError::Render(e.to_string()))?;
 
@@ -162,7 +187,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = VolSurface3DConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_3d_vol_surface.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_3d_vol_surface.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

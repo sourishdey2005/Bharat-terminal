@@ -13,20 +13,50 @@ use crate::palette::Theme;
 #[derive(Debug, Clone)]
 pub struct MonsoonAgriPoint {
     pub month: String,
-    pub rainfall_mm: f64,       // actual rainfall
+    pub rainfall_mm: f64,        // actual rainfall
     pub normal_rainfall_mm: f64, // long-period average
-    pub agri_index: f64,        // agricultural commodity price index
+    pub agri_index: f64,         // agricultural commodity price index
 }
 
 /// Sample data for Jun-Sep monsoon season.
 fn sample_monsoon() -> Vec<MonsoonAgriPoint> {
     vec![
-        MonsoonAgriPoint { month: "Jun".to_string(), rainfall_mm: 120.0, normal_rainfall_mm: 145.0, agri_index: 100.0 },
-        MonsoonAgriPoint { month: "Jul".to_string(), rainfall_mm: 280.0, normal_rainfall_mm: 290.0, agri_index: 103.5 },
-        MonsoonAgriPoint { month: "Aug".to_string(), rainfall_mm: 240.0, normal_rainfall_mm: 260.0, agri_index: 107.2 },
-        MonsoonAgriPoint { month: "Sep".to_string(), rainfall_mm: 180.0, normal_rainfall_mm: 175.0, agri_index: 110.8 },
-        MonsoonAgriPoint { month: "Oct".to_string(), rainfall_mm: 60.0, normal_rainfall_mm: 70.0, agri_index: 112.3 },
-        MonsoonAgriPoint { month: "Nov".to_string(), rainfall_mm: 20.0, normal_rainfall_mm: 25.0, agri_index: 111.5 },
+        MonsoonAgriPoint {
+            month: "Jun".to_string(),
+            rainfall_mm: 120.0,
+            normal_rainfall_mm: 145.0,
+            agri_index: 100.0,
+        },
+        MonsoonAgriPoint {
+            month: "Jul".to_string(),
+            rainfall_mm: 280.0,
+            normal_rainfall_mm: 290.0,
+            agri_index: 103.5,
+        },
+        MonsoonAgriPoint {
+            month: "Aug".to_string(),
+            rainfall_mm: 240.0,
+            normal_rainfall_mm: 260.0,
+            agri_index: 107.2,
+        },
+        MonsoonAgriPoint {
+            month: "Sep".to_string(),
+            rainfall_mm: 180.0,
+            normal_rainfall_mm: 175.0,
+            agri_index: 110.8,
+        },
+        MonsoonAgriPoint {
+            month: "Oct".to_string(),
+            rainfall_mm: 60.0,
+            normal_rainfall_mm: 70.0,
+            agri_index: 112.3,
+        },
+        MonsoonAgriPoint {
+            month: "Nov".to_string(),
+            rainfall_mm: 20.0,
+            normal_rainfall_mm: 25.0,
+            agri_index: 111.5,
+        },
     ]
 }
 
@@ -136,9 +166,7 @@ where
         }))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Rainfall")
-        .legend(|(x, y)| {
-            Rectangle::new([(x, y), (x + 10, y + 10)], cfg.theme.info().filled())
-        });
+        .legend(|(x, y)| Rectangle::new([(x, y), (x + 10, y + 10)], cfg.theme.info().filled()));
 
     // Normal rainfall line
     let normal_pts: Vec<(f64, f64)> = data
@@ -167,10 +195,7 @@ where
         .map(|(i, p)| (i as f64, p.agri_index))
         .collect();
     chart
-        .draw_secondary_series(LineSeries::new(
-            idx_pts,
-            cfg.theme.accent().stroke_width(2),
-        ))
+        .draw_secondary_series(LineSeries::new(idx_pts, cfg.theme.accent().stroke_width(2)))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Agri Index")
         .legend(|(x, y)| {

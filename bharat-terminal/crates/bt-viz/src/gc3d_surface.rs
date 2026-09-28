@@ -32,19 +32,37 @@ impl Default for Gc3dSurfaceConfig {
 }
 
 impl Gc3dSurfaceConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn tenors(mut self, t: Vec<f64>) -> Self { self.tenors = t; self }
-    pub fn dates(mut self, d: Vec<f64>) -> Self { self.dates = d; self }
-    pub fn surface(mut self, s: Vec<Vec<f64>>) -> Self { self.surface = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn tenors(mut self, t: Vec<f64>) -> Self {
+        self.tenors = t;
+        self
+    }
+    pub fn dates(mut self, d: Vec<f64>) -> Self {
+        self.dates = d;
+        self
+    }
+    pub fn surface(mut self, s: Vec<Vec<f64>>) -> Self {
+        self.surface = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
     root: plotters::drawing::DrawingArea<DB, plotters::coord::Shift>,
     cfg: &Gc3dSurfaceConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if cfg.surface.is_empty() || cfg.surface[0].is_empty() {
         return Err(BtError::EmptySeries("surface data".into()));
@@ -83,26 +101,27 @@ where DB::ErrorType: 'static,
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart
-        .draw_series(
-            cfg.surface.iter().enumerate().flat_map(|(di, row)| {
-                row.iter().enumerate().map(move |(ti, &z)| {
-                    let color_val = (z - z_min) / z_range;
-                    let color = if color_val < 0.5 {
-                        let t = color_val * 2.0;
-                        let lerp = |a: u8, b: u8| (a as f64 + (b as f64 - a as f64) * t).round() as u8;
-                        RGBColor(lerp(0x00, 0xFF), lerp(0xBF, 0x3B), lerp(0xFF, 0x3B))
-                    } else {
-                        let t = (color_val - 0.5) * 2.0;
-                        let lerp = |a: u8, b: u8| (a as f64 + (b as f64 - a as f64) * t).round() as u8;
-                        RGBColor(lerp(0xFF, 0x00), lerp(0x3B, 0xFF), lerp(0x3B, 0x88))
-                    };
-                    Rectangle::new(
-                        [(di as f64, z, ti as f64), ((di + 1) as f64, z, (ti + 1) as f64)],
-                        color.filled(),
-                    )
-                })
-            }),
-        )
+        .draw_series(cfg.surface.iter().enumerate().flat_map(|(di, row)| {
+            row.iter().enumerate().map(move |(ti, &z)| {
+                let color_val = (z - z_min) / z_range;
+                let color = if color_val < 0.5 {
+                    let t = color_val * 2.0;
+                    let lerp = |a: u8, b: u8| (a as f64 + (b as f64 - a as f64) * t).round() as u8;
+                    RGBColor(lerp(0x00, 0xFF), lerp(0xBF, 0x3B), lerp(0xFF, 0x3B))
+                } else {
+                    let t = (color_val - 0.5) * 2.0;
+                    let lerp = |a: u8, b: u8| (a as f64 + (b as f64 - a as f64) * t).round() as u8;
+                    RGBColor(lerp(0xFF, 0x00), lerp(0x3B, 0xFF), lerp(0x3B, 0x88))
+                };
+                Rectangle::new(
+                    [
+                        (di as f64, z, ti as f64),
+                        ((di + 1) as f64, z, (ti + 1) as f64),
+                    ],
+                    color.filled(),
+                )
+            })
+        }))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     draw_footer(&root, cfg.theme)?;
@@ -125,10 +144,18 @@ mod tests {
     #[test]
     fn renders() {
         let surface: Vec<Vec<f64>> = (0..12)
-            .map(|d| (0..7).map(|t| 3.0 + d as f64 * 0.1 + t as f64 * 0.3).collect())
+            .map(|d| {
+                (0..7)
+                    .map(|t| 3.0 + d as f64 * 0.1 + t as f64 * 0.3)
+                    .collect()
+            })
             .collect();
         let cfg = Gc3dSurfaceConfig::new().theme(Theme::Dark).surface(surface);
-        let path = std::env::temp_dir().join("bt_test_gc3d_surface.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_gc3d_surface.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&cfg, &path).unwrap();
     }
 }

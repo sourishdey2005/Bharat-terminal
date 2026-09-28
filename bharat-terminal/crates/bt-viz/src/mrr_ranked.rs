@@ -19,7 +19,11 @@ pub struct RankedEntry {
 
 impl RankedEntry {
     pub fn new(name: impl Into<String>, return_pct: f64, market_cap: f64) -> Self {
-        Self { name: name.into(), return_pct, market_cap: market_cap.max(0.0) }
+        Self {
+            name: name.into(),
+            return_pct,
+            market_cap: market_cap.max(0.0),
+        }
     }
 }
 
@@ -43,11 +47,25 @@ impl Default for MrrRankedConfig {
 }
 
 impl MrrRankedConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn top_n(mut self, n: usize) -> Self { self.top_n = n.max(3).min(50); self }
-    pub fn ascending(mut self, a: bool) -> Self { self.ascending = a; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn top_n(mut self, n: usize) -> Self {
+        self.top_n = n.max(3).min(50);
+        self
+    }
+    pub fn ascending(mut self, a: bool) -> Self {
+        self.ascending = a;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -55,7 +73,8 @@ fn render<DB: DrawingBackend>(
     entries: &[RankedEntry],
     cfg: &MrrRankedConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if entries.is_empty() {
         return Err(BtError::EmptySeries("ranked entries".into()));
@@ -65,15 +84,25 @@ where DB::ErrorType: 'static,
     let mut sorted: Vec<RankedEntry> = entries.to_vec();
     sorted.sort_by(|a, b| {
         if cfg.ascending {
-            a.return_pct.partial_cmp(&b.return_pct).unwrap_or(std::cmp::Ordering::Equal)
+            a.return_pct
+                .partial_cmp(&b.return_pct)
+                .unwrap_or(std::cmp::Ordering::Equal)
         } else {
-            b.return_pct.partial_cmp(&a.return_pct).unwrap_or(std::cmp::Ordering::Equal)
+            b.return_pct
+                .partial_cmp(&a.return_pct)
+                .unwrap_or(std::cmp::Ordering::Equal)
         }
     });
     let top: Vec<RankedEntry> = sorted.into_iter().take(cfg.top_n).collect();
 
-    let r_min = top.iter().map(|e| e.return_pct).fold(f64::INFINITY, f64::min);
-    let r_max = top.iter().map(|e| e.return_pct).fold(f64::NEG_INFINITY, f64::max);
+    let r_min = top
+        .iter()
+        .map(|e| e.return_pct)
+        .fold(f64::INFINITY, f64::min);
+    let r_max = top
+        .iter()
+        .map(|e| e.return_pct)
+        .fold(f64::NEG_INFINITY, f64::max);
     let pad = (r_max - r_min).max(0.1) * 0.1;
 
     let mut chart = ChartBuilder::on(&root)
@@ -99,7 +128,11 @@ where DB::ErrorType: 'static,
 
     chart
         .draw_series(top.iter().enumerate().map(|(i, e)| {
-            let color = if e.return_pct >= 0.0 { cfg.theme.profit() } else { cfg.theme.loss() };
+            let color = if e.return_pct >= 0.0 {
+                cfg.theme.profit()
+            } else {
+                cfg.theme.loss()
+            };
             Rectangle::new(
                 [(i, 0.0_f64.max(r_min - pad)), (i + 1, e.return_pct)],
                 color.filled(),
@@ -127,10 +160,20 @@ mod tests {
     #[test]
     fn renders() {
         let entries: Vec<RankedEntry> = (0..15)
-            .map(|i| RankedEntry::new(format!("MEM{}", i), (15 - i) as f64 * 0.8 - 5.0, (15 - i) as f64 * 100.0))
+            .map(|i| {
+                RankedEntry::new(
+                    format!("MEM{}", i),
+                    (15 - i) as f64 * 0.8 - 5.0,
+                    (15 - i) as f64 * 100.0,
+                )
+            })
             .collect();
         let cfg = MrrRankedConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_mrr_ranked.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_mrr_ranked.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&entries, &cfg, &path).unwrap();
     }
 }

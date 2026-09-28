@@ -20,16 +20,35 @@ pub struct SupertrendConfig {
 
 impl Default for SupertrendConfig {
     fn default() -> Self {
-        Self { title: "Supertrend".to_string(), theme: Theme::Dark, period: 10, multiplier: 3.0 }
+        Self {
+            title: "Supertrend".to_string(),
+            theme: Theme::Dark,
+            period: 10,
+            multiplier: 3.0,
+        }
     }
 }
 
 impl SupertrendConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn period(mut self, p: usize) -> Self { self.period = p.max(2); self }
-    pub fn multiplier(mut self, m: f64) -> Self { self.multiplier = m.max(0.5); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn period(mut self, p: usize) -> Self {
+        self.period = p.max(2);
+        self
+    }
+    pub fn multiplier(mut self, m: f64) -> Self {
+        self.multiplier = m.max(0.5);
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -37,7 +56,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &SupertrendConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -48,7 +68,9 @@ where DB::ErrorType: 'static,
     let mut is_uptrend = true;
 
     for i in 0..n {
-        if atr_vals[i].is_nan() { continue; }
+        if atr_vals[i].is_nan() {
+            continue;
+        }
         let hl2 = (series.candles[i].high + series.candles[i].low) / 2.0;
         let upper = hl2 + cfg.multiplier * atr_vals[i];
         let lower = hl2 - cfg.multiplier * atr_vals[i];
@@ -67,38 +89,68 @@ where DB::ErrorType: 'static,
 
     let t_min = series.candles.first().unwrap().t;
     let t_max = series.candles.last().unwrap().t;
-    let low = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
-    let high = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
+    let low = series
+        .candles
+        .iter()
+        .map(|c| c.low)
+        .fold(f64::MAX, f64::min);
+    let high = series
+        .candles
+        .iter()
+        .map(|c| c.high)
+        .fold(f64::MIN, f64::max);
     let pad = (high - low) * 0.05;
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(10)
         .x_label_area_size(30)
         .y_label_area_size(60)
         .build_cartesian_2d(t_min..t_max, (low - pad)..(high + pad))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
-    chart.configure_mesh()
+    chart
+        .configure_mesh()
         .label_style((LABEL_FONT, 12).into_font().color(&cfg.theme.text()))
         .axis_style(&cfg.theme.border())
         .draw()
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     for c in &series.candles {
-        let color = if c.is_bullish() { cfg.theme.profit() } else { cfg.theme.loss() };
-        chart.draw_series(std::iter::once(CandleStick::new(
-            c.t, c.open, c.high, c.low, c.close,
-            color.filled(), color.filled(), 5,
-        )))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        let color = if c.is_bullish() {
+            cfg.theme.profit()
+        } else {
+            cfg.theme.loss()
+        };
+        chart
+            .draw_series(std::iter::once(CandleStick::new(
+                c.t,
+                c.open,
+                c.high,
+                c.low,
+                c.close,
+                color.filled(),
+                color.filled(),
+                5,
+            )))
+            .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
-    chart.draw_series(LineSeries::new(
-        series.candles.iter().enumerate().filter_map(|(i, c)| if !supertrend[i].is_nan() { Some((c.t, supertrend[i])) } else { None }),
-        cfg.theme.info().stroke_width(2),
-    ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+    chart
+        .draw_series(LineSeries::new(
+            series.candles.iter().enumerate().filter_map(|(i, c)| {
+                if !supertrend[i].is_nan() {
+                    Some((c.t, supertrend[i]))
+                } else {
+                    None
+                }
+            }),
+            cfg.theme.info().stroke_width(2),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
 
     draw_footer(&root, cfg.theme)?;
     root.present().map_err(|e| BtError::Render(e.to_string()))?;
@@ -122,7 +174,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = SupertrendConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_supertrend.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_supertrend.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

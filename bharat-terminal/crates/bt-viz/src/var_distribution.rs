@@ -34,28 +34,48 @@ impl Default for VarDistributionConfig {
 }
 
 impl VarDistributionConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn confidence(mut self, c: f64) -> Self { self.confidence = c.clamp(0.5, 0.999); self }
-    pub fn num_buckets(mut self, b: usize) -> Self { self.num_buckets = b.max(5).min(50); self }
-    pub fn returns(mut self, r: Vec<f64>) -> Self { self.returns = r; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn confidence(mut self, c: f64) -> Self {
+        self.confidence = c.clamp(0.5, 0.999);
+        self
+    }
+    pub fn num_buckets(mut self, b: usize) -> Self {
+        self.num_buckets = b.max(5).min(50);
+        self
+    }
+    pub fn returns(mut self, r: Vec<f64>) -> Self {
+        self.returns = r;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
     root: plotters::drawing::DrawingArea<DB, plotters::coord::Shift>,
     cfg: &VarDistributionConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     fill_background(&root, cfg.theme)?;
 
     let returns = if cfg.returns.is_empty() {
         let mut rng = rand::rngs::StdRng::seed_from_u64(42);
-        (0..200).map(|_| {
-            let shock: f64 = rng.gen_range(-1.0..1.0);
-            -0.02 + shock * 0.015
-        }).collect()
+        (0..200)
+            .map(|_| {
+                let shock: f64 = rng.gen_range(-1.0..1.0);
+                -0.02 + shock * 0.015
+            })
+            .collect()
     } else {
         cfg.returns.clone()
     };
@@ -88,7 +108,12 @@ where DB::ErrorType: 'static,
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
-            format!("{} — {:.0}% VaR: {:.2}%", cfg.title, cfg.confidence * 100.0, var_value),
+            format!(
+                "{} — {:.0}% VaR: {:.2}%",
+                cfg.title,
+                cfg.confidence * 100.0,
+                var_value
+            ),
             (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
         )
         .margin(10)
@@ -143,7 +168,11 @@ mod tests {
     #[test]
     fn renders() {
         let cfg = VarDistributionConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_var_distribution.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_var_distribution.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&cfg, &path).unwrap();
     }
 }

@@ -30,11 +30,25 @@ impl Default for ComparisonVolatilityConfig {
 }
 
 impl ComparisonVolatilityConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, title: impl Into<String>) -> Self { self.title = title.into(); self }
-    pub fn theme(mut self, theme: Theme) -> Self { self.theme = theme; self }
-    pub fn window(mut self, v: usize) -> Self { self.window = v.max(2); self }
-    pub fn periods_per_year(mut self, v: usize) -> Self { self.periods_per_year = v.max(1); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
+        self
+    }
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
+    pub fn window(mut self, v: usize) -> Self {
+        self.window = v.max(2);
+        self
+    }
+    pub fn periods_per_year(mut self, v: usize) -> Self {
+        self.periods_per_year = v.max(1);
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -58,9 +72,13 @@ where
     let n = vol_a.len().min(vol_b.len());
     let t_min = 0.0;
     let t_max = n as f64;
-    let max_vol = vol_a.iter().chain(vol_b.iter())
+    let max_vol = vol_a
+        .iter()
+        .chain(vol_b.iter())
         .filter(|v| !v.is_nan())
-        .copied().fold(0.0_f64, f64::max) * 1.1;
+        .copied()
+        .fold(0.0_f64, f64::max)
+        * 1.1;
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
@@ -83,21 +101,40 @@ where
 
     chart
         .draw_series(LineSeries::new(
-            (0..n).filter_map(|i| if !vol_a[i].is_nan() { Some((i as f64, vol_a[i])) } else { None }),
+            (0..n).filter_map(|i| {
+                if !vol_a[i].is_nan() {
+                    Some((i as f64, vol_a[i]))
+                } else {
+                    None
+                }
+            }),
             cfg.theme.profit().stroke_width(2),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label(&series_a.symbol)
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.profit().stroke_width(2)));
+        .legend(|(x, y)| {
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.profit().stroke_width(2),
+            )
+        });
 
     chart
         .draw_series(LineSeries::new(
-            (0..n).filter_map(|i| if !vol_b[i].is_nan() { Some((i as f64, vol_b[i])) } else { None }),
+            (0..n).filter_map(|i| {
+                if !vol_b[i].is_nan() {
+                    Some((i as f64, vol_b[i]))
+                } else {
+                    None
+                }
+            }),
             cfg.theme.loss().stroke_width(2),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label(&series_b.symbol)
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.loss().stroke_width(2)));
+        .legend(|(x, y)| {
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.loss().stroke_width(2))
+        });
 
     chart
         .configure_series_labels()
@@ -112,11 +149,21 @@ where
     Ok(())
 }
 
-pub fn render_png(series_a: &OhlcvSeries, series_b: &OhlcvSeries, cfg: &ComparisonVolatilityConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    series_a: &OhlcvSeries,
+    series_b: &OhlcvSeries,
+    cfg: &ComparisonVolatilityConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, series_a, series_b, cfg)
 }
 
-pub fn render_svg(series_a: &OhlcvSeries, series_b: &OhlcvSeries, cfg: &ComparisonVolatilityConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    series_a: &OhlcvSeries,
+    series_b: &OhlcvSeries,
+    cfg: &ComparisonVolatilityConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, series_a, series_b, cfg)
 }
 
@@ -130,7 +177,11 @@ mod tests {
         let a = synthetic_ohlcv("AAA", 100, 1, 100.0);
         let b = synthetic_ohlcv("BBB", 100, 2, 100.0);
         let cfg = ComparisonVolatilityConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_comparison_volatility.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_comparison_volatility.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&a, &b, &cfg, &path).unwrap();
     }
 }

@@ -47,7 +47,10 @@ impl CandleImbalanceBarsConfig {
     }
 }
 
-fn build_imbalance_bars(series: &OhlcvSeries, threshold: f64) -> Vec<(f64, f64, f64, f64, f64, f64)> {
+fn build_imbalance_bars(
+    series: &OhlcvSeries,
+    threshold: f64,
+) -> Vec<(f64, f64, f64, f64, f64, f64)> {
     let mut bars = Vec::new();
     let mut cur: Option<(f64, f64, f64, f64, f64, f64)> = None;
 

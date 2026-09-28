@@ -21,9 +21,9 @@ pub mod yahoo;
 pub use provider::{CompanyProfile, DataProvider, Interval, Quote, SymbolInfo};
 pub use symbol::{COMPANY_LIST, DEFAULT_COMPANY};
 
-use crate::yahoo::YahooProvider;
-use crate::coinbase::CoinbaseProvider;
 use crate::cache::Cache;
+use crate::coinbase::CoinbaseProvider;
+use crate::yahoo::YahooProvider;
 use bt_core::{OhlcvSeries, Result};
 use chrono::{DateTime, Utc};
 use std::path::Path;
@@ -75,7 +75,8 @@ impl DataService {
         }
 
         // Determine provider based on symbol
-        let series = if symbol.ends_with("-USD") || symbol.contains("BTC") || symbol.contains("ETH") {
+        let series = if symbol.ends_with("-USD") || symbol.contains("BTC") || symbol.contains("ETH")
+        {
             // Use Coinbase for crypto
             let granularity = self.interval_to_granularity(interval);
             let start_ts = Some(start);
@@ -144,15 +145,15 @@ impl Default for DataService {
 }
 
 // Re-exports for convenience
+pub use crate::coinbase::CoinbaseProvider as Coinbase;
 pub use crate::provider::DataProvider as Provider;
 pub use crate::yahoo::YahooProvider as Yahoo;
-pub use crate::coinbase::CoinbaseProvider as Coinbase;
 
 // India market data re-exports
 pub use crate::india::{
-    BankingIndicator, CommodityData, CorporateAction, CreditRating, FPIFlow, GSecData,
-    IPOData, MacroIndicator, MoneyMarketRate, MutualFundData, OptionsChainEntry, RBIPolicy,
-    USDRate, YieldCurvePoint,
+    BankingIndicator, CommodityData, CorporateAction, CreditRating, FPIFlow, GSecData, IPOData,
+    MacroIndicator, MoneyMarketRate, MutualFundData, OptionsChainEntry, RBIPolicy, USDRate,
+    YieldCurvePoint,
 };
 
 #[cfg(test)]

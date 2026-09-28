@@ -90,25 +90,49 @@ fn compute_kagi(series: &OhlcvSeries, reversal_pct: f64) -> Vec<KagiPoint> {
             KagiDirection::Up => {
                 if close > extreme {
                     extreme = close;
-                    points.push(KagiPoint { x, price: close, kagi_dir: direction });
+                    points.push(KagiPoint {
+                        x,
+                        price: close,
+                        kagi_dir: direction,
+                    });
                 } else if (extreme - close) / extreme > reversal_factor {
                     direction = KagiDirection::Down;
-                    points.push(KagiPoint { x, price: extreme, kagi_dir: KagiDirection::Up });
+                    points.push(KagiPoint {
+                        x,
+                        price: extreme,
+                        kagi_dir: KagiDirection::Up,
+                    });
                     prev_price = extreme;
                     extreme = close;
-                    points.push(KagiPoint { x, price: close, kagi_dir: KagiDirection::Down });
+                    points.push(KagiPoint {
+                        x,
+                        price: close,
+                        kagi_dir: KagiDirection::Down,
+                    });
                 }
             }
             KagiDirection::Down => {
                 if close < extreme {
                     extreme = close;
-                    points.push(KagiPoint { x, price: close, kagi_dir: direction });
+                    points.push(KagiPoint {
+                        x,
+                        price: close,
+                        kagi_dir: direction,
+                    });
                 } else if (close - prev_price) / prev_price > reversal_factor {
                     direction = KagiDirection::Up;
-                    points.push(KagiPoint { x, price: extreme, kagi_dir: KagiDirection::Down });
+                    points.push(KagiPoint {
+                        x,
+                        price: extreme,
+                        kagi_dir: KagiDirection::Down,
+                    });
                     prev_price = extreme;
                     extreme = close;
-                    points.push(KagiPoint { x, price: close, kagi_dir: KagiDirection::Up });
+                    points.push(KagiPoint {
+                        x,
+                        price: close,
+                        kagi_dir: KagiDirection::Up,
+                    });
                 }
             }
         }
@@ -160,7 +184,10 @@ where
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
-            format!("{} — {} (Reversal: {:.1}%)", cfg.title, series.symbol, cfg.reversal_pct),
+            format!(
+                "{} — {} (Reversal: {:.1}%)",
+                cfg.title, series.symbol, cfg.reversal_pct
+            ),
             (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
         )
         .margin(10)
@@ -185,7 +212,11 @@ where
         } else {
             cfg.theme.loss()
         };
-        let width = if p2.kagi_dir == KagiDirection::Up { 1 } else { 3 };
+        let width = if p2.kagi_dir == KagiDirection::Up {
+            1
+        } else {
+            3
+        };
 
         chart
             .draw_series(std::iter::once(PathElement::new(
@@ -229,7 +260,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = KagiConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_kagi.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_kagi.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

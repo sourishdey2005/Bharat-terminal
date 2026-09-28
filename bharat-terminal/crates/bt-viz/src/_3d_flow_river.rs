@@ -22,16 +22,35 @@ pub struct FlowRiver3DConfig {
 
 impl Default for FlowRiver3DConfig {
     fn default() -> Self {
-        Self { title: "3D Flow River".to_string(), theme: Theme::Dark, n_particles: 800, seed: 7 }
+        Self {
+            title: "3D Flow River".to_string(),
+            theme: Theme::Dark,
+            n_particles: 800,
+            seed: 7,
+        }
     }
 }
 
 impl FlowRiver3DConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn n_particles(mut self, n: usize) -> Self { self.n_particles = n.max(50); self }
-    pub fn seed(mut self, s: u64) -> Self { self.seed = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn n_particles(mut self, n: usize) -> Self {
+        self.n_particles = n.max(50);
+        self
+    }
+    pub fn seed(mut self, s: u64) -> Self {
+        self.seed = s;
+        self
+    }
 }
 
 fn project(x: f64, y: f64, z: f64, cx: f64, cy: f64) -> (i32, i32, f64) {
@@ -54,7 +73,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &FlowRiver3DConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -70,8 +90,16 @@ where DB::ErrorType: 'static,
     ))
     .map_err(|e| BtError::Render(e.to_string()))?;
 
-    let min_p = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
-    let max_p = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
+    let min_p = series
+        .candles
+        .iter()
+        .map(|c| c.low)
+        .fold(f64::MAX, f64::min);
+    let max_p = series
+        .candles
+        .iter()
+        .map(|c| c.high)
+        .fold(f64::MIN, f64::max);
     let pr = (max_p - min_p).max(1e-9);
     let n = series.candles.len();
 
@@ -93,11 +121,19 @@ where DB::ErrorType: 'static,
         particles.push(((sx, sy, s), pressure));
     }
 
-    particles.sort_by(|a, b| a.0 .2.partial_cmp(&b.0 .2).unwrap_or(std::cmp::Ordering::Equal));
+    particles.sort_by(|a, b| {
+        a.0 .2
+            .partial_cmp(&b.0 .2)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     for ((sx, sy, s), pressure) in &particles {
         let size = (2.0 * s) as i32 + 1;
-        let color = if *pressure > 0.0 { cfg.theme.profit() } else { cfg.theme.loss() };
+        let color = if *pressure > 0.0 {
+            cfg.theme.profit()
+        } else {
+            cfg.theme.loss()
+        };
         let alpha = (0.3 + 0.5 * s).clamp(0.2, 0.8);
         root.draw(&Circle::new((*sx, *sy), size, shade(color, alpha).filled()))
             .map_err(|e| BtError::Render(e.to_string()))?;
@@ -106,7 +142,9 @@ where DB::ErrorType: 'static,
     root.draw(&Text::new(
         "X: price  Y: time  Z: buy/sell pressure",
         (w as i32 / 2 - 120, h as i32 - 40),
-        (LABEL_FONT, 11).into_font().color(&cfg.theme.text().mix(0.6)),
+        (LABEL_FONT, 11)
+            .into_font()
+            .color(&cfg.theme.text().mix(0.6)),
     ))
     .map_err(|e| BtError::Render(e.to_string()))?;
 
@@ -132,7 +170,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = FlowRiver3DConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_3d_flow_river.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_3d_flow_river.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

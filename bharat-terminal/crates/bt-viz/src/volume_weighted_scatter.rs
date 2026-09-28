@@ -150,11 +150,19 @@ where
     Ok(())
 }
 
-pub fn render_png(series: &OhlcvSeries, cfg: &VolumeWeightedScatterConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    series: &OhlcvSeries,
+    cfg: &VolumeWeightedScatterConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, series, cfg)
 }
 
-pub fn render_svg(series: &OhlcvSeries, cfg: &VolumeWeightedScatterConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    series: &OhlcvSeries,
+    cfg: &VolumeWeightedScatterConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, series, cfg)
 }
 

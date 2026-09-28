@@ -17,14 +17,25 @@ pub struct MoneyMarketConfig {
 
 impl Default for MoneyMarketConfig {
     fn default() -> Self {
-        Self { title: "Money Market Rates".to_string(), theme: Theme::Dark }
+        Self {
+            title: "Money Market Rates".to_string(),
+            theme: Theme::Dark,
+        }
     }
 }
 
 impl MoneyMarketConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
 }
 
 fn sample_rates() -> Vec<(String, f64, f64)> {
@@ -47,7 +58,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &MoneyMarketConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -65,31 +77,63 @@ where DB::ErrorType: 'static,
     let row_h = (h as i32 - 100) / (data.len() as i32 + 1);
     let col_rate = w as i32 * 2 / 3;
 
-    root.draw(&Text::new("Instrument".to_string(), (10, 45), (LABEL_FONT, 12).into_font().color(&cfg.theme.accent())))
-        .map_err(|e| BtError::Render(e.to_string()))?;
-    root.draw(&Text::new("Bid".to_string(), (col_rate - 60, 45), (LABEL_FONT, 12).into_font().color(&cfg.theme.accent())))
-        .map_err(|e| BtError::Render(e.to_string()))?;
-    root.draw(&Text::new("Offer".to_string(), (col_rate + 20, 45), (LABEL_FONT, 12).into_font().color(&cfg.theme.accent())))
-        .map_err(|e| BtError::Render(e.to_string()))?;
-    root.draw(&Text::new("Spread".to_string(), (col_rate + 100, 45), (LABEL_FONT, 12).into_font().color(&cfg.theme.accent())))
-        .map_err(|e| BtError::Render(e.to_string()))?;
+    root.draw(&Text::new(
+        "Instrument".to_string(),
+        (10, 45),
+        (LABEL_FONT, 12).into_font().color(&cfg.theme.accent()),
+    ))
+    .map_err(|e| BtError::Render(e.to_string()))?;
+    root.draw(&Text::new(
+        "Bid".to_string(),
+        (col_rate - 60, 45),
+        (LABEL_FONT, 12).into_font().color(&cfg.theme.accent()),
+    ))
+    .map_err(|e| BtError::Render(e.to_string()))?;
+    root.draw(&Text::new(
+        "Offer".to_string(),
+        (col_rate + 20, 45),
+        (LABEL_FONT, 12).into_font().color(&cfg.theme.accent()),
+    ))
+    .map_err(|e| BtError::Render(e.to_string()))?;
+    root.draw(&Text::new(
+        "Spread".to_string(),
+        (col_rate + 100, 45),
+        (LABEL_FONT, 12).into_font().color(&cfg.theme.accent()),
+    ))
+    .map_err(|e| BtError::Render(e.to_string()))?;
 
     for (i, (name, bid, offer)) in data.iter().enumerate() {
         let y = 45 + (i as i32 + 1) * row_h;
-        root.draw(&Text::new(name.clone(), (10, y + row_h / 2 - 6), (LABEL_FONT, 12).into_font().color(&cfg.theme.text())))
-            .map_err(|e| BtError::Render(e.to_string()))?;
-        root.draw(&Text::new(format!("{:.2}", bid), (col_rate - 60, y + row_h / 2 - 6), (LABEL_FONT, 12).into_font().color(&cfg.theme.profit())))
-            .map_err(|e| BtError::Render(e.to_string()))?;
-        root.draw(&Text::new(format!("{:.2}", offer), (col_rate + 20, y + row_h / 2 - 6), (LABEL_FONT, 12).into_font().color(&cfg.theme.loss())))
-            .map_err(|e| BtError::Render(e.to_string()))?;
+        root.draw(&Text::new(
+            name.clone(),
+            (10, y + row_h / 2 - 6),
+            (LABEL_FONT, 12).into_font().color(&cfg.theme.text()),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
+        root.draw(&Text::new(
+            format!("{:.2}", bid),
+            (col_rate - 60, y + row_h / 2 - 6),
+            (LABEL_FONT, 12).into_font().color(&cfg.theme.profit()),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
+        root.draw(&Text::new(
+            format!("{:.2}", offer),
+            (col_rate + 20, y + row_h / 2 - 6),
+            (LABEL_FONT, 12).into_font().color(&cfg.theme.loss()),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
         let spread = offer - bid;
-        root.draw(&Text::new(format!("{:.0}bp", spread * 100.0), (col_rate + 100, y + row_h / 2 - 6), (LABEL_FONT, 12).into_font().color(&cfg.theme.info())))
-            .map_err(|e| BtError::Render(e.to_string()))?;
+        root.draw(&Text::new(
+            format!("{:.0}bp", spread * 100.0),
+            (col_rate + 100, y + row_h / 2 - 6),
+            (LABEL_FONT, 12).into_font().color(&cfg.theme.info()),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
         root.draw(&PathElement::new(
             vec![(0, y + row_h), (w as i32, y + row_h)],
             cfg.theme.border().stroke_width(1),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
     draw_footer(&root, cfg.theme)?;
@@ -114,7 +158,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("MM", 100, 1, 100.0);
         let cfg = MoneyMarketConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_money_market.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_money_market.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

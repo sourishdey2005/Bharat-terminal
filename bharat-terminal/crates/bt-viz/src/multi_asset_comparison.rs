@@ -138,10 +138,7 @@ where
         let color = colors[idx % colors.len()];
         chart
             .draw_series(LineSeries::new(
-                normalized
-                    .iter()
-                    .enumerate()
-                    .map(|(i, &v)| (i as f64, v)),
+                normalized.iter().enumerate().map(|(i, &v)| (i as f64, v)),
                 color.stroke_width(2),
             ))
             .map_err(|e| BtError::Render(e.to_string()))?

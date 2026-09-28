@@ -67,16 +67,86 @@ pub struct BreadthData {
 
 fn sample_breadth() -> Vec<BreadthData> {
     vec![
-        BreadthData { advances: 1200, declines: 800, unchanged: 100, ad_ratio: 1.5, mcclellan: 12.5, thrust: false },
-        BreadthData { advances: 1400, declines: 600, unchanged: 80, ad_ratio: 2.3, mcclellan: 25.1, thrust: true },
-        BreadthData { advances: 1100, declines: 900, unchanged: 120, ad_ratio: 1.2, mcclellan: -5.3, thrust: false },
-        BreadthData { advances: 1600, declines: 400, unchanged: 60, ad_ratio: 4.0, mcclellan: 45.8, thrust: true },
-        BreadthData { advances: 900, declines: 1100, unchanged: 150, ad_ratio: 0.8, mcclellan: -18.2, thrust: false },
-        BreadthData { advances: 1300, declines: 700, unchanged: 90, ad_ratio: 1.9, mcclellan: 8.7, thrust: false },
-        BreadthData { advances: 1500, declines: 500, unchanged: 70, ad_ratio: 3.0, mcclellan: 32.4, thrust: true },
-        BreadthData { advances: 1000, declines: 1000, unchanged: 130, ad_ratio: 1.0, mcclellan: -2.1, thrust: false },
-        BreadthData { advances: 1700, declines: 300, unchanged: 50, ad_ratio: 5.7, mcclellan: 58.3, thrust: true },
-        BreadthData { advances: 800, declines: 1200, unchanged: 140, ad_ratio: 0.7, mcclellan: -28.5, thrust: false },
+        BreadthData {
+            advances: 1200,
+            declines: 800,
+            unchanged: 100,
+            ad_ratio: 1.5,
+            mcclellan: 12.5,
+            thrust: false,
+        },
+        BreadthData {
+            advances: 1400,
+            declines: 600,
+            unchanged: 80,
+            ad_ratio: 2.3,
+            mcclellan: 25.1,
+            thrust: true,
+        },
+        BreadthData {
+            advances: 1100,
+            declines: 900,
+            unchanged: 120,
+            ad_ratio: 1.2,
+            mcclellan: -5.3,
+            thrust: false,
+        },
+        BreadthData {
+            advances: 1600,
+            declines: 400,
+            unchanged: 60,
+            ad_ratio: 4.0,
+            mcclellan: 45.8,
+            thrust: true,
+        },
+        BreadthData {
+            advances: 900,
+            declines: 1100,
+            unchanged: 150,
+            ad_ratio: 0.8,
+            mcclellan: -18.2,
+            thrust: false,
+        },
+        BreadthData {
+            advances: 1300,
+            declines: 700,
+            unchanged: 90,
+            ad_ratio: 1.9,
+            mcclellan: 8.7,
+            thrust: false,
+        },
+        BreadthData {
+            advances: 1500,
+            declines: 500,
+            unchanged: 70,
+            ad_ratio: 3.0,
+            mcclellan: 32.4,
+            thrust: true,
+        },
+        BreadthData {
+            advances: 1000,
+            declines: 1000,
+            unchanged: 130,
+            ad_ratio: 1.0,
+            mcclellan: -2.1,
+            thrust: false,
+        },
+        BreadthData {
+            advances: 1700,
+            declines: 300,
+            unchanged: 50,
+            ad_ratio: 5.7,
+            mcclellan: 58.3,
+            thrust: true,
+        },
+        BreadthData {
+            advances: 800,
+            declines: 1200,
+            unchanged: 140,
+            ad_ratio: 0.7,
+            mcclellan: -28.5,
+            thrust: false,
+        },
     ]
 }
 
@@ -91,14 +161,8 @@ where
     fill_background(&root, cfg.theme)?;
 
     let n = breadth.len();
-    let max_ad = breadth
-        .iter()
-        .map(|b| b.advances)
-        .fold(0_usize, usize::max);
-    let max_dec = breadth
-        .iter()
-        .map(|b| b.declines)
-        .fold(0_usize, usize::max);
+    let max_ad = breadth.iter().map(|b| b.advances).fold(0_usize, usize::max);
+    let max_dec = breadth.iter().map(|b| b.declines).fold(0_usize, usize::max);
     let max_val = max_ad.max(max_dec) as f64;
 
     let (ad_area, lower_area) = root.split_vertically((50).percent());
@@ -136,20 +200,14 @@ where
     for (i, b) in breadth.iter().enumerate() {
         ad_chart
             .draw_series(std::iter::once(Rectangle::new(
-                [
-                    (i as f64 - bar_width, 0.0),
-                    (i as f64, b.advances as f64),
-                ],
+                [(i as f64 - bar_width, 0.0), (i as f64, b.advances as f64)],
                 cfg.theme.profit().mix(0.7).filled(),
             )))
             .map_err(|e| BtError::Render(e.to_string()))?;
 
         ad_chart
             .draw_series(std::iter::once(Rectangle::new(
-                [
-                    (i as f64, 0.0),
-                    (i as f64 + bar_width, b.declines as f64),
-                ],
+                [(i as f64, 0.0), (i as f64 + bar_width, b.declines as f64)],
                 cfg.theme.loss().mix(0.7).filled(),
             )))
             .map_err(|e| BtError::Render(e.to_string()))?;
@@ -163,7 +221,10 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Advances")
         .legend(|(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.profit().stroke_width(2))
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.profit().stroke_width(2),
+            )
         });
 
     ad_chart
@@ -225,7 +286,10 @@ where
             .map_err(|e| BtError::Render(e.to_string()))?
             .label("McClellan")
             .legend(|(x, y)| {
-                PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(2))
+                PathElement::new(
+                    vec![(x, y), (x + 20, y)],
+                    cfg.theme.accent().stroke_width(2),
+                )
             });
 
         for (i, b) in breadth.iter().enumerate() {

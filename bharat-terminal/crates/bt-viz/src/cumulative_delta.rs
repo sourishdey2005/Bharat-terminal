@@ -1,4 +1,4 @@
-﻿//! Tier 1 #4 â€” Tick delta / cumulative delta (order-flow bars). Made by Sourish Dey.
+//! Tier 1 #4 â€” Tick delta / cumulative delta (order-flow bars). Made by Sourish Dey.
 
 use bt_core::{BtError, OhlcvSeries, Result};
 use plotters::prelude::*;
@@ -72,7 +72,10 @@ where
 
     let max_abs_bar = per_bar.iter().cloned().fold(0.0_f64, |a, b| a.max(b.abs()));
     let mut bar_chart = ChartBuilder::on(&bar_area)
-        .caption(&cfg.title, (TITLE_FONT, 20).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 20).into_font().color(&cfg.theme.text()),
+        )
         .margin(10)
         .x_label_area_size(20)
         .y_label_area_size(60)
@@ -89,7 +92,11 @@ where
 
     bar_chart
         .draw_series(per_bar.iter().enumerate().map(|(i, &d)| {
-            let color = if d >= 0.0 { cfg.theme.profit() } else { cfg.theme.loss() };
+            let color = if d >= 0.0 {
+                cfg.theme.profit()
+            } else {
+                cfg.theme.loss()
+            };
             Rectangle::new([(i as f64, 0.0), (i as f64 + 0.8, d)], color.filled())
         }))
         .map_err(|e| BtError::Render(e.to_string()))?;

@@ -244,27 +244,28 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Momentum")
         .legend(|(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(2))
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.accent().stroke_width(2),
+            )
         });
 
     mom_chart
-        .draw_series(
-            series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !momentum[i].is_nan() {
-                    let color = if momentum[i] > 0.0 {
-                        cfg.theme.profit().mix(0.3)
-                    } else {
-                        cfg.theme.loss().mix(0.3)
-                    };
-                    Some(Rectangle::new(
-                        [(c.t - candle_width, 0.0), (c.t + candle_width, momentum[i])],
-                        color.filled(),
-                    ))
+        .draw_series(series.candles.iter().enumerate().filter_map(|(i, c)| {
+            if !momentum[i].is_nan() {
+                let color = if momentum[i] > 0.0 {
+                    cfg.theme.profit().mix(0.3)
                 } else {
-                    None
-                }
-            }),
-        )
+                    cfg.theme.loss().mix(0.3)
+                };
+                Some(Rectangle::new(
+                    [(c.t - candle_width, 0.0), (c.t + candle_width, momentum[i])],
+                    color.filled(),
+                ))
+            } else {
+                None
+            }
+        }))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     price_chart

@@ -68,10 +68,7 @@ where
     let t_max = series.candles.last().unwrap().t;
 
     let mut chart = ChartBuilder::on(area)
-        .caption(
-            title,
-            (TITLE_FONT, 14).into_font().color(&theme.text()),
-        )
+        .caption(title, (TITLE_FONT, 14).into_font().color(&theme.text()))
         .margin(5)
         .x_label_area_size(25)
         .y_label_area_size(45)
@@ -98,7 +95,11 @@ where
     chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !values[i].is_nan() { Some((c.t, values[i])) } else { None }
+                if !values[i].is_nan() {
+                    Some((c.t, values[i]))
+                } else {
+                    None
+                }
             }),
             color.stroke_width(2),
         ))
@@ -148,7 +149,11 @@ where
         cfg.theme,
         0.0,
         100.0,
-        &[(70.0, cfg.theme.loss()), (30.0, cfg.theme.profit()), (50.0, cfg.theme.border())],
+        &[
+            (70.0, cfg.theme.loss()),
+            (30.0, cfg.theme.profit()),
+            (50.0, cfg.theme.border()),
+        ],
         cfg.theme.info(),
     )?;
 
@@ -156,14 +161,23 @@ where
     {
         let t_min = series.candles.first().unwrap().t;
         let t_max = series.candles.last().unwrap().t;
-        let macd_min = histogram.iter().filter(|v| !v.is_nan()).fold(f64::INFINITY, |a, &b| a.min(b));
-        let macd_max = histogram.iter().filter(|v| !v.is_nan()).fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+        let macd_min = histogram
+            .iter()
+            .filter(|v| !v.is_nan())
+            .fold(f64::INFINITY, |a, &b| a.min(b));
+        let macd_max = histogram
+            .iter()
+            .filter(|v| !v.is_nan())
+            .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
         let range = (macd_max - macd_min).max(1e-6);
         let y_min = macd_min - range * 0.2;
         let y_max = macd_max + range * 0.2;
 
         let mut chart = ChartBuilder::on(&macd_area)
-            .caption("MACD", (TITLE_FONT, 14).into_font().color(&cfg.theme.text()))
+            .caption(
+                "MACD",
+                (TITLE_FONT, 14).into_font().color(&cfg.theme.text()),
+            )
             .margin(5)
             .x_label_area_size(25)
             .y_label_area_size(45)
@@ -191,12 +205,21 @@ where
         chart
             .draw_series(series.candles.iter().enumerate().filter_map(|(i, c)| {
                 if !histogram[i].is_nan() {
-                    let color = if histogram[i] >= 0.0 { cfg.theme.profit() } else { cfg.theme.loss() };
+                    let color = if histogram[i] >= 0.0 {
+                        cfg.theme.profit()
+                    } else {
+                        cfg.theme.loss()
+                    };
                     Some(Rectangle::new(
-                        [(c.t - candle_width * 0.5, 0.0), (c.t + candle_width * 0.5, histogram[i])],
+                        [
+                            (c.t - candle_width * 0.5, 0.0),
+                            (c.t + candle_width * 0.5, histogram[i]),
+                        ],
                         color.mix(0.7).filled(),
                     ))
-                } else { None }
+                } else {
+                    None
+                }
             }))
             .map_err(|e| BtError::Render(e.to_string()))?;
 
@@ -204,7 +227,11 @@ where
         chart
             .draw_series(LineSeries::new(
                 series.candles.iter().enumerate().filter_map(|(i, c)| {
-                    if !macd_line[i].is_nan() { Some((c.t, macd_line[i])) } else { None }
+                    if !macd_line[i].is_nan() {
+                        Some((c.t, macd_line[i]))
+                    } else {
+                        None
+                    }
                 }),
                 cfg.theme.info().stroke_width(2),
             ))
@@ -214,7 +241,11 @@ where
         chart
             .draw_series(LineSeries::new(
                 series.candles.iter().enumerate().filter_map(|(i, c)| {
-                    if !signal_line[i].is_nan() { Some((c.t, signal_line[i])) } else { None }
+                    if !signal_line[i].is_nan() {
+                        Some((c.t, signal_line[i]))
+                    } else {
+                        None
+                    }
                 }),
                 cfg.theme.accent().stroke_width(2),
             ))
@@ -230,12 +261,19 @@ where
         cfg.theme,
         0.0,
         100.0,
-        &[(80.0, cfg.theme.loss()), (20.0, cfg.theme.profit()), (50.0, cfg.theme.border())],
+        &[
+            (80.0, cfg.theme.loss()),
+            (20.0, cfg.theme.profit()),
+            (50.0, cfg.theme.border()),
+        ],
         cfg.theme.info(),
     )?;
 
     // ATR Panel
-    let atr_max = atr_vals.iter().filter(|v| !v.is_nan()).fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+    let atr_max = atr_vals
+        .iter()
+        .filter(|v| !v.is_nan())
+        .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
     draw_indicator_panel(
         &atr_area,
         &format!("ATR({})", cfg.atr_period),
@@ -264,8 +302,14 @@ where
     )?;
 
     // VWAP Panel
-    let vwap_min = vwap_vals.iter().filter(|v| !v.is_nan()).fold(f64::INFINITY, |a, &b| a.min(b));
-    let vwap_max = vwap_vals.iter().filter(|v| !v.is_nan()).fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+    let vwap_min = vwap_vals
+        .iter()
+        .filter(|v| !v.is_nan())
+        .fold(f64::INFINITY, |a, &b| a.min(b));
+    let vwap_max = vwap_vals
+        .iter()
+        .filter(|v| !v.is_nan())
+        .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
     draw_indicator_panel(
         &vwap_area,
         "VWAP",

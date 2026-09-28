@@ -1,4 +1,4 @@
-﻿// crates/bt-viz/src/renko.rs
+// crates/bt-viz/src/renko.rs
 // Author: Sourish Dey
 
 //! Tier 1 #7 â€” Renko Chart (fixed-brick price chart).
@@ -90,12 +90,17 @@ where
     // Find price range of bricks
     let brick_prices: Vec<f64> = bricks.iter().map(|b| b.0).collect();
     let low = brick_prices.iter().fold(f64::MAX, |a, &b| a.min(b));
-    let high = brick_prices.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+    let high = brick_prices
+        .iter()
+        .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
     let pad = (high - low).max(1.0) * 0.1;
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
-            format!("{} â€” {} (Brick: {:.2})", cfg.title, series.symbol, cfg.brick_size),
+            format!(
+                "{} â€” {} (Brick: {:.2})",
+                cfg.title, series.symbol, cfg.brick_size
+            ),
             (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
         )
         .margin(10)

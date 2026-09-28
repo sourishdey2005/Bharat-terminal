@@ -88,7 +88,11 @@ fn lerp(a: u8, b: u8, t: f64) -> u8 {
 
 fn change_color(theme: Theme, v: f64) -> RGBColor {
     let bg = theme.background();
-    let target = if v >= 0.0 { theme.profit() } else { theme.loss() };
+    let target = if v >= 0.0 {
+        theme.profit()
+    } else {
+        theme.loss()
+    };
     let t = v.abs().min(1.0);
     RGBColor(
         lerp(bg.0, target.0, t),
@@ -136,11 +140,21 @@ where
 
     for pair in data {
         let i = match pair.base.as_str() {
-            "USD" => 0, "EUR" => 1, "GBP" => 2, "JPY" => 3, "INR" => 4, "AUD" => 5,
+            "USD" => 0,
+            "EUR" => 1,
+            "GBP" => 2,
+            "JPY" => 3,
+            "INR" => 4,
+            "AUD" => 5,
             _ => continue,
         };
         let j = match pair.quote.as_str() {
-            "USD" => 0, "EUR" => 1, "GBP" => 2, "JPY" => 3, "INR" => 4, "AUD" => 5,
+            "USD" => 0,
+            "EUR" => 1,
+            "GBP" => 2,
+            "JPY" => 3,
+            "INR" => 4,
+            "AUD" => 5,
             _ => continue,
         };
 
@@ -149,13 +163,19 @@ where
 
         let color = change_color(cfg.theme, pair.change_pct / max_abs_change);
         root.draw(&Rectangle::new(
-            [(x as i32, y as i32), ((x + cell_w) as i32, (y + cell_h) as i32)],
+            [
+                (x as i32, y as i32),
+                ((x + cell_w) as i32, (y + cell_h) as i32),
+            ],
             color.filled(),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
         root.draw(&Rectangle::new(
-            [(x as i32, y as i32), ((x + cell_w) as i32, (y + cell_h) as i32)],
+            [
+                (x as i32, y as i32),
+                ((x + cell_w) as i32, (y + cell_h) as i32),
+            ],
             cfg.theme.border().stroke_width(1),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?;
@@ -172,7 +192,9 @@ where
         root.draw(&Text::new(
             format!("{:+.2}%", pair.change_pct),
             (x as i32 + 5, y as i32 + 26),
-            (LABEL_FONT, 10).into_font().color(&cfg.theme.text().mix(0.7)),
+            (LABEL_FONT, 10)
+                .into_font()
+                .color(&cfg.theme.text().mix(0.7)),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?;
     }
@@ -182,14 +204,20 @@ where
     for (i, label) in labels.iter().enumerate() {
         root.draw(&Text::new(
             *label,
-            (side_pad as i32 - 30, (top_pad as f64 + i as f64 * cell_h + cell_h / 2.0) as i32),
+            (
+                side_pad as i32 - 30,
+                (top_pad as f64 + i as f64 * cell_h + cell_h / 2.0) as i32,
+            ),
             (LABEL_FONT, 12).into_font().color(&cfg.theme.text()),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
         root.draw(&Text::new(
             *label,
-            (side_pad as i32 + i as i32 * cell_w as i32 + 10, top_pad as i32 - 15),
+            (
+                side_pad as i32 + i as i32 * cell_w as i32 + 10,
+                top_pad as i32 - 15,
+            ),
             (LABEL_FONT, 12).into_font().color(&cfg.theme.text()),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?;

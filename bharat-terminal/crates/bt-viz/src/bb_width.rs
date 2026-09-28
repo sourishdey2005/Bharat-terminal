@@ -1,4 +1,4 @@
-﻿// crates/bt-viz/src/bb_width.rs
+// crates/bt-viz/src/bb_width.rs
 // Author: Sourish Dey
 
 //! Tier 3 â€” Bollinger Band Width (band squeeze/expansion).
@@ -84,10 +84,24 @@ where
     let (price_area, width_area) = root.split_vertically((60).percent());
 
     // Price chart with Bollinger Bands
-    let low = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
-    let high = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
-    let band_high = upper.iter().filter(|v| !v.is_nan()).fold(f64::NEG_INFINITY, |a, &b| a.max(b));
-    let band_low = lower.iter().filter(|v| !v.is_nan()).fold(f64::INFINITY, |a, &b| a.min(b));
+    let low = series
+        .candles
+        .iter()
+        .map(|c| c.low)
+        .fold(f64::MAX, f64::min);
+    let high = series
+        .candles
+        .iter()
+        .map(|c| c.high)
+        .fold(f64::MIN, f64::max);
+    let band_high = upper
+        .iter()
+        .filter(|v| !v.is_nan())
+        .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+    let band_low = lower
+        .iter()
+        .filter(|v| !v.is_nan())
+        .fold(f64::INFINITY, |a, &b| a.min(b));
     let y_min = low.min(band_low) - (high - low) * 0.05;
     let y_max = high.max(band_high) + (high - low) * 0.05;
 
@@ -112,23 +126,27 @@ where
 
     // Shaded bands
     price_chart
-        .draw_series(
-            series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !upper[i].is_nan() && !lower[i].is_nan() {
-                    Some(Polygon::new(
-                        vec![(c.t, upper[i]), (c.t, lower[i])],
-                        cfg.theme.info().mix(0.15).filled(),
-                    ))
-                } else { None }
-            }),
-        )
+        .draw_series(series.candles.iter().enumerate().filter_map(|(i, c)| {
+            if !upper[i].is_nan() && !lower[i].is_nan() {
+                Some(Polygon::new(
+                    vec![(c.t, upper[i]), (c.t, lower[i])],
+                    cfg.theme.info().mix(0.15).filled(),
+                ))
+            } else {
+                None
+            }
+        }))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     // Band lines
     price_chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !upper[i].is_nan() { Some((c.t, upper[i])) } else { None }
+                if !upper[i].is_nan() {
+                    Some((c.t, upper[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.info().mix(0.7).stroke_width(1),
         ))
@@ -137,7 +155,11 @@ where
     price_chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !middle[i].is_nan() { Some((c.t, middle[i])) } else { None }
+                if !middle[i].is_nan() {
+                    Some((c.t, middle[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.accent().stroke_width(2),
         ))
@@ -146,7 +168,11 @@ where
     price_chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !lower[i].is_nan() { Some((c.t, lower[i])) } else { None }
+                if !lower[i].is_nan() {
+                    Some((c.t, lower[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.info().mix(0.7).stroke_width(1),
         ))
@@ -155,8 +181,21 @@ where
     let candle_width = ((t_max - t_min) / series.candles.len() as f64).max(0.3) * 0.4;
     price_chart
         .draw_series(series.candles.iter().map(|c| {
-            let color = if c.is_bullish() { cfg.theme.profit() } else { cfg.theme.loss() };
-            CandleStick::new(c.t, c.open, c.high, c.low, c.close, color.filled(), color.filled(), (candle_width * 10.0) as u32)
+            let color = if c.is_bullish() {
+                cfg.theme.profit()
+            } else {
+                cfg.theme.loss()
+            };
+            CandleStick::new(
+                c.t,
+                c.open,
+                c.high,
+                c.low,
+                c.close,
+                color.filled(),
+                color.filled(),
+                (candle_width * 10.0) as u32,
+            )
         }))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
@@ -174,7 +213,10 @@ where
         .margin(10)
         .x_label_area_size(30)
         .y_label_area_size(60)
-        .build_cartesian_2d(t_min..t_max, (width_min - range * 0.1)..(width_max + range * 0.1))
+        .build_cartesian_2d(
+            t_min..t_max,
+            (width_min - range * 0.1)..(width_max + range * 0.1),
+        )
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     width_chart
@@ -188,7 +230,11 @@ where
     width_chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !bb_width[i].is_nan() { Some((c.t, bb_width[i])) } else { None }
+                if !bb_width[i].is_nan() {
+                    Some((c.t, bb_width[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.accent().stroke_width(2),
         ))
@@ -196,21 +242,21 @@ where
 
     // Fill area under curve
     width_chart
-        .draw_series(
-            series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !bb_width[i].is_nan() && i > 0 && !bb_width[i-1].is_nan() {
-                    Some(Polygon::new(
-                        vec![
-                            (c.t, 0.0),
-                            (c.t, bb_width[i]),
-                            (series.candles[i-1].t, bb_width[i-1]),
-                            (series.candles[i-1].t, 0.0),
-                        ],
-                        cfg.theme.accent().mix(0.1).filled(),
-                    ))
-                } else { None }
-            }),
-        )
+        .draw_series(series.candles.iter().enumerate().filter_map(|(i, c)| {
+            if !bb_width[i].is_nan() && i > 0 && !bb_width[i - 1].is_nan() {
+                Some(Polygon::new(
+                    vec![
+                        (c.t, 0.0),
+                        (c.t, bb_width[i]),
+                        (series.candles[i - 1].t, bb_width[i - 1]),
+                        (series.candles[i - 1].t, 0.0),
+                    ],
+                    cfg.theme.accent().mix(0.1).filled(),
+                ))
+            } else {
+                None
+            }
+        }))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     draw_footer(&root, cfg.theme)?;

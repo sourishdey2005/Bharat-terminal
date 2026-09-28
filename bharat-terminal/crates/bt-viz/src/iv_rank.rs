@@ -29,11 +29,25 @@ impl Default for IvRankConfig {
 }
 
 impl IvRankConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn window(mut self, w: usize) -> Self { self.window = w; self }
-    pub fn iv_series(mut self, v: Vec<f64>) -> Self { self.iv_series = v; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn window(mut self, w: usize) -> Self {
+        self.window = w;
+        self
+    }
+    pub fn iv_series(mut self, v: Vec<f64>) -> Self {
+        self.iv_series = v;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -41,7 +55,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &IvRankConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -73,7 +88,10 @@ where DB::ErrorType: 'static,
     let pad = (iv_max - iv_min).max(0.1) * 0.15;
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(15)
         .x_label_area_size(35)
         .y_label_area_size(60)
@@ -89,14 +107,13 @@ where DB::ErrorType: 'static,
         .draw()
         .map_err(|e| BtError::Render(e.to_string()))?;
 
-    let points: Vec<(f64, f64)> = iv
-        .iter()
-        .enumerate()
-        .map(|(i, v)| (i as f64, *v))
-        .collect();
+    let points: Vec<(f64, f64)> = iv.iter().enumerate().map(|(i, v)| (i as f64, *v)).collect();
 
     chart
-        .draw_series(LineSeries::new(points.clone(), cfg.theme.accent().stroke_width(2)))
+        .draw_series(LineSeries::new(
+            points.clone(),
+            cfg.theme.accent().stroke_width(2),
+        ))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart
@@ -138,7 +155,11 @@ mod tests {
         let mut cfg = IvRankConfig::new().theme(Theme::Dark);
         let iv: Vec<f64> = (1..=30).map(|i| 15.0 + (i as f64 * 0.5)).collect();
         cfg.iv_series = iv;
-        let path = std::env::temp_dir().join("bt_test_iv_rank.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_iv_rank.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

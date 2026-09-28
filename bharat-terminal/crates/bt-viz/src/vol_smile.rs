@@ -1,4 +1,4 @@
-﻿//! Tier 2 #10 â€” Volatility smile/skew, multi-expiry. Made by Sourish Dey.
+//! Tier 2 #10 â€” Volatility smile/skew, multi-expiry. Made by Sourish Dey.
 
 use bt_core::{BtError, Result};
 use plotters::prelude::*;
@@ -100,7 +100,10 @@ where
     let pad = (y_max - y_min).max(0.01) * 0.15;
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(15)
         .x_label_area_size(35)
         .y_label_area_size(60)
@@ -129,10 +132,16 @@ where
             .draw_series(LineSeries::new(points.clone(), color.stroke_width(2)))
             .map_err(|e| BtError::Render(e.to_string()))?
             .label(curve.label.clone())
-            .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], color.stroke_width(2)));
+            .legend(move |(x, y)| {
+                PathElement::new(vec![(x, y), (x + 20, y)], color.stroke_width(2))
+            });
 
         chart
-            .draw_series(points.iter().map(|&(x, y)| Circle::new((x, y), 3, color.filled())))
+            .draw_series(
+                points
+                    .iter()
+                    .map(|&(x, y)| Circle::new((x, y), 3, color.filled())),
+            )
             .map_err(|e| BtError::Render(e.to_string()))?;
     }
 

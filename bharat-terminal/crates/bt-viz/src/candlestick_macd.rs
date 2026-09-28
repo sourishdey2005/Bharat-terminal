@@ -1,4 +1,4 @@
-﻿// crates/bt-viz/src/candlestick_macd.rs
+// crates/bt-viz/src/candlestick_macd.rs
 // Author: Sourish Dey
 
 //! Tier 1 #5 â€” Candlestick + MACD Panel (2-panel layout).
@@ -80,8 +80,16 @@ where
 
     let t_min = series.candles.first().unwrap().t;
     let t_max = series.candles.last().unwrap().t;
-    let low = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
-    let high = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
+    let low = series
+        .candles
+        .iter()
+        .map(|c| c.low)
+        .fold(f64::MAX, f64::min);
+    let high = series
+        .candles
+        .iter()
+        .map(|c| c.high)
+        .fold(f64::MIN, f64::max);
     let pad = (high - low) * 0.05;
 
     let (macd_line, signal_line, histogram) = macd(series);
@@ -116,15 +124,25 @@ where
                 cfg.theme.loss()
             };
             CandleStick::new(
-                c.t, c.open, c.high, c.low, c.close,
-                color.filled(), color.filled(), (candle_width * 10.0) as u32,
+                c.t,
+                c.open,
+                c.high,
+                c.low,
+                c.close,
+                color.filled(),
+                color.filled(),
+                (candle_width * 10.0) as u32,
             )
         }))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     // Volume chart
     if let Some(vol_area) = vol_area {
-        let max_vol = series.candles.iter().map(|c| c.volume).fold(0.0_f64, f64::max);
+        let max_vol = series
+            .candles
+            .iter()
+            .map(|c| c.volume)
+            .fold(0.0_f64, f64::max);
         let mut vol_chart = ChartBuilder::on(&vol_area)
             .margin(10)
             .x_label_area_size(20)
@@ -157,8 +175,14 @@ where
 
     // MACD chart
     // Find min/max for scaling
-    let macd_min = histogram.iter().filter(|v| !v.is_nan()).fold(f64::INFINITY, |a, &b| a.min(b));
-    let macd_max = histogram.iter().filter(|v| !v.is_nan()).fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+    let macd_min = histogram
+        .iter()
+        .filter(|v| !v.is_nan())
+        .fold(f64::INFINITY, |a, &b| a.min(b));
+    let macd_max = histogram
+        .iter()
+        .filter(|v| !v.is_nan())
+        .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
     let macd_range = (macd_max - macd_min).max(1e-6);
     let y_min = macd_min - macd_range * 0.2;
     let y_max = macd_max + macd_range * 0.2;
@@ -216,25 +240,40 @@ where
     macd_chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !macd_line[i].is_nan() { Some((c.t, macd_line[i])) } else { None }
+                if !macd_line[i].is_nan() {
+                    Some((c.t, macd_line[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.info().stroke_width(2),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("MACD")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(2)));
+        .legend(|(x, y)| {
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(2))
+        });
 
     // Signal line
     macd_chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !signal_line[i].is_nan() { Some((c.t, signal_line[i])) } else { None }
+                if !signal_line[i].is_nan() {
+                    Some((c.t, signal_line[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.accent().stroke_width(2),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Signal")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(2)));
+        .legend(|(x, y)| {
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.accent().stroke_width(2),
+            )
+        });
 
     macd_chart
         .configure_series_labels()

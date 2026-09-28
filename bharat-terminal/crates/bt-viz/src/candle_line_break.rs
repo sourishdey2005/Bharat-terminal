@@ -195,7 +195,10 @@ where
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
-            format!("{} — {} ({}-line break)", cfg.title, series.symbol, cfg.lines),
+            format!(
+                "{} — {} ({}-line break)",
+                cfg.title, series.symbol, cfg.lines
+            ),
             (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
         )
         .margin(10)

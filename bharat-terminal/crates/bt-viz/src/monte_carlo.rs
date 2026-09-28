@@ -33,12 +33,29 @@ impl Default for MonteCarloConfig {
 }
 
 impl MonteCarloConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn n_paths(mut self, n: usize) -> Self { self.n_paths = n; self }
-    pub fn horizon(mut self, h: usize) -> Self { self.horizon = h; self }
-    pub fn seed(mut self, s: u64) -> Self { self.seed = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn n_paths(mut self, n: usize) -> Self {
+        self.n_paths = n;
+        self
+    }
+    pub fn horizon(mut self, h: usize) -> Self {
+        self.horizon = h;
+        self
+    }
+    pub fn seed(mut self, s: u64) -> Self {
+        self.seed = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -46,7 +63,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &MonteCarloConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -88,7 +106,10 @@ where DB::ErrorType: 'static,
     let pad = (y_max - y_min).max(1.0) * 0.1;
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(15)
         .x_label_area_size(35)
         .y_label_area_size(60)
@@ -130,10 +151,18 @@ where DB::ErrorType: 'static,
         .map(|(i, v)| (i as f64, *v))
         .collect();
     chart
-        .draw_series(LineSeries::new(median_points, cfg.theme.accent().stroke_width(3)))
+        .draw_series(LineSeries::new(
+            median_points,
+            cfg.theme.accent().stroke_width(3),
+        ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Median")
-        .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(3)));
+        .legend(move |(x, y)| {
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.accent().stroke_width(3),
+            )
+        });
 
     chart
         .configure_series_labels()
@@ -165,7 +194,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = MonteCarloConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_monte_carlo.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_monte_carlo.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

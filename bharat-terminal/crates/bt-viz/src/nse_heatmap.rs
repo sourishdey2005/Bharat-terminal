@@ -17,14 +17,25 @@ pub struct NseHeatmapConfig {
 
 impl Default for NseHeatmapConfig {
     fn default() -> Self {
-        Self { title: "NSE Sector Heatmap".to_string(), theme: Theme::Dark }
+        Self {
+            title: "NSE Sector Heatmap".to_string(),
+            theme: Theme::Dark,
+        }
     }
 }
 
 impl NseHeatmapConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
 }
 
 fn sample_sectors() -> Vec<(String, f64, f64)> {
@@ -49,7 +60,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &NseHeatmapConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -69,7 +81,11 @@ where DB::ErrorType: 'static,
     let cell_w = w as f64 / cols as f64;
     let cell_h = (h as f64 - 100.0) / rows as f64;
 
-    let max_abs = data.iter().map(|(_, c, _)| c.abs()).fold(0.0f64, f64::max).max(0.5);
+    let max_abs = data
+        .iter()
+        .map(|(_, c, _)| c.abs())
+        .fold(0.0f64, f64::max)
+        .max(0.5);
 
     for (i, (name, change, weight)) in data.iter().enumerate() {
         let col = i % cols;
@@ -90,31 +106,33 @@ where DB::ErrorType: 'static,
             [(x as i32, y as i32), ((x + cw) as i32, (y + ch) as i32)],
             color.filled(),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
         root.draw(&Rectangle::new(
             [(x as i32, y as i32), ((x + cw) as i32, (y + ch) as i32)],
             cfg.theme.border().stroke_width(1),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
 
         root.draw(&Text::new(
             name.clone(),
             (x as i32 + 8, y as i32 + 10),
             (LABEL_FONT, 12).into_font().color(&cfg.theme.text()),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
         root.draw(&Text::new(
             format!("{:+.2}%", change),
             (x as i32 + 8, y as i32 + ch as i32 / 2 - 4),
             (TITLE_FONT, 18).into_font().color(&cfg.theme.text()),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
         root.draw(&Text::new(
             format!("{:.1}% wt", weight),
             (x as i32 + 8, y as i32 + ch as i32 - 18),
-            (LABEL_FONT, 10).into_font().color(&cfg.theme.text().mix(0.7)),
+            (LABEL_FONT, 10)
+                .into_font()
+                .color(&cfg.theme.text().mix(0.7)),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
     draw_footer(&root, cfg.theme)?;
@@ -139,7 +157,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("NSE", 100, 1, 100.0);
         let cfg = NseHeatmapConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_nse_heatmap.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_nse_heatmap.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

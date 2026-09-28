@@ -63,17 +63,15 @@ fn resample_series(series: &OhlcvSeries, factor: usize) -> OhlcvSeries {
         let chunk = &series.candles[i..end];
         let first = &chunk[0];
         let last = &chunk[chunk.len() - 1];
-        let high = chunk.iter().map(|c| c.high).fold(f64::NEG_INFINITY, f64::max);
+        let high = chunk
+            .iter()
+            .map(|c| c.high)
+            .fold(f64::NEG_INFINITY, f64::max);
         let low = chunk.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
         let volume: f64 = chunk.iter().map(|c| c.volume).sum();
 
         candles.push(bt_core::Candle::new(
-            first.t,
-            first.open,
-            high,
-            low,
-            last.close,
-            volume,
+            first.t, first.open, high, low, last.close, volume,
         ));
 
         i += factor;
@@ -107,16 +105,8 @@ where
         let ma = sma(&rs, cfg.ma_period);
         let t_min = rs.candles.first().unwrap().t;
         let t_max = rs.candles.last().unwrap().t;
-        let low = rs
-            .candles
-            .iter()
-            .map(|c| c.low)
-            .fold(f64::MAX, f64::min);
-        let high = rs
-            .candles
-            .iter()
-            .map(|c| c.high)
-            .fold(f64::MIN, f64::max);
+        let low = rs.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
+        let high = rs.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
         let pad = (high - low).max(1.0) * 0.08;
 
         let mut chart = ChartBuilder::on(&panels[idx])

@@ -29,17 +29,37 @@ impl Default for ComparisonMonteCarloConfig {
 }
 
 impl ComparisonMonteCarloConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, title: impl Into<String>) -> Self { self.title = title.into(); self }
-    pub fn theme(mut self, theme: Theme) -> Self { self.theme = theme; self }
-    pub fn simulations(mut self, v: usize) -> Self { self.simulations = v.clamp(10, 1000); self }
-    pub fn days(mut self, v: usize) -> Self { self.days = v.max(10); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
+        self
+    }
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
+    pub fn simulations(mut self, v: usize) -> Self {
+        self.simulations = v.clamp(10, 1000);
+        self
+    }
+    pub fn days(mut self, v: usize) -> Self {
+        self.days = v.max(10);
+        self
+    }
 }
 
-fn monte_carlo_paths(series: &OhlcvSeries, n_sims: usize, n_days: usize, seed: u64) -> Vec<Vec<f64>> {
+fn monte_carlo_paths(
+    series: &OhlcvSeries,
+    n_sims: usize,
+    n_days: usize,
+    seed: u64,
+) -> Vec<Vec<f64>> {
     let returns = series.returns();
     let mean = returns.iter().sum::<f64>() / returns.len().max(1) as f64;
-    let variance = returns.iter().map(|r| (r - mean).powi(2)).sum::<f64>() / returns.len().max(1) as f64;
+    let variance =
+        returns.iter().map(|r| (r - mean).powi(2)).sum::<f64>() / returns.len().max(1) as f64;
     let std_dev = variance.sqrt();
     let start_price = series.candles.last().unwrap().close;
 
@@ -82,16 +102,25 @@ where
 
     let t_min = 0.0;
     let t_max = cfg.days as f64;
-    let y_min = paths_a.iter().chain(paths_b.iter())
+    let y_min = paths_a
+        .iter()
+        .chain(paths_b.iter())
         .flat_map(|p| p.iter().copied())
-        .fold(f64::MAX, f64::min) * 0.9;
-    let y_max = paths_a.iter().chain(paths_b.iter())
+        .fold(f64::MAX, f64::min)
+        * 0.9;
+    let y_max = paths_a
+        .iter()
+        .chain(paths_b.iter())
         .flat_map(|p| p.iter().copied())
-        .fold(f64::MIN, f64::max) * 1.1;
+        .fold(f64::MIN, f64::max)
+        * 1.1;
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
-            format!("{} — {} vs {} ({} sims)", cfg.title, series_a.symbol, series_b.symbol, cfg.simulations),
+            format!(
+                "{} — {} vs {} ({} sims)",
+                cfg.title, series_a.symbol, series_b.symbol, cfg.simulations
+            ),
             (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
         )
         .margin(10)
@@ -131,11 +160,21 @@ where
     Ok(())
 }
 
-pub fn render_png(series_a: &OhlcvSeries, series_b: &OhlcvSeries, cfg: &ComparisonMonteCarloConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    series_a: &OhlcvSeries,
+    series_b: &OhlcvSeries,
+    cfg: &ComparisonMonteCarloConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, series_a, series_b, cfg)
 }
 
-pub fn render_svg(series_a: &OhlcvSeries, series_b: &OhlcvSeries, cfg: &ComparisonMonteCarloConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    series_a: &OhlcvSeries,
+    series_b: &OhlcvSeries,
+    cfg: &ComparisonMonteCarloConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, series_a, series_b, cfg)
 }
 
@@ -148,8 +187,14 @@ mod tests {
     fn renders() {
         let a = synthetic_ohlcv("AAA", 100, 1, 100.0);
         let b = synthetic_ohlcv("BBB", 100, 2, 100.0);
-        let cfg = ComparisonMonteCarloConfig::new().simulations(20).theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_comparison_monte_carlo.png").to_str().unwrap().to_string();
+        let cfg = ComparisonMonteCarloConfig::new()
+            .simulations(20)
+            .theme(Theme::Dark);
+        let path = std::env::temp_dir()
+            .join("bt_test_comparison_monte_carlo.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&a, &b, &cfg, &path).unwrap();
     }
 }

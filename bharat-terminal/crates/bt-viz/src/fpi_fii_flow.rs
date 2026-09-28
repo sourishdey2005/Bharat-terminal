@@ -17,14 +17,25 @@ pub struct FpiFiiFlowConfig {
 
 impl Default for FpiFiiFlowConfig {
     fn default() -> Self {
-        Self { title: "FPI/FII Flow".to_string(), theme: Theme::Dark }
+        Self {
+            title: "FPI/FII Flow".to_string(),
+            theme: Theme::Dark,
+        }
     }
 }
 
 impl FpiFiiFlowConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
 }
 
 fn sample_flows() -> Vec<(String, f64, f64)> {
@@ -44,7 +55,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &FpiFiiFlowConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -67,13 +79,18 @@ where DB::ErrorType: 'static,
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     let mut chart = chart;
-    chart.configure_mesh()
+    chart
+        .configure_mesh()
         .label_style((LABEL_FONT, 11).into_font().color(&cfg.theme.text()))
         .axis_style(&cfg.theme.border())
         .x_labels(data.len())
         .x_label_formatter(&|x| {
             let idx = *x as usize;
-            if idx < data.len() { data[idx].0.clone() } else { String::new() }
+            if idx < data.len() {
+                data[idx].0.clone()
+            } else {
+                String::new()
+            }
         })
         .y_desc("Flow (INR Cr)")
         .draw()
@@ -81,25 +98,36 @@ where DB::ErrorType: 'static,
 
     let bar_w = 0.35;
     for (i, (_, fpi, fii)) in data.iter().enumerate() {
-        let fpi_color = if *fpi >= 0.0 { cfg.theme.profit() } else { cfg.theme.loss() };
-        let fii_color = if *fii >= 0.0 { cfg.theme.info() } else { cfg.theme.accent() };
-        chart.draw_series(std::iter::once(Rectangle::new(
-            [(i as f64 - bar_w, 0.0f64), (i as f64, *fpi)],
-            fpi_color.filled(),
-        )))
-    .map_err(|e| BtError::Render(e.to_string()))?;
-        chart.draw_series(std::iter::once(Rectangle::new(
-            [(i as f64, 0.0f64), (i as f64 + bar_w, *fii)],
-            fii_color.filled(),
-        )))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        let fpi_color = if *fpi >= 0.0 {
+            cfg.theme.profit()
+        } else {
+            cfg.theme.loss()
+        };
+        let fii_color = if *fii >= 0.0 {
+            cfg.theme.info()
+        } else {
+            cfg.theme.accent()
+        };
+        chart
+            .draw_series(std::iter::once(Rectangle::new(
+                [(i as f64 - bar_w, 0.0f64), (i as f64, *fpi)],
+                fpi_color.filled(),
+            )))
+            .map_err(|e| BtError::Render(e.to_string()))?;
+        chart
+            .draw_series(std::iter::once(Rectangle::new(
+                [(i as f64, 0.0f64), (i as f64 + bar_w, *fii)],
+                fii_color.filled(),
+            )))
+            .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
-    chart.draw_series(LineSeries::new(
-        vec![(0.0, 0.0), (data.len() as f64, 0.0)],
-        cfg.theme.text().stroke_width(1),
-    ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+    chart
+        .draw_series(LineSeries::new(
+            vec![(0.0, 0.0), (data.len() as f64, 0.0)],
+            cfg.theme.text().stroke_width(1),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
 
     let _ = (w, h);
     draw_footer(&root, cfg.theme)?;
@@ -124,7 +152,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("FPI", 100, 1, 100.0);
         let cfg = FpiFiiFlowConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_fpi_fii_flow.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_fpi_fii_flow.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

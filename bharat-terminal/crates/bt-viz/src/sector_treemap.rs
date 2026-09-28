@@ -1,4 +1,4 @@
-﻿//! Tier 6 #39 / Tier 7 #47 â€” Market Map Treemap (sector x size x change).
+//! Tier 6 #39 / Tier 7 #47 â€” Market Map Treemap (sector x size x change).
 //! Made by Sourish Dey.
 //!
 //! Implements a real squarified-ish slice-and-dice treemap layout (simple,
@@ -59,14 +59,34 @@ pub fn layout(nodes: &[TreemapNode], rect: Rect) -> Vec<Rect> {
     let mut out = Vec::with_capacity(nodes.len());
     if rect.w >= rect.h {
         let split_w = rect.w * frac;
-        let left_rect = Rect { x: rect.x, y: rect.y, w: split_w, h: rect.h };
-        let right_rect = Rect { x: rect.x + split_w, y: rect.y, w: rect.w - split_w, h: rect.h };
+        let left_rect = Rect {
+            x: rect.x,
+            y: rect.y,
+            w: split_w,
+            h: rect.h,
+        };
+        let right_rect = Rect {
+            x: rect.x + split_w,
+            y: rect.y,
+            w: rect.w - split_w,
+            h: rect.h,
+        };
         out.extend(layout(left_nodes, left_rect));
         out.extend(layout(right_nodes, right_rect));
     } else {
         let split_h = rect.h * frac;
-        let top_rect = Rect { x: rect.x, y: rect.y, w: rect.w, h: split_h };
-        let bottom_rect = Rect { x: rect.x, y: rect.y + split_h, w: rect.w, h: rect.h - split_h };
+        let top_rect = Rect {
+            x: rect.x,
+            y: rect.y,
+            w: rect.w,
+            h: split_h,
+        };
+        let bottom_rect = Rect {
+            x: rect.x,
+            y: rect.y + split_h,
+            w: rect.w,
+            h: rect.h - split_h,
+        };
         out.extend(layout(left_nodes, top_rect));
         out.extend(layout(right_nodes, bottom_rect));
     }
@@ -104,10 +124,18 @@ impl TreemapConfig {
 
 fn change_color(theme: Theme, pct: f64) -> RGBColor {
     let t = (pct.abs() / 5.0).clamp(0.15, 1.0);
-    let target = if pct >= 0.0 { theme.profit() } else { theme.loss() };
+    let target = if pct >= 0.0 {
+        theme.profit()
+    } else {
+        theme.loss()
+    };
     let bg = theme.background();
     let lerp = |a: u8, b: u8| (a as f64 + (b as f64 - a as f64) * t).round() as u8;
-    RGBColor(lerp(bg.0, target.0), lerp(bg.1, target.1), lerp(bg.2, target.2))
+    RGBColor(
+        lerp(bg.0, target.0),
+        lerp(bg.1, target.1),
+        lerp(bg.2, target.2),
+    )
 }
 
 fn render<DB: DrawingBackend>(
@@ -136,20 +164,31 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     let (w, h) = body_area.dim_in_pixel();
-    let full = Rect { x: 0.0, y: 0.0, w: w as f64, h: (h - 30) as f64 };
+    let full = Rect {
+        x: 0.0,
+        y: 0.0,
+        w: w as f64,
+        h: (h - 30) as f64,
+    };
     let rects = layout(&sorted, full);
 
     for (node, r) in sorted.iter().zip(rects.iter()) {
         let color = change_color(cfg.theme, node.pct_change);
         body_area
             .draw(&Rectangle::new(
-                [(r.x as i32, r.y as i32), ((r.x + r.w) as i32, (r.y + r.h) as i32)],
+                [
+                    (r.x as i32, r.y as i32),
+                    ((r.x + r.w) as i32, (r.y + r.h) as i32),
+                ],
                 color.filled(),
             ))
             .map_err(|e| BtError::Render(e.to_string()))?;
         body_area
             .draw(&Rectangle::new(
-                [(r.x as i32, r.y as i32), ((r.x + r.w) as i32, (r.y + r.h) as i32)],
+                [
+                    (r.x as i32, r.y as i32),
+                    ((r.x + r.w) as i32, (r.y + r.h) as i32),
+                ],
                 cfg.theme.border().stroke_width(1),
             ))
             .map_err(|e| BtError::Render(e.to_string()))?;

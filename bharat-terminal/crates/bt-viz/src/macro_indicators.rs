@@ -17,14 +17,25 @@ pub struct MacroIndicatorsConfig {
 
 impl Default for MacroIndicatorsConfig {
     fn default() -> Self {
-        Self { title: "India Macro Indicators".to_string(), theme: Theme::Dark }
+        Self {
+            title: "India Macro Indicators".to_string(),
+            theme: Theme::Dark,
+        }
     }
 }
 
 impl MacroIndicatorsConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
 }
 
 fn sample_macro() -> Vec<(String, f64, String)> {
@@ -45,7 +56,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &MacroIndicatorsConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -77,34 +89,42 @@ where DB::ErrorType: 'static,
             [(x as i32, y as i32), ((x + cw) as i32, (y + ch) as i32)],
             cfg.theme.border().filled(),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
         root.draw(&Rectangle::new(
             [(x as i32, y as i32), ((x + cw) as i32, (y + ch) as i32)],
             cfg.theme.border().stroke_width(1),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
 
         root.draw(&Text::new(
             name.clone(),
             (x as i32 + 10, y as i32 + 12),
-            (LABEL_FONT, 12).into_font().color(&cfg.theme.text().mix(0.8)),
+            (LABEL_FONT, 12)
+                .into_font()
+                .color(&cfg.theme.text().mix(0.8)),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
 
-        let color = if *value < 0.0 { cfg.theme.loss() } else { cfg.theme.profit() };
+        let color = if *value < 0.0 {
+            cfg.theme.loss()
+        } else {
+            cfg.theme.profit()
+        };
         root.draw(&Text::new(
             format!("{:.2}", value),
             (x as i32 + 10, y as i32 + ch as i32 / 2 - 4),
             (TITLE_FONT, 22).into_font().color(&color),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
 
         root.draw(&Text::new(
             unit.clone(),
             (x as i32 + 10, y as i32 + ch as i32 - 20),
-            (LABEL_FONT, 10).into_font().color(&cfg.theme.text().mix(0.6)),
+            (LABEL_FONT, 10)
+                .into_font()
+                .color(&cfg.theme.text().mix(0.6)),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
     draw_footer(&root, cfg.theme)?;
@@ -129,7 +149,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("INDIA", 100, 1, 100.0);
         let cfg = MacroIndicatorsConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_macro_indicators.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_macro_indicators.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

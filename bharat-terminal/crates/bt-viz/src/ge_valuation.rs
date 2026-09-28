@@ -32,28 +32,57 @@ impl Default for GeValuationConfig {
             band_low: 15.0,
             band_mid: 20.0,
             band_high: 25.0,
-            historical_values: (0..20).map(|i| 15.0 + (i as f64 * 0.5) + (i as f64 * 0.1).sin() * 3.0).collect(),
+            historical_values: (0..20)
+                .map(|i| 15.0 + (i as f64 * 0.5) + (i as f64 * 0.1).sin() * 3.0)
+                .collect(),
         }
     }
 }
 
 impl GeValuationConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn multiple(mut self, m: impl Into<String>) -> Self { self.multiple = m.into(); self }
-    pub fn current_value(mut self, v: f64) -> Self { self.current_value = v.max(0.0); self }
-    pub fn band_low(mut self, v: f64) -> Self { self.band_low = v.max(0.0); self }
-    pub fn band_mid(mut self, v: f64) -> Self { self.band_mid = v.max(0.0); self }
-    pub fn band_high(mut self, v: f64) -> Self { self.band_high = v.max(0.0); self }
-    pub fn historical_values(mut self, v: Vec<f64>) -> Self { self.historical_values = v; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn multiple(mut self, m: impl Into<String>) -> Self {
+        self.multiple = m.into();
+        self
+    }
+    pub fn current_value(mut self, v: f64) -> Self {
+        self.current_value = v.max(0.0);
+        self
+    }
+    pub fn band_low(mut self, v: f64) -> Self {
+        self.band_low = v.max(0.0);
+        self
+    }
+    pub fn band_mid(mut self, v: f64) -> Self {
+        self.band_mid = v.max(0.0);
+        self
+    }
+    pub fn band_high(mut self, v: f64) -> Self {
+        self.band_high = v.max(0.0);
+        self
+    }
+    pub fn historical_values(mut self, v: Vec<f64>) -> Self {
+        self.historical_values = v;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
     root: plotters::drawing::DrawingArea<DB, plotters::coord::Shift>,
     cfg: &GeValuationConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     fill_background(&root, cfg.theme)?;
 
@@ -71,7 +100,10 @@ where DB::ErrorType: 'static,
         .margin(10)
         .x_label_area_size(40)
         .y_label_area_size(60)
-        .build_cartesian_2d(0.0..(cfg.historical_values.len() + 1) as f64, (v_min - pad)..(v_max + pad))
+        .build_cartesian_2d(
+            0.0..(cfg.historical_values.len() + 1) as f64,
+            (v_min - pad)..(v_max + pad),
+        )
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart
@@ -84,40 +116,61 @@ where DB::ErrorType: 'static,
 
     chart
         .draw_series(LineSeries::new(
-            vec![(0.0, cfg.band_low), ((cfg.historical_values.len() + 1) as f64, cfg.band_low)],
+            vec![
+                (0.0, cfg.band_low),
+                ((cfg.historical_values.len() + 1) as f64, cfg.band_low),
+            ],
             cfg.theme.loss().mix(0.5).stroke_width(1),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Band Low")
         .legend(|(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.loss().mix(0.5).stroke_width(1))
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.loss().mix(0.5).stroke_width(1),
+            )
         });
 
     chart
         .draw_series(LineSeries::new(
-            vec![(0.0, cfg.band_high), ((cfg.historical_values.len() + 1) as f64, cfg.band_high)],
+            vec![
+                (0.0, cfg.band_high),
+                ((cfg.historical_values.len() + 1) as f64, cfg.band_high),
+            ],
             cfg.theme.profit().mix(0.5).stroke_width(1),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Band High")
         .legend(|(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.profit().mix(0.5).stroke_width(1))
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.profit().mix(0.5).stroke_width(1),
+            )
         });
 
     chart
         .draw_series(LineSeries::new(
-            vec![(0.0, cfg.band_mid), ((cfg.historical_values.len() + 1) as f64, cfg.band_mid)],
+            vec![
+                (0.0, cfg.band_mid),
+                ((cfg.historical_values.len() + 1) as f64, cfg.band_mid),
+            ],
             cfg.theme.accent().mix(0.5).stroke_width(1),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Band Mid")
         .legend(|(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().mix(0.5).stroke_width(1))
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.accent().mix(0.5).stroke_width(1),
+            )
         });
 
     chart
         .draw_series(LineSeries::new(
-            cfg.historical_values.iter().enumerate().map(|(i, &v)| (i as f64 + 1.0, v)),
+            cfg.historical_values
+                .iter()
+                .enumerate()
+                .map(|(i, &v)| (i as f64 + 1.0, v)),
             cfg.theme.info().stroke_width(2),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
@@ -128,15 +181,13 @@ where DB::ErrorType: 'static,
 
     chart
         .draw_series(std::iter::once(Circle::new(
-        (cfg.historical_values.len() as f64 + 1.0, cfg.current_value),
-        6,
-        cfg.theme.accent().filled(),
-    )))
-    .map_err(|e| BtError::Render(e.to_string()))?
-    .label("Current")
-    .legend(|(x, y)| {
-        Circle::new((x + 10, y), 5, cfg.theme.accent().filled())
-    });
+            (cfg.historical_values.len() as f64 + 1.0, cfg.current_value),
+            6,
+            cfg.theme.accent().filled(),
+        )))
+        .map_err(|e| BtError::Render(e.to_string()))?
+        .label("Current")
+        .legend(|(x, y)| Circle::new((x + 10, y), 5, cfg.theme.accent().filled()));
 
     chart
         .configure_series_labels()
@@ -166,7 +217,11 @@ mod tests {
     #[test]
     fn renders() {
         let cfg = GeValuationConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_ge_valuation.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_ge_valuation.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&cfg, &path).unwrap();
     }
 }

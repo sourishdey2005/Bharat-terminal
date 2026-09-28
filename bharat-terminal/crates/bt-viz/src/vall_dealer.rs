@@ -19,7 +19,11 @@ pub struct DealerQuote {
 
 impl DealerQuote {
     pub fn new(dealer: impl Into<String>, bid: f64, ask: f64) -> Self {
-        Self { dealer: dealer.into(), bid, ask }
+        Self {
+            dealer: dealer.into(),
+            bid,
+            ask,
+        }
     }
 }
 
@@ -41,10 +45,21 @@ impl Default for VallDealerConfig {
 }
 
 impl VallDealerConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn show_spread(mut self, s: bool) -> Self { self.show_spread = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn show_spread(mut self, s: bool) -> Self {
+        self.show_spread = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -52,7 +67,8 @@ fn render<DB: DrawingBackend>(
     quotes: &[DealerQuote],
     cfg: &VallDealerConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if quotes.is_empty() {
         return Err(BtError::EmptySeries("dealer quotes".into()));
@@ -90,10 +106,18 @@ where DB::ErrorType: 'static,
 
     for (i, q) in quotes.iter().enumerate() {
         chart
-            .draw_series(std::iter::once(Circle::new((i, q.bid), 5, cfg.theme.profit().filled())))
+            .draw_series(std::iter::once(Circle::new(
+                (i, q.bid),
+                5,
+                cfg.theme.profit().filled(),
+            )))
             .map_err(|e| BtError::Render(e.to_string()))?;
         chart
-            .draw_series(std::iter::once(Circle::new((i, q.ask), 5, cfg.theme.loss().filled())))
+            .draw_series(std::iter::once(Circle::new(
+                (i, q.ask),
+                5,
+                cfg.theme.loss().filled(),
+            )))
             .map_err(|e| BtError::Render(e.to_string()))?;
         chart
             .draw_series(std::iter::once(PathElement::new(
@@ -133,10 +157,20 @@ mod tests {
     #[test]
     fn renders() {
         let quotes: Vec<DealerQuote> = (0..6)
-            .map(|i| DealerQuote::new(format!("D{}", i), 100.0 + i as f64 * 0.1, 100.0 + i as f64 * 0.1 + 0.05))
+            .map(|i| {
+                DealerQuote::new(
+                    format!("D{}", i),
+                    100.0 + i as f64 * 0.1,
+                    100.0 + i as f64 * 0.1 + 0.05,
+                )
+            })
             .collect();
         let cfg = VallDealerConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_vall_dealer.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_vall_dealer.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&quotes, &cfg, &path).unwrap();
     }
 }

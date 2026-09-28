@@ -36,14 +36,37 @@ impl Default for FxfmDistributionConfig {
 }
 
 impl FxfmDistributionConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn current_rate(mut self, r: f64) -> Self { self.current_rate = r; self }
-    pub fn forecast_mean(mut self, m: f64) -> Self { self.forecast_mean = m; self }
-    pub fn forecast_std(mut self, s: f64) -> Self { self.forecast_std = s.max(0.01); self }
-    pub fn horizon_days(mut self, d: usize) -> Self { self.horizon_days = d.max(7).min(365); self }
-    pub fn num_buckets(mut self, b: usize) -> Self { self.num_buckets = b.max(5).min(50); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn current_rate(mut self, r: f64) -> Self {
+        self.current_rate = r;
+        self
+    }
+    pub fn forecast_mean(mut self, m: f64) -> Self {
+        self.forecast_mean = m;
+        self
+    }
+    pub fn forecast_std(mut self, s: f64) -> Self {
+        self.forecast_std = s.max(0.01);
+        self
+    }
+    pub fn horizon_days(mut self, d: usize) -> Self {
+        self.horizon_days = d.max(7).min(365);
+        self
+    }
+    pub fn num_buckets(mut self, b: usize) -> Self {
+        self.num_buckets = b.max(5).min(50);
+        self
+    }
 }
 
 fn normal_pdf(x: f64, mean: f64, std: f64) -> f64 {
@@ -56,7 +79,8 @@ fn render<DB: DrawingBackend>(
     root: plotters::drawing::DrawingArea<DB, plotters::coord::Shift>,
     cfg: &FxfmDistributionConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     fill_background(&root, cfg.theme)?;
 
@@ -104,7 +128,10 @@ where DB::ErrorType: 'static,
     chart
         .draw_series(buckets.iter().enumerate().map(|(i, &p)| {
             let norm_p = if prob_sum > 0.0 { p / prob_sum } else { 0.0 };
-            Rectangle::new([(i, 0.0), (i + 1, norm_p)], cfg.theme.info().mix(0.6).filled())
+            Rectangle::new(
+                [(i, 0.0), (i + 1, norm_p)],
+                cfg.theme.info().mix(0.6).filled(),
+            )
         }))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
@@ -120,7 +147,10 @@ where DB::ErrorType: 'static,
 
     let (w, h) = root.dim_in_pixel();
     root.draw(&Text::new(
-        format!("Current: {:.2} | Forecast: {:.2}", cfg.current_rate, cfg.forecast_mean),
+        format!(
+            "Current: {:.2} | Forecast: {:.2}",
+            cfg.current_rate, cfg.forecast_mean
+        ),
         (w as i32 / 2 - 120, 60),
         (LABEL_FONT, 12).into_font().color(&cfg.theme.text()),
     ))
@@ -146,7 +176,11 @@ mod tests {
     #[test]
     fn renders() {
         let cfg = FxfmDistributionConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_fxfm_distribution.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_fxfm_distribution.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&cfg, &path).unwrap();
     }
 }

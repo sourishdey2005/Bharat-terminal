@@ -17,14 +17,25 @@ pub struct GstBudgetConfig {
 
 impl Default for GstBudgetConfig {
     fn default() -> Self {
-        Self { title: "GST & Union Budget".to_string(), theme: Theme::Dark }
+        Self {
+            title: "GST & Union Budget".to_string(),
+            theme: Theme::Dark,
+        }
     }
 }
 
 impl GstBudgetConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
 }
 
 fn sample_gst() -> Vec<(String, f64, f64)> {
@@ -49,7 +60,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &GstBudgetConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -72,32 +84,61 @@ where DB::ErrorType: 'static,
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     let mut chart = chart;
-    chart.configure_mesh()
+    chart
+        .configure_mesh()
         .label_style((LABEL_FONT, 11).into_font().color(&cfg.theme.text()))
         .axis_style(&cfg.theme.border())
         .x_labels(data.len())
         .x_label_formatter(&|x| {
             let idx = *x as usize;
-            if idx < data.len() { data[idx].0.clone() } else { String::new() }
+            if idx < data.len() {
+                data[idx].0.clone()
+            } else {
+                String::new()
+            }
         })
         .y_desc("GST Collection (L Cr)")
         .draw()
         .map_err(|e| BtError::Render(e.to_string()))?;
 
-    let current: Vec<(f64, f64)> = data.iter().enumerate().map(|(i, (_, c, _))| (i as f64, *c)).collect();
-    let previous: Vec<(f64, f64)> = data.iter().enumerate().map(|(i, (_, _, p))| (i as f64, *p)).collect();
+    let current: Vec<(f64, f64)> = data
+        .iter()
+        .enumerate()
+        .map(|(i, (_, c, _))| (i as f64, *c))
+        .collect();
+    let previous: Vec<(f64, f64)> = data
+        .iter()
+        .enumerate()
+        .map(|(i, (_, _, p))| (i as f64, *p))
+        .collect();
 
-    chart.draw_series(LineSeries::new(previous, cfg.theme.text().mix(0.5).stroke_width(2)))
+    chart
+        .draw_series(LineSeries::new(
+            previous,
+            cfg.theme.text().mix(0.5).stroke_width(2),
+        ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Previous Year")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.text().mix(0.5).stroke_width(2)));
+        .legend(|(x, y)| {
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.text().mix(0.5).stroke_width(2),
+            )
+        });
 
-    chart.draw_series(LineSeries::new(current, cfg.theme.accent().stroke_width(3)))
+    chart
+        .draw_series(LineSeries::new(current, cfg.theme.accent().stroke_width(3)))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Current Year")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(3)));
+        .legend(|(x, y)| {
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.accent().stroke_width(3),
+            )
+        });
 
-    chart.configure_series_labels()
+    chart
+        .configure_series_labels()
         .border_style(&cfg.theme.border())
         .label_font((LABEL_FONT, 12).into_font().color(&cfg.theme.text()))
         .draw()
@@ -126,7 +167,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("GST", 100, 1, 100.0);
         let cfg = GstBudgetConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_gst_budget.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_gst_budget.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

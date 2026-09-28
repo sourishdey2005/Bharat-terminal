@@ -56,10 +56,7 @@ struct FootprintRow {
     ask: f64,
 }
 
-fn compute_footprint(
-    series: &OhlcvSeries,
-    num_rows: usize,
-) -> Vec<(f64, Vec<FootprintRow>)> {
+fn compute_footprint(series: &OhlcvSeries, num_rows: usize) -> Vec<(f64, Vec<FootprintRow>)> {
     let obv_vals = obv(series);
     let mut result = Vec::new();
 

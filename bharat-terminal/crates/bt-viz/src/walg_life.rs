@@ -34,20 +34,41 @@ impl Default for WalgLifeConfig {
 }
 
 impl WalgLifeConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn prepayment_speed(mut self, s: f64) -> Self { self.prepayment_speed = s.max(0.0); self }
-    pub fn original_wal(mut self, w: f64) -> Self { self.original_wal = w.max(0.1); self }
-    pub fn principal(mut self, p: f64) -> Self { self.principal = p.max(0.0); self }
-    pub fn periods(mut self, p: usize) -> Self { self.periods = p.max(5).min(50); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn prepayment_speed(mut self, s: f64) -> Self {
+        self.prepayment_speed = s.max(0.0);
+        self
+    }
+    pub fn original_wal(mut self, w: f64) -> Self {
+        self.original_wal = w.max(0.1);
+        self
+    }
+    pub fn principal(mut self, p: f64) -> Self {
+        self.principal = p.max(0.0);
+        self
+    }
+    pub fn periods(mut self, p: usize) -> Self {
+        self.periods = p.max(5).min(50);
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
     root: plotters::drawing::DrawingArea<DB, plotters::coord::Shift>,
     cfg: &WalgLifeConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     fill_background(&root, cfg.theme)?;
 
@@ -92,18 +113,27 @@ where DB::ErrorType: 'static,
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Projected WAL")
         .legend(|(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(2))
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.accent().stroke_width(2),
+            )
         });
 
     chart
         .draw_series(LineSeries::new(
-            vec![(0.0, cfg.original_wal), (cfg.periods as f64, cfg.original_wal)],
+            vec![
+                (0.0, cfg.original_wal),
+                (cfg.periods as f64, cfg.original_wal),
+            ],
             cfg.theme.border().mix(0.5).stroke_width(1),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Original WAL")
         .legend(|(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.border().mix(0.5).stroke_width(1))
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.border().mix(0.5).stroke_width(1),
+            )
         });
 
     chart
@@ -134,7 +164,11 @@ mod tests {
     #[test]
     fn renders() {
         let cfg = WalgLifeConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_walg_life.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_walg_life.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&cfg, &path).unwrap();
     }
 }

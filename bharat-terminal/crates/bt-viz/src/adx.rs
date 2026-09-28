@@ -1,4 +1,4 @@
-﻿// crates/bt-viz/src/adx.rs
+// crates/bt-viz/src/adx.rs
 // Author: Sourish Dey
 
 //! Tier 3 â€” ADX / DI+ / DI- (Trend strength + threshold).
@@ -76,8 +76,16 @@ where
     let (price_area, adx_area) = root.split_vertically((55).percent());
 
     // Price chart
-    let low = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
-    let high = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
+    let low = series
+        .candles
+        .iter()
+        .map(|c| c.low)
+        .fold(f64::MAX, f64::min);
+    let high = series
+        .candles
+        .iter()
+        .map(|c| c.high)
+        .fold(f64::MIN, f64::max);
     let pad = (high - low) * 0.05;
 
     let mut price_chart = ChartBuilder::on(&price_area)
@@ -102,8 +110,21 @@ where
     let candle_width = ((t_max - t_min) / series.candles.len() as f64).max(0.3) * 0.4;
     price_chart
         .draw_series(series.candles.iter().map(|c| {
-            let color = if c.is_bullish() { cfg.theme.profit() } else { cfg.theme.loss() };
-            CandleStick::new(c.t, c.open, c.high, c.low, c.close, color.filled(), color.filled(), (candle_width * 10.0) as u32)
+            let color = if c.is_bullish() {
+                cfg.theme.profit()
+            } else {
+                cfg.theme.loss()
+            };
+            CandleStick::new(
+                c.t,
+                c.open,
+                c.high,
+                c.low,
+                c.close,
+                color.filled(),
+                color.filled(),
+                (candle_width * 10.0) as u32,
+            )
         }))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
@@ -139,37 +160,58 @@ where
     adx_chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !adx_vals[i].is_nan() { Some((c.t, adx_vals[i])) } else { None }
+                if !adx_vals[i].is_nan() {
+                    Some((c.t, adx_vals[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.info().stroke_width(2),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("ADX")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(2)));
+        .legend(|(x, y)| {
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(2))
+        });
 
     // +DI line
     adx_chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !plus_di[i].is_nan() { Some((c.t, plus_di[i])) } else { None }
+                if !plus_di[i].is_nan() {
+                    Some((c.t, plus_di[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.profit().stroke_width(2),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("+DI")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.profit().stroke_width(2)));
+        .legend(|(x, y)| {
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.profit().stroke_width(2),
+            )
+        });
 
     // -DI line
     adx_chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !minus_di[i].is_nan() { Some((c.t, minus_di[i])) } else { None }
+                if !minus_di[i].is_nan() {
+                    Some((c.t, minus_di[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.loss().stroke_width(2),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("-DI")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.loss().stroke_width(2)));
+        .legend(|(x, y)| {
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.loss().stroke_width(2))
+        });
 
     adx_chart
         .configure_series_labels()

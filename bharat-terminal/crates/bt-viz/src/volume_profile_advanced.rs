@@ -107,9 +107,7 @@ where
         }
     }
 
-    let max_vol = volume_at_price
-        .iter()
-        .fold(0.0_f64, |a, &b| a.max(b));
+    let max_vol = volume_at_price.iter().fold(0.0_f64, |a, &b| a.max(b));
     let total_vol: f64 = volume_at_price.iter().sum();
 
     let poc_idx = volume_at_price
@@ -337,11 +335,19 @@ where
     Ok(())
 }
 
-pub fn render_png(series: &OhlcvSeries, cfg: &VolumeProfileAdvancedConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    series: &OhlcvSeries,
+    cfg: &VolumeProfileAdvancedConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, series, cfg)
 }
 
-pub fn render_svg(series: &OhlcvSeries, cfg: &VolumeProfileAdvancedConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    series: &OhlcvSeries,
+    cfg: &VolumeProfileAdvancedConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, series, cfg)
 }
 

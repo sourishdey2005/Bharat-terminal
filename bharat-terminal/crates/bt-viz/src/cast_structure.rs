@@ -20,7 +20,12 @@ pub struct CapitalLayer {
 
 impl CapitalLayer {
     pub fn new(name: impl Into<String>, value: f64, rate: f64, priority: usize) -> Self {
-        Self { name: name.into(), value: value.max(0.0), rate, priority }
+        Self {
+            name: name.into(),
+            value: value.max(0.0),
+            rate,
+            priority,
+        }
     }
 }
 
@@ -42,10 +47,21 @@ impl Default for CastStructureConfig {
 }
 
 impl CastStructureConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn show_rates(mut self, s: bool) -> Self { self.show_rates = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn show_rates(mut self, s: bool) -> Self {
+        self.show_rates = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -53,7 +69,8 @@ fn render<DB: DrawingBackend>(
     layers: &[CapitalLayer],
     cfg: &CastStructureConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if layers.is_empty() {
         return Err(BtError::EmptySeries("capital layers".into()));
@@ -79,7 +96,11 @@ where DB::ErrorType: 'static,
 
     for (i, layer) in sorted.iter().enumerate() {
         let y = 40 + i * bar_h;
-        let frac = if max_val > 0.0 { layer.value / max_val } else { 0.0 };
+        let frac = if max_val > 0.0 {
+            layer.value / max_val
+        } else {
+            0.0
+        };
         let bar_w = (w as f64 * frac * 0.7) as i32;
 
         let color = match layer.priority {
@@ -149,7 +170,11 @@ mod tests {
             CapitalLayer::new("Equity", 300.0, 12.0, 3),
         ];
         let cfg = CastStructureConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_cast_structure.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_cast_structure.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&layers, &cfg, &path).unwrap();
     }
 }

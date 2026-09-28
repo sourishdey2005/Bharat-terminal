@@ -18,15 +18,30 @@ pub struct VortexConfig {
 
 impl Default for VortexConfig {
     fn default() -> Self {
-        Self { title: "Vortex".to_string(), theme: Theme::Dark, period: 14 }
+        Self {
+            title: "Vortex".to_string(),
+            theme: Theme::Dark,
+            period: 14,
+        }
     }
 }
 
 impl VortexConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn period(mut self, p: usize) -> Self { self.period = p.max(2); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn period(mut self, p: usize) -> Self {
+        self.period = p.max(2);
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -34,7 +49,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &VortexConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -53,13 +69,19 @@ where DB::ErrorType: 'static,
 
         if i >= cfg.period {
             let start = i - cfg.period + 1;
-            let sum_vm_plus: f64 = (start..=i).map(|j| (series.candles[j].high - series.candles[j - 1].low).abs()).sum();
-            let sum_vm_minus: f64 = (start..=i).map(|j| (series.candles[j].low - series.candles[j - 1].high).abs()).sum();
-            let sum_tr: f64 = (start..=i).map(|j| {
-                (series.candles[j].high - series.candles[j].low)
-                    .max((series.candles[j].high - series.candles[j - 1].close).abs())
-                    .max((series.candles[j].low - series.candles[j - 1].close).abs())
-            }).sum();
+            let sum_vm_plus: f64 = (start..=i)
+                .map(|j| (series.candles[j].high - series.candles[j - 1].low).abs())
+                .sum();
+            let sum_vm_minus: f64 = (start..=i)
+                .map(|j| (series.candles[j].low - series.candles[j - 1].high).abs())
+                .sum();
+            let sum_tr: f64 = (start..=i)
+                .map(|j| {
+                    (series.candles[j].high - series.candles[j].low)
+                        .max((series.candles[j].high - series.candles[j - 1].close).abs())
+                        .max((series.candles[j].low - series.candles[j - 1].close).abs())
+                })
+                .sum();
 
             if sum_tr > 0.0 {
                 vi_plus[i] = sum_vm_plus / sum_tr;
@@ -72,30 +94,48 @@ where DB::ErrorType: 'static,
     let t_max = series.candles.last().unwrap().t;
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(10)
         .x_label_area_size(30)
         .y_label_area_size(50)
         .build_cartesian_2d(t_min..t_max, 0.5..1.5)
         .map_err(|e| BtError::Render(e.to_string()))?;
 
-    chart.configure_mesh()
+    chart
+        .configure_mesh()
         .label_style((LABEL_FONT, 12).into_font().color(&cfg.theme.text()))
         .axis_style(&cfg.theme.border())
         .draw()
         .map_err(|e| BtError::Render(e.to_string()))?;
 
-    chart.draw_series(LineSeries::new(
-        series.candles.iter().enumerate().filter_map(|(i, c)| if !vi_plus[i].is_nan() { Some((c.t, vi_plus[i])) } else { None }),
-        cfg.theme.profit().stroke_width(2),
-    ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+    chart
+        .draw_series(LineSeries::new(
+            series.candles.iter().enumerate().filter_map(|(i, c)| {
+                if !vi_plus[i].is_nan() {
+                    Some((c.t, vi_plus[i]))
+                } else {
+                    None
+                }
+            }),
+            cfg.theme.profit().stroke_width(2),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
 
-    chart.draw_series(LineSeries::new(
-        series.candles.iter().enumerate().filter_map(|(i, c)| if !vi_minus[i].is_nan() { Some((c.t, vi_minus[i])) } else { None }),
-        cfg.theme.loss().stroke_width(2),
-    ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+    chart
+        .draw_series(LineSeries::new(
+            series.candles.iter().enumerate().filter_map(|(i, c)| {
+                if !vi_minus[i].is_nan() {
+                    Some((c.t, vi_minus[i]))
+                } else {
+                    None
+                }
+            }),
+            cfg.theme.loss().stroke_width(2),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
 
     draw_footer(&root, cfg.theme)?;
     root.present().map_err(|e| BtError::Render(e.to_string()))?;
@@ -119,7 +159,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = VortexConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_vortex.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_vortex.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

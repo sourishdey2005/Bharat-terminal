@@ -34,20 +34,41 @@ impl Default for VdatConeConfig {
 }
 
 impl VdatConeConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn percentiles(mut self, p: Vec<f64>) -> Self { self.percentiles = p; self }
-    pub fn tenors(mut self, t: Vec<f64>) -> Self { self.tenors = t; self }
-    pub fn cone_data(mut self, d: Vec<Vec<f64>>) -> Self { self.cone_data = d; self }
-    pub fn current_vol(mut self, v: f64) -> Self { self.current_vol = v.max(0.0); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn percentiles(mut self, p: Vec<f64>) -> Self {
+        self.percentiles = p;
+        self
+    }
+    pub fn tenors(mut self, t: Vec<f64>) -> Self {
+        self.tenors = t;
+        self
+    }
+    pub fn cone_data(mut self, d: Vec<Vec<f64>>) -> Self {
+        self.cone_data = d;
+        self
+    }
+    pub fn current_vol(mut self, v: f64) -> Self {
+        self.current_vol = v.max(0.0);
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
     root: plotters::drawing::DrawingArea<DB, plotters::coord::Shift>,
     cfg: &VdatConeConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if cfg.cone_data.is_empty() || cfg.cone_data[0].is_empty() {
         return Err(BtError::EmptySeries("cone data".into()));
@@ -106,7 +127,10 @@ where DB::ErrorType: 'static,
         chart
             .draw_series(LineSeries::new(points, color.stroke_width(2)))
             .map_err(|e| BtError::Render(e.to_string()))?
-            .label(format!("P{:.0}", cfg.percentiles.get(pi).unwrap_or(&0.0) * 100.0))
+            .label(format!(
+                "P{:.0}",
+                cfg.percentiles.get(pi).unwrap_or(&0.0) * 100.0
+            ))
             .legend(move |(x, y)| {
                 PathElement::new(vec![(x, y), (x + 20, y)], color.stroke_width(2))
             });
@@ -114,7 +138,10 @@ where DB::ErrorType: 'static,
 
     chart
         .draw_series(LineSeries::new(
-            vec![(0.0, cfg.current_vol), (cfg.tenors.len() as f64, cfg.current_vol)],
+            vec![
+                (0.0, cfg.current_vol),
+                (cfg.tenors.len() as f64, cfg.current_vol),
+            ],
             cfg.theme.text().stroke_width(2),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
@@ -151,10 +178,20 @@ mod tests {
     #[test]
     fn renders() {
         let cone_data: Vec<Vec<f64>> = (0..5)
-            .map(|p| (0..6).map(|t| 15.0 + p as f64 * 3.0 + t as f64 * 2.0).collect())
+            .map(|p| {
+                (0..6)
+                    .map(|t| 15.0 + p as f64 * 3.0 + t as f64 * 2.0)
+                    .collect()
+            })
             .collect();
-        let cfg = VdatConeConfig::new().theme(Theme::Dark).cone_data(cone_data);
-        let path = std::env::temp_dir().join("bt_test_vdat_cone.png").to_str().unwrap().to_string();
+        let cfg = VdatConeConfig::new()
+            .theme(Theme::Dark)
+            .cone_data(cone_data);
+        let path = std::env::temp_dir()
+            .join("bt_test_vdat_cone.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&cfg, &path).unwrap();
     }
 }

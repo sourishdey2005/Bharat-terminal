@@ -17,26 +17,69 @@ pub struct IndiaDashboardConfig {
 
 impl Default for IndiaDashboardConfig {
     fn default() -> Self {
-        Self { title: "India Dashboard".to_string(), theme: Theme::Dark }
+        Self {
+            title: "India Dashboard".to_string(),
+            theme: Theme::Dark,
+        }
     }
 }
 
 impl IndiaDashboardConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
 }
 
 fn sample_widgets() -> Vec<(String, String, String)> {
     vec![
-        ("Nifty 50".to_string(), "24,812".to_string(), "+0.8%".to_string()),
-        ("Sensex".to_string(), "81,450".to_string(), "+0.6%".to_string()),
-        ("USD/INR".to_string(), "83.25".to_string(), "-0.1%".to_string()),
-        ("10Y G-Sec".to_string(), "7.05%".to_string(), "+2bp".to_string()),
-        ("Crude Oil".to_string(), "$84.50".to_string(), "-0.8%".to_string()),
-        ("Gold".to_string(), "72,500".to_string(), "+0.5%".to_string()),
-        ("FII Flow".to_string(), "+2,100 Cr".to_string(), "Net Buy".to_string()),
-        ("DII Flow".to_string(), "+1,450 Cr".to_string(), "Net Buy".to_string()),
+        (
+            "Nifty 50".to_string(),
+            "24,812".to_string(),
+            "+0.8%".to_string(),
+        ),
+        (
+            "Sensex".to_string(),
+            "81,450".to_string(),
+            "+0.6%".to_string(),
+        ),
+        (
+            "USD/INR".to_string(),
+            "83.25".to_string(),
+            "-0.1%".to_string(),
+        ),
+        (
+            "10Y G-Sec".to_string(),
+            "7.05%".to_string(),
+            "+2bp".to_string(),
+        ),
+        (
+            "Crude Oil".to_string(),
+            "$84.50".to_string(),
+            "-0.8%".to_string(),
+        ),
+        (
+            "Gold".to_string(),
+            "72,500".to_string(),
+            "+0.5%".to_string(),
+        ),
+        (
+            "FII Flow".to_string(),
+            "+2,100 Cr".to_string(),
+            "Net Buy".to_string(),
+        ),
+        (
+            "DII Flow".to_string(),
+            "+1,450 Cr".to_string(),
+            "Net Buy".to_string(),
+        ),
     ]
 }
 
@@ -45,7 +88,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &IndiaDashboardConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -77,26 +121,28 @@ where DB::ErrorType: 'static,
             [(x as i32, y as i32), ((x + cw) as i32, (y + ch) as i32)],
             cfg.theme.border().filled(),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
         root.draw(&Rectangle::new(
             [(x as i32, y as i32), ((x + cw) as i32, (y + ch) as i32)],
             cfg.theme.border().stroke_width(1),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
 
         root.draw(&Text::new(
             name.clone(),
             (x as i32 + 10, y as i32 + 12),
-            (LABEL_FONT, 12).into_font().color(&cfg.theme.text().mix(0.8)),
+            (LABEL_FONT, 12)
+                .into_font()
+                .color(&cfg.theme.text().mix(0.8)),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
 
         root.draw(&Text::new(
             value.clone(),
             (x as i32 + 10, y as i32 + ch as i32 / 2 - 4),
             (TITLE_FONT, 20).into_font().color(&cfg.theme.text()),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
 
         let change_color = if change.starts_with('+') || change == "Net Buy" {
             cfg.theme.profit()
@@ -110,7 +156,7 @@ where DB::ErrorType: 'static,
             (x as i32 + 10, y as i32 + ch as i32 - 20),
             (LABEL_FONT, 11).into_font().color(&change_color),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
     draw_footer(&root, cfg.theme)?;
@@ -135,7 +181,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("INDIA", 100, 1, 100.0);
         let cfg = IndiaDashboardConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_india_dashboard.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_india_dashboard.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

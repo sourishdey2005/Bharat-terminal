@@ -16,7 +16,7 @@ pub struct HeatmapStock {
     pub symbol: String,
     pub name: String,
     pub sector: String,
-    pub change_pct: f64,    // daily change %
+    pub change_pct: f64, // daily change %
     pub volume: f64,
     pub market_cap: f64,
 }
@@ -63,36 +63,246 @@ impl SensexHeatmapConfig {
 /// Sample Sensex 30 data (replace with real data from bt-data)
 fn sample_sensex30() -> Vec<HeatmapStock> {
     vec![
-        HeatmapStock { symbol: "RELIANCE.BO".to_string(), name: "Reliance".to_string(), sector: "Oil & Gas".to_string(), change_pct: 1.2, volume: 1500000.0, market_cap: 1700000.0 },
-        HeatmapStock { symbol: "HDFCBANK.BO".to_string(), name: "HDFC Bank".to_string(), sector: "Banking".to_string(), change_pct: 0.8, volume: 2000000.0, market_cap: 1100000.0 },
-        HeatmapStock { symbol: "ICICIBANK.BO".to_string(), name: "ICICI Bank".to_string(), sector: "Banking".to_string(), change_pct: 1.5, volume: 1800000.0, market_cap: 750000.0 },
-        HeatmapStock { symbol: "INFY.BO".to_string(), name: "Infosys".to_string(), sector: "IT".to_string(), change_pct: -0.5, volume: 1200000.0, market_cap: 650000.0 },
-        HeatmapStock { symbol: "TCS.BO".to_string(), name: "TCS".to_string(), sector: "IT".to_string(), change_pct: 0.3, volume: 900000.0, market_cap: 1300000.0 },
-        HeatmapStock { symbol: "BHARTIARTL.BO".to_string(), name: "Bharti Airtel".to_string(), sector: "Telecom".to_string(), change_pct: 2.1, volume: 3000000.0, market_cap: 550000.0 },
-        HeatmapStock { symbol: "ITC.BO".to_string(), name: "ITC".to_string(), sector: "FMCG".to_string(), change_pct: -0.2, volume: 2500000.0, market_cap: 500000.0 },
-        HeatmapStock { symbol: "LT.BO".to_string(), name: "L&T".to_string(), sector: "Construction".to_string(), change_pct: 1.8, volume: 800000.0, market_cap: 450000.0 },
-        HeatmapStock { symbol: "SBIN.BO".to_string(), name: "SBI".to_string(), sector: "Banking".to_string(), change_pct: 2.5, volume: 4000000.0, market_cap: 550000.0 },
-        HeatmapStock { symbol: "KOTAKBANK.BO".to_string(), name: "Kotak Bank".to_string(), sector: "Banking".to_string(), change_pct: 0.9, volume: 1100000.0, market_cap: 380000.0 },
-        HeatmapStock { symbol: "HINDUNILVR.BO".to_string(), name: "HUL".to_string(), sector: "FMCG".to_string(), change_pct: -0.8, volume: 900000.0, market_cap: 580000.0 },
-        HeatmapStock { symbol: "BAJFINANCE.BO".to_string(), name: "Bajaj Fin".to_string(), sector: "Financial".to_string(), change_pct: 1.1, volume: 700000.0, market_cap: 420000.0 },
-        HeatmapStock { symbol: "ASIANPAINT.BO".to_string(), name: "Asian Paints".to_string(), sector: "Consumer".to_string(), change_pct: -0.3, volume: 500000.0, market_cap: 280000.0 },
-        HeatmapStock { symbol: "MARUTI.BO".to_string(), name: "Maruti".to_string(), sector: "Auto".to_string(), change_pct: 1.4, volume: 600000.0, market_cap: 320000.0 },
-        HeatmapStock { symbol: "SUNPHARMA.BO".to_string(), name: "Sun Pharma".to_string(), sector: "Pharma".to_string(), change_pct: -1.2, volume: 800000.0, market_cap: 290000.0 },
-        HeatmapStock { symbol: "TITAN.BO".to_string(), name: "Titan".to_string(), sector: "Consumer".to_string(), change_pct: 0.7, volume: 600000.0, market_cap: 260000.0 },
-        HeatmapStock { symbol: "ULTRACEMCO.BO".to_string(), name: "UltraTech".to_string(), sector: "Cement".to_string(), change_pct: 1.0, volume: 400000.0, market_cap: 240000.0 },
-        HeatmapStock { symbol: "NESTLEIND.BO".to_string(), name: "Nestle".to_string(), sector: "FMCG".to_string(), change_pct: -0.4, volume: 300000.0, market_cap: 220000.0 },
-        HeatmapStock { symbol: "WIPRO.BO".to_string(), name: "Wipro".to_string(), sector: "IT".to_string(), change_pct: -0.6, volume: 1000000.0, market_cap: 250000.0 },
-        HeatmapStock { symbol: "HCLTECH.BO".to_string(), name: "HCL Tech".to_string(), sector: "IT".to_string(), change_pct: 0.5, volume: 900000.0, market_cap: 320000.0 },
-        HeatmapStock { symbol: "AXISBANK.BO".to_string(), name: "Axis Bank".to_string(), sector: "Banking".to_string(), change_pct: 1.3, volume: 1500000.0, market_cap: 280000.0 },
-        HeatmapStock { symbol: "TATAMOTORS.BO".to_string(), name: "Tata Motors".to_string(), sector: "Auto".to_string(), change_pct: 2.0, volume: 2000000.0, market_cap: 250000.0 },
-        HeatmapStock { symbol: "TATASTEEL.BO".to_string(), name: "Tata Steel".to_string(), sector: "Metals".to_string(), change_pct: 1.5, volume: 1200000.0, market_cap: 180000.0 },
-        HeatmapStock { symbol: "ADANIENT.BO".to_string(), name: "Adani Ent".to_string(), sector: "Conglomerate".to_string(), change_pct: 3.2, volume: 1500000.0, market_cap: 280000.0 },
-        HeatmapStock { symbol: "ADANIPORTS.BO".to_string(), name: "Adani Ports".to_string(), sector: "Infra".to_string(), change_pct: 1.8, volume: 800000.0, market_cap: 190000.0 },
-        HeatmapStock { symbol: "BAJAJ-AUTO.BO".to_string(), name: "Bajaj Auto".to_string(), sector: "Auto".to_string(), change_pct: 0.6, volume: 400000.0, market_cap: 160000.0 },
-        HeatmapStock { symbol: "COALINDIA.BO".to_string(), name: "Coal India".to_string(), sector: "Mining".to_string(), change_pct: -0.5, volume: 2000000.0, market_cap: 140000.0 },
-        HeatmapStock { symbol: "NTPC.BO".to_string(), name: "NTPC".to_string(), sector: "Power".to_string(), change_pct: 0.4, volume: 1500000.0, market_cap: 170000.0 },
-        HeatmapStock { symbol: "POWERGRID.BO".to_string(), name: "Power Grid".to_string(), sector: "Power".to_string(), change_pct: 0.3, volume: 1000000.0, market_cap: 150000.0 },
-        HeatmapStock { symbol: "TECHM.BO".to_string(), name: "Tech M".to_string(), sector: "IT".to_string(), change_pct: -0.4, volume: 800000.0, market_cap: 110000.0 },
+        HeatmapStock {
+            symbol: "RELIANCE.BO".to_string(),
+            name: "Reliance".to_string(),
+            sector: "Oil & Gas".to_string(),
+            change_pct: 1.2,
+            volume: 1500000.0,
+            market_cap: 1700000.0,
+        },
+        HeatmapStock {
+            symbol: "HDFCBANK.BO".to_string(),
+            name: "HDFC Bank".to_string(),
+            sector: "Banking".to_string(),
+            change_pct: 0.8,
+            volume: 2000000.0,
+            market_cap: 1100000.0,
+        },
+        HeatmapStock {
+            symbol: "ICICIBANK.BO".to_string(),
+            name: "ICICI Bank".to_string(),
+            sector: "Banking".to_string(),
+            change_pct: 1.5,
+            volume: 1800000.0,
+            market_cap: 750000.0,
+        },
+        HeatmapStock {
+            symbol: "INFY.BO".to_string(),
+            name: "Infosys".to_string(),
+            sector: "IT".to_string(),
+            change_pct: -0.5,
+            volume: 1200000.0,
+            market_cap: 650000.0,
+        },
+        HeatmapStock {
+            symbol: "TCS.BO".to_string(),
+            name: "TCS".to_string(),
+            sector: "IT".to_string(),
+            change_pct: 0.3,
+            volume: 900000.0,
+            market_cap: 1300000.0,
+        },
+        HeatmapStock {
+            symbol: "BHARTIARTL.BO".to_string(),
+            name: "Bharti Airtel".to_string(),
+            sector: "Telecom".to_string(),
+            change_pct: 2.1,
+            volume: 3000000.0,
+            market_cap: 550000.0,
+        },
+        HeatmapStock {
+            symbol: "ITC.BO".to_string(),
+            name: "ITC".to_string(),
+            sector: "FMCG".to_string(),
+            change_pct: -0.2,
+            volume: 2500000.0,
+            market_cap: 500000.0,
+        },
+        HeatmapStock {
+            symbol: "LT.BO".to_string(),
+            name: "L&T".to_string(),
+            sector: "Construction".to_string(),
+            change_pct: 1.8,
+            volume: 800000.0,
+            market_cap: 450000.0,
+        },
+        HeatmapStock {
+            symbol: "SBIN.BO".to_string(),
+            name: "SBI".to_string(),
+            sector: "Banking".to_string(),
+            change_pct: 2.5,
+            volume: 4000000.0,
+            market_cap: 550000.0,
+        },
+        HeatmapStock {
+            symbol: "KOTAKBANK.BO".to_string(),
+            name: "Kotak Bank".to_string(),
+            sector: "Banking".to_string(),
+            change_pct: 0.9,
+            volume: 1100000.0,
+            market_cap: 380000.0,
+        },
+        HeatmapStock {
+            symbol: "HINDUNILVR.BO".to_string(),
+            name: "HUL".to_string(),
+            sector: "FMCG".to_string(),
+            change_pct: -0.8,
+            volume: 900000.0,
+            market_cap: 580000.0,
+        },
+        HeatmapStock {
+            symbol: "BAJFINANCE.BO".to_string(),
+            name: "Bajaj Fin".to_string(),
+            sector: "Financial".to_string(),
+            change_pct: 1.1,
+            volume: 700000.0,
+            market_cap: 420000.0,
+        },
+        HeatmapStock {
+            symbol: "ASIANPAINT.BO".to_string(),
+            name: "Asian Paints".to_string(),
+            sector: "Consumer".to_string(),
+            change_pct: -0.3,
+            volume: 500000.0,
+            market_cap: 280000.0,
+        },
+        HeatmapStock {
+            symbol: "MARUTI.BO".to_string(),
+            name: "Maruti".to_string(),
+            sector: "Auto".to_string(),
+            change_pct: 1.4,
+            volume: 600000.0,
+            market_cap: 320000.0,
+        },
+        HeatmapStock {
+            symbol: "SUNPHARMA.BO".to_string(),
+            name: "Sun Pharma".to_string(),
+            sector: "Pharma".to_string(),
+            change_pct: -1.2,
+            volume: 800000.0,
+            market_cap: 290000.0,
+        },
+        HeatmapStock {
+            symbol: "TITAN.BO".to_string(),
+            name: "Titan".to_string(),
+            sector: "Consumer".to_string(),
+            change_pct: 0.7,
+            volume: 600000.0,
+            market_cap: 260000.0,
+        },
+        HeatmapStock {
+            symbol: "ULTRACEMCO.BO".to_string(),
+            name: "UltraTech".to_string(),
+            sector: "Cement".to_string(),
+            change_pct: 1.0,
+            volume: 400000.0,
+            market_cap: 240000.0,
+        },
+        HeatmapStock {
+            symbol: "NESTLEIND.BO".to_string(),
+            name: "Nestle".to_string(),
+            sector: "FMCG".to_string(),
+            change_pct: -0.4,
+            volume: 300000.0,
+            market_cap: 220000.0,
+        },
+        HeatmapStock {
+            symbol: "WIPRO.BO".to_string(),
+            name: "Wipro".to_string(),
+            sector: "IT".to_string(),
+            change_pct: -0.6,
+            volume: 1000000.0,
+            market_cap: 250000.0,
+        },
+        HeatmapStock {
+            symbol: "HCLTECH.BO".to_string(),
+            name: "HCL Tech".to_string(),
+            sector: "IT".to_string(),
+            change_pct: 0.5,
+            volume: 900000.0,
+            market_cap: 320000.0,
+        },
+        HeatmapStock {
+            symbol: "AXISBANK.BO".to_string(),
+            name: "Axis Bank".to_string(),
+            sector: "Banking".to_string(),
+            change_pct: 1.3,
+            volume: 1500000.0,
+            market_cap: 280000.0,
+        },
+        HeatmapStock {
+            symbol: "TATAMOTORS.BO".to_string(),
+            name: "Tata Motors".to_string(),
+            sector: "Auto".to_string(),
+            change_pct: 2.0,
+            volume: 2000000.0,
+            market_cap: 250000.0,
+        },
+        HeatmapStock {
+            symbol: "TATASTEEL.BO".to_string(),
+            name: "Tata Steel".to_string(),
+            sector: "Metals".to_string(),
+            change_pct: 1.5,
+            volume: 1200000.0,
+            market_cap: 180000.0,
+        },
+        HeatmapStock {
+            symbol: "ADANIENT.BO".to_string(),
+            name: "Adani Ent".to_string(),
+            sector: "Conglomerate".to_string(),
+            change_pct: 3.2,
+            volume: 1500000.0,
+            market_cap: 280000.0,
+        },
+        HeatmapStock {
+            symbol: "ADANIPORTS.BO".to_string(),
+            name: "Adani Ports".to_string(),
+            sector: "Infra".to_string(),
+            change_pct: 1.8,
+            volume: 800000.0,
+            market_cap: 190000.0,
+        },
+        HeatmapStock {
+            symbol: "BAJAJ-AUTO.BO".to_string(),
+            name: "Bajaj Auto".to_string(),
+            sector: "Auto".to_string(),
+            change_pct: 0.6,
+            volume: 400000.0,
+            market_cap: 160000.0,
+        },
+        HeatmapStock {
+            symbol: "COALINDIA.BO".to_string(),
+            name: "Coal India".to_string(),
+            sector: "Mining".to_string(),
+            change_pct: -0.5,
+            volume: 2000000.0,
+            market_cap: 140000.0,
+        },
+        HeatmapStock {
+            symbol: "NTPC.BO".to_string(),
+            name: "NTPC".to_string(),
+            sector: "Power".to_string(),
+            change_pct: 0.4,
+            volume: 1500000.0,
+            market_cap: 170000.0,
+        },
+        HeatmapStock {
+            symbol: "POWERGRID.BO".to_string(),
+            name: "Power Grid".to_string(),
+            sector: "Power".to_string(),
+            change_pct: 0.3,
+            volume: 1000000.0,
+            market_cap: 150000.0,
+        },
+        HeatmapStock {
+            symbol: "TECHM.BO".to_string(),
+            name: "Tech M".to_string(),
+            sector: "IT".to_string(),
+            change_pct: -0.4,
+            volume: 800000.0,
+            market_cap: 110000.0,
+        },
     ]
 }
 
@@ -118,7 +328,8 @@ where
     let padding = 4.0;
 
     // Find max absolute change for color scaling
-    let max_abs_change = stocks.iter()
+    let max_abs_change = stocks
+        .iter()
         .map(|s| s.change_pct.abs())
         .fold(0.0_f64, f64::max)
         .max(0.5);
@@ -172,11 +383,17 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?;
 
         // Sector (small)
-        let sector_short = if stock.sector.len() > 12 { &stock.sector[..12] } else { &stock.sector };
+        let sector_short = if stock.sector.len() > 12 {
+            &stock.sector[..12]
+        } else {
+            &stock.sector
+        };
         root.draw(&Text::new(
             sector_short,
             (x as i32 + 4, (y + ch - 16.0) as i32),
-            (LABEL_FONT, 9).into_font().color(&cfg.theme.text().mix(0.7)),
+            (LABEL_FONT, 9)
+                .into_font()
+                .color(&cfg.theme.text().mix(0.7)),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?;
     }

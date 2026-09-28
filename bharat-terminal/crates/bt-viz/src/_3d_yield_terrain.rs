@@ -19,15 +19,30 @@ pub struct YieldTerrain3DConfig {
 
 impl Default for YieldTerrain3DConfig {
     fn default() -> Self {
-        Self { title: "3D Yield Terrain".to_string(), theme: Theme::Dark, flow: 0.5 }
+        Self {
+            title: "3D Yield Terrain".to_string(),
+            theme: Theme::Dark,
+            flow: 0.5,
+        }
     }
 }
 
 impl YieldTerrain3DConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn flow(mut self, v: f64) -> Self { self.flow = v.clamp(0.0, 1.0); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn flow(mut self, v: f64) -> Self {
+        self.flow = v.clamp(0.0, 1.0);
+        self
+    }
 }
 
 fn project(x: f64, y: f64, z: f64, cx: f64, cy: f64) -> (i32, i32) {
@@ -47,8 +62,7 @@ fn shade(c: RGBAColor, f: f64) -> RGBColor {
 
 fn yield_at(maturity: f64, time: f64, base: f64, flow: f64) -> f64 {
     let wave = (maturity * 2.0 + time * flow * 3.0).sin() * 0.3;
-    base + 0.5 * (1.0 - (-maturity * 0.4).exp()) + wave * 0.1
-        + 0.2 * (time * 0.5).sin() * maturity
+    base + 0.5 * (1.0 - (-maturity * 0.4).exp()) + wave * 0.1 + 0.2 * (time * 0.5).sin() * maturity
 }
 
 fn render<DB: DrawingBackend>(
@@ -56,7 +70,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &YieldTerrain3DConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -117,7 +132,12 @@ where DB::ErrorType: 'static,
                 cfg.theme.info().mix(0.7)
             };
             let depth_f = 0.4 + 0.6 * (j as f64 / n_t as f64);
-            let pts = vec![grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]];
+            let pts = vec![
+                grid[j][i],
+                grid[j][i + 1],
+                grid[j + 1][i + 1],
+                grid[j + 1][i],
+            ];
             root.draw(&Polygon::new(pts, shade(color, depth_f).filled()))
                 .map_err(|e| BtError::Render(e.to_string()))?;
         }
@@ -137,7 +157,9 @@ where DB::ErrorType: 'static,
     root.draw(&Text::new(
         "X: maturity  Y: yield  Z: time",
         (w as i32 / 2 - 90, h as i32 - 40),
-        (LABEL_FONT, 11).into_font().color(&cfg.theme.text().mix(0.6)),
+        (LABEL_FONT, 11)
+            .into_font()
+            .color(&cfg.theme.text().mix(0.6)),
     ))
     .map_err(|e| BtError::Render(e.to_string()))?;
 
@@ -163,7 +185,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = YieldTerrain3DConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_3d_yield_terrain.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_3d_yield_terrain.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

@@ -252,7 +252,10 @@ pub fn stochastic(series: &OhlcvSeries, k_period: usize, d_period: usize) -> (Ve
 
     for i in (k_period - 1)..n {
         let window = &series.candles[i + 1 - k_period..=i];
-        let highest_high = window.iter().map(|c| c.high).fold(f64::NEG_INFINITY, f64::max);
+        let highest_high = window
+            .iter()
+            .map(|c| c.high)
+            .fold(f64::NEG_INFINITY, f64::max);
         let lowest_low = window.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
         let close = series.candles[i].close;
 
@@ -312,8 +315,16 @@ pub fn adx(series: &OhlcvSeries, period: usize) -> (Vec<f64>, Vec<f64>, Vec<f64>
         let up_move = h - ph;
         let down_move = pl - l;
 
-        plus_dm[i] = if up_move > down_move && up_move > 0.0 { up_move } else { 0.0 };
-        minus_dm[i] = if down_move > up_move && down_move > 0.0 { down_move } else { 0.0 };
+        plus_dm[i] = if up_move > down_move && up_move > 0.0 {
+            up_move
+        } else {
+            0.0
+        };
+        minus_dm[i] = if down_move > up_move && down_move > 0.0 {
+            down_move
+        } else {
+            0.0
+        };
 
         tr[i] = (h - l).max((h - pc).abs()).max((l - pc).abs());
     }
@@ -368,12 +379,20 @@ pub fn cci(series: &OhlcvSeries, period: usize) -> Vec<f64> {
 
     for i in (period - 1)..n {
         let window = &series.candles[i + 1 - period..=i];
-        let typical_prices: Vec<f64> = window.iter().map(|c| (c.high + c.low + c.close) / 3.0).collect();
+        let typical_prices: Vec<f64> = window
+            .iter()
+            .map(|c| (c.high + c.low + c.close) / 3.0)
+            .collect();
         let mean = typical_prices.iter().sum::<f64>() / period as f64;
-        let mean_dev = typical_prices.iter().map(|tp| (tp - mean).abs()).sum::<f64>() / period as f64;
+        let mean_dev = typical_prices
+            .iter()
+            .map(|tp| (tp - mean).abs())
+            .sum::<f64>()
+            / period as f64;
 
         if mean_dev > 0.0 {
-            let tp = (series.candles[i].high + series.candles[i].low + series.candles[i].close) / 3.0;
+            let tp =
+                (series.candles[i].high + series.candles[i].low + series.candles[i].close) / 3.0;
             result[i] = (tp - mean) / (0.015 * mean_dev);
         }
     }
@@ -392,7 +411,10 @@ pub fn williams_r(series: &OhlcvSeries, period: usize) -> Vec<f64> {
 
     for i in (period - 1)..n {
         let window = &series.candles[i + 1 - period..=i];
-        let highest_high = window.iter().map(|c| c.high).fold(f64::NEG_INFINITY, f64::max);
+        let highest_high = window
+            .iter()
+            .map(|c| c.high)
+            .fold(f64::NEG_INFINITY, f64::max);
         let lowest_low = window.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
         let close = series.candles[i].close;
 
@@ -460,7 +482,11 @@ pub fn cmf(series: &OhlcvSeries, period: usize) -> Vec<f64> {
 }
 
 /// Keltner Channels: returns (middle, upper, lower)
-pub fn keltner(series: &OhlcvSeries, period: usize, atr_mult: f64) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+pub fn keltner(
+    series: &OhlcvSeries,
+    period: usize,
+    atr_mult: f64,
+) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
     let middle = ema(series, period);
     let atr_vals = atr(series, period);
 
@@ -492,7 +518,10 @@ pub fn donchian(series: &OhlcvSeries, period: usize) -> (Vec<f64>, Vec<f64>, Vec
 
     for i in (period - 1)..n {
         let window = &series.candles[i + 1 - period..=i];
-        let hi = window.iter().map(|c| c.high).fold(f64::NEG_INFINITY, f64::max);
+        let hi = window
+            .iter()
+            .map(|c| c.high)
+            .fold(f64::NEG_INFINITY, f64::max);
         let lo = window.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
         upper[i] = hi;
         lower[i] = lo;
@@ -503,7 +532,12 @@ pub fn donchian(series: &OhlcvSeries, period: usize) -> (Vec<f64>, Vec<f64>, Vec
 }
 
 /// Parabolic SAR.
-pub fn parabolic_sar(series: &OhlcvSeries, af_start: f64, af_increment: f64, af_max: f64) -> Vec<f64> {
+pub fn parabolic_sar(
+    series: &OhlcvSeries,
+    af_start: f64,
+    af_increment: f64,
+    af_max: f64,
+) -> Vec<f64> {
     let n = series.candles.len();
     let mut sar = vec![f64::NAN; n];
 
@@ -519,7 +553,11 @@ pub fn parabolic_sar(series: &OhlcvSeries, af_start: f64, af_increment: f64, af_
     };
     let mut af = af_start;
 
-    sar[0] = if is_uptrend { series.candles[0].low } else { series.candles[0].high };
+    sar[0] = if is_uptrend {
+        series.candles[0].low
+    } else {
+        series.candles[0].high
+    };
     sar[1] = sar[0];
 
     for i in 2..n {
@@ -529,7 +567,9 @@ pub fn parabolic_sar(series: &OhlcvSeries, af_start: f64, af_increment: f64, af_
         sar[i] = prev_sar + af * (ep - prev_sar);
 
         if is_uptrend {
-            sar[i] = sar[i].min(series.candles[i - 1].low).min(series.candles[i - 2].low);
+            sar[i] = sar[i]
+                .min(series.candles[i - 1].low)
+                .min(series.candles[i - 2].low);
             if candle.low <= sar[i] {
                 is_uptrend = false;
                 sar[i] = ep;
@@ -542,7 +582,9 @@ pub fn parabolic_sar(series: &OhlcvSeries, af_start: f64, af_increment: f64, af_
                 }
             }
         } else {
-            sar[i] = sar[i].max(series.candles[i - 1].high).max(series.candles[i - 2].high);
+            sar[i] = sar[i]
+                .max(series.candles[i - 1].high)
+                .max(series.candles[i - 2].high);
             if candle.high >= sar[i] {
                 is_uptrend = true;
                 sar[i] = ep;
@@ -575,13 +617,21 @@ pub fn heikin_ashi(series: &OhlcvSeries) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f
 
     // First candle
     ha_open[0] = (series.candles[0].open + series.candles[0].close) / 2.0;
-    ha_close[0] = (series.candles[0].open + series.candles[0].high + series.candles[0].low + series.candles[0].close) / 4.0;
+    ha_close[0] = (series.candles[0].open
+        + series.candles[0].high
+        + series.candles[0].low
+        + series.candles[0].close)
+        / 4.0;
     ha_high[0] = series.candles[0].high.max(ha_open[0]).max(ha_close[0]);
     ha_low[0] = series.candles[0].low.min(ha_open[0]).min(ha_close[0]);
 
     for i in 1..n {
         ha_open[i] = (ha_open[i - 1] + ha_close[i - 1]) / 2.0;
-        ha_close[i] = (series.candles[i].open + series.candles[i].high + series.candles[i].low + series.candles[i].close) / 4.0;
+        ha_close[i] = (series.candles[i].open
+            + series.candles[i].high
+            + series.candles[i].low
+            + series.candles[i].close)
+            / 4.0;
         ha_high[i] = series.candles[i].high.max(ha_open[i]).max(ha_close[i]);
         ha_low[i] = series.candles[i].low.min(ha_open[i]).min(ha_close[i]);
     }
@@ -629,7 +679,7 @@ pub fn renko(series: &OhlcvSeries, brick_size: f64) -> Vec<(f64, i8)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-use bt_core::OhlcvSeries;
+    use bt_core::OhlcvSeries;
 
     fn test_series() -> OhlcvSeries {
         let candles = vec![

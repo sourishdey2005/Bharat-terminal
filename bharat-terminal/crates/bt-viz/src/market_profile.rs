@@ -129,7 +129,10 @@ where
 
         chart
             .draw_series(std::iter::once(Rectangle::new(
-                [(0.0, price - bin_size / 2.0), (count, price + bin_size / 2.0)],
+                [
+                    (0.0, price - bin_size / 2.0),
+                    (count, price + bin_size / 2.0),
+                ],
                 cfg.theme.accent().mix(intensity * 0.7).filled(),
             )))
             .map_err(|e| BtError::Render(e.to_string()))?;

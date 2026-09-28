@@ -17,14 +17,25 @@ pub struct IvSurfaceConfig {
 
 impl Default for IvSurfaceConfig {
     fn default() -> Self {
-        Self { title: "IV Surface".to_string(), theme: Theme::Dark }
+        Self {
+            title: "IV Surface".to_string(),
+            theme: Theme::Dark,
+        }
     }
 }
 
 impl IvSurfaceConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
 }
 
 fn blend_colors(a: RGBColor, b: RGBColor, t: f64) -> RGBColor {
@@ -38,7 +49,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &IvSurfaceConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -77,17 +89,20 @@ where DB::ErrorType: 'static,
             let x = grid_x + si as f64 * cw;
             let y = grid_y + ti as f64 * ch;
             root.draw(&Rectangle::new(
-                [(x as i32, y as i32), ((x + cw) as i32 - 1, (y + ch) as i32 - 1)],
+                [
+                    (x as i32, y as i32),
+                    ((x + cw) as i32 - 1, (y + ch) as i32 - 1),
+                ],
                 color.filled(),
             ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+            .map_err(|e| BtError::Render(e.to_string()))?;
             if cw > 40.0 && ch > 24.0 {
                 root.draw(&Text::new(
                     format!("{:.1}", iv * 100.0),
                     (x as i32 + 6, y as i32 + ch as i32 / 2 - 6),
                     (LABEL_FONT, 11).into_font().color(&cfg.theme.text()),
                 ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+                .map_err(|e| BtError::Render(e.to_string()))?;
             }
         }
         root.draw(&Text::new(
@@ -95,7 +110,7 @@ where DB::ErrorType: 'static,
             (10, (grid_y + ti as f64 * ch + ch / 2.0) as i32),
             (LABEL_FONT, 12).into_font().color(&cfg.theme.text()),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
     for (si, &k) in strikes.iter().enumerate() {
@@ -105,7 +120,7 @@ where DB::ErrorType: 'static,
             (x as i32 - 14, (grid_y + grid_h + 4.0) as i32),
             (LABEL_FONT, 11).into_font().color(&cfg.theme.text()),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
     draw_footer(&root, cfg.theme)?;
@@ -130,7 +145,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("NIFTY", 100, 1, 100.0);
         let cfg = IvSurfaceConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_iv_surface.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_iv_surface.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

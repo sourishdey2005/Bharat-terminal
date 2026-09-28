@@ -30,11 +30,25 @@ impl Default for CandlestickSupertrendConfig {
 }
 
 impl CandlestickSupertrendConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, title: impl Into<String>) -> Self { self.title = title.into(); self }
-    pub fn theme(mut self, theme: Theme) -> Self { self.theme = theme; self }
-    pub fn period(mut self, period: usize) -> Self { self.period = period.max(2); self }
-    pub fn multiplier(mut self, v: f64) -> Self { self.multiplier = v.max(0.1); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
+        self
+    }
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
+    pub fn period(mut self, period: usize) -> Self {
+        self.period = period.max(2);
+        self
+    }
+    pub fn multiplier(mut self, v: f64) -> Self {
+        self.multiplier = v.max(0.1);
+        self
+    }
 }
 
 fn supertrend(series: &OhlcvSeries, period: usize, multiplier: f64) -> (Vec<f64>, Vec<bool>) {
@@ -82,8 +96,16 @@ where
 
     let t_min = series.candles.first().unwrap().t;
     let t_max = series.candles.last().unwrap().t;
-    let low = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
-    let high = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
+    let low = series
+        .candles
+        .iter()
+        .map(|c| c.low)
+        .fold(f64::MAX, f64::min);
+    let high = series
+        .candles
+        .iter()
+        .map(|c| c.high)
+        .fold(f64::MIN, f64::max);
     let pad = (high - low) * 0.05;
 
     let (st_vals, is_uptrend) = supertrend(series, cfg.period, cfg.multiplier);
@@ -111,10 +133,20 @@ where
 
     chart
         .draw_series(series.candles.iter().map(|c| {
-            let color = if c.is_bullish() { cfg.theme.profit() } else { cfg.theme.loss() };
+            let color = if c.is_bullish() {
+                cfg.theme.profit()
+            } else {
+                cfg.theme.loss()
+            };
             CandleStick::new(
-                c.t, c.open, c.high, c.low, c.close,
-                color.filled(), color.filled(), (candle_width * 10.0) as u32,
+                c.t,
+                c.open,
+                c.high,
+                c.low,
+                c.close,
+                color.filled(),
+                color.filled(),
+                (candle_width * 10.0) as u32,
             )
         }))
         .map_err(|e| BtError::Render(e.to_string()))?;
@@ -123,7 +155,11 @@ where
         if !st_vals[i].is_nan() && !st_vals[i + 1].is_nan() {
             let c1 = &series.candles[i];
             let c2 = &series.candles[i + 1];
-            let color = if is_uptrend[i] { cfg.theme.profit() } else { cfg.theme.loss() };
+            let color = if is_uptrend[i] {
+                cfg.theme.profit()
+            } else {
+                cfg.theme.loss()
+            };
             chart
                 .draw_series(LineSeries::new(
                     vec![(c1.t, st_vals[i]), (c2.t, st_vals[i + 1])],
@@ -138,11 +174,19 @@ where
     Ok(())
 }
 
-pub fn render_png(series: &OhlcvSeries, cfg: &CandlestickSupertrendConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    series: &OhlcvSeries,
+    cfg: &CandlestickSupertrendConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, series, cfg)
 }
 
-pub fn render_svg(series: &OhlcvSeries, cfg: &CandlestickSupertrendConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    series: &OhlcvSeries,
+    cfg: &CandlestickSupertrendConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, series, cfg)
 }
 
@@ -155,7 +199,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = CandlestickSupertrendConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_candlestick_supertrend.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_candlestick_supertrend.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

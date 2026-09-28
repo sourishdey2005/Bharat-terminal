@@ -1,4 +1,4 @@
-﻿// crates/bt-viz/src/candlestick_bollinger.rs
+// crates/bt-viz/src/candlestick_bollinger.rs
 // Author: Sourish Dey
 
 //! Tier 1 #3 â€” Candlestick + Bollinger Bands (3 bands shaded).
@@ -83,15 +83,29 @@ where
 
     let t_min = series.candles.first().unwrap().t;
     let t_max = series.candles.last().unwrap().t;
-    let low = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
-    let high = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
+    let low = series
+        .candles
+        .iter()
+        .map(|c| c.low)
+        .fold(f64::MAX, f64::min);
+    let high = series
+        .candles
+        .iter()
+        .map(|c| c.high)
+        .fold(f64::MIN, f64::max);
     let pad = (high - low) * 0.05;
 
     let (middle, upper, lower) = bollinger(series, cfg.period, cfg.std_dev);
 
     // Extend y-range to include bands
-    let band_high = upper.iter().filter(|v| !v.is_nan()).fold(f64::NEG_INFINITY, |a, &b| a.max(b));
-    let band_low = lower.iter().filter(|v| !v.is_nan()).fold(f64::INFINITY, |a, &b| a.min(b));
+    let band_high = upper
+        .iter()
+        .filter(|v| !v.is_nan())
+        .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+    let band_low = lower
+        .iter()
+        .filter(|v| !v.is_nan())
+        .fold(f64::INFINITY, |a, &b| a.min(b));
     let y_min = low.min(band_low) - pad;
     let y_max = high.max(band_high) + pad;
 
@@ -116,58 +130,74 @@ where
 
     // Shaded Bollinger Bands area
     chart
-        .draw_series(
-            series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !upper[i].is_nan() && !lower[i].is_nan() {
-                    Some(Polygon::new(
-                        vec![
-                            (c.t, upper[i]),
-                            (c.t, lower[i]),
-                        ],
-                        cfg.theme.info().mix(0.15).filled(),
-                    ))
-                } else {
-                    None
-                }
-            }),
-        )
+        .draw_series(series.candles.iter().enumerate().filter_map(|(i, c)| {
+            if !upper[i].is_nan() && !lower[i].is_nan() {
+                Some(Polygon::new(
+                    vec![(c.t, upper[i]), (c.t, lower[i])],
+                    cfg.theme.info().mix(0.15).filled(),
+                ))
+            } else {
+                None
+            }
+        }))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     // Upper band line
     chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !upper[i].is_nan() { Some((c.t, upper[i])) } else { None }
+                if !upper[i].is_nan() {
+                    Some((c.t, upper[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.info().mix(0.7).stroke_width(1),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label(format!("Upper ({})", cfg.std_dev))
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(1)));
+        .legend(|(x, y)| {
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(1))
+        });
 
     // Middle band (SMA)
     chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !middle[i].is_nan() { Some((c.t, middle[i])) } else { None }
+                if !middle[i].is_nan() {
+                    Some((c.t, middle[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.accent().stroke_width(2),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label(format!("SMA{}", cfg.period))
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(2)));
+        .legend(|(x, y)| {
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.accent().stroke_width(2),
+            )
+        });
 
     // Lower band line
     chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !lower[i].is_nan() { Some((c.t, lower[i])) } else { None }
+                if !lower[i].is_nan() {
+                    Some((c.t, lower[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.info().mix(0.7).stroke_width(1),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label(format!("Lower ({})", cfg.std_dev))
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(1)));
+        .legend(|(x, y)| {
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(1))
+        });
 
     let candle_width = ((t_max - t_min) / series.candles.len() as f64).max(0.3) * 0.4;
 
@@ -179,8 +209,14 @@ where
                 cfg.theme.loss()
             };
             CandleStick::new(
-                c.t, c.open, c.high, c.low, c.close,
-                color.filled(), color.filled(), (candle_width * 10.0) as u32,
+                c.t,
+                c.open,
+                c.high,
+                c.low,
+                c.close,
+                color.filled(),
+                color.filled(),
+                (candle_width * 10.0) as u32,
             )
         }))
         .map_err(|e| BtError::Render(e.to_string()))?;
@@ -194,7 +230,11 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     if let Some(vol_area) = volume_area {
-        let max_vol = series.candles.iter().map(|c| c.volume).fold(0.0_f64, f64::max);
+        let max_vol = series
+            .candles
+            .iter()
+            .map(|c| c.volume)
+            .fold(0.0_f64, f64::max);
         let mut vol_chart = ChartBuilder::on(&vol_area)
             .margin(10)
             .x_label_area_size(20)
@@ -230,11 +270,19 @@ where
     Ok(())
 }
 
-pub fn render_png(series: &OhlcvSeries, cfg: &CandlestickBollingerConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    series: &OhlcvSeries,
+    cfg: &CandlestickBollingerConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, series, cfg)
 }
 
-pub fn render_svg(series: &OhlcvSeries, cfg: &CandlestickBollingerConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    series: &OhlcvSeries,
+    cfg: &CandlestickBollingerConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, series, cfg)
 }
 

@@ -19,7 +19,11 @@ pub struct ImapNode {
 
 impl ImapNode {
     pub fn new(label: impl Into<String>, market_cap: f64, pct_change: f64) -> Self {
-        Self { label: label.into(), market_cap: market_cap.max(0.0001), pct_change }
+        Self {
+            label: label.into(),
+            market_cap: market_cap.max(0.0001),
+            pct_change,
+        }
     }
 }
 
@@ -41,10 +45,21 @@ impl Default for ImapTreemapConfig {
 }
 
 impl ImapTreemapConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn min_tile_size(mut self, s: f64) -> Self { self.min_tile_size = s.max(10.0); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn min_tile_size(mut self, s: f64) -> Self {
+        self.min_tile_size = s.max(10.0);
+        self
+    }
 }
 
 fn layout(nodes: &[ImapNode], x: f64, y: f64, w: f64, h: f64) -> Vec<(f64, f64, f64, f64)> {
@@ -78,7 +93,8 @@ fn render<DB: DrawingBackend>(
     nodes: &[ImapNode],
     cfg: &ImapTreemapConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if nodes.is_empty() {
         return Err(BtError::EmptySeries("treemap nodes".into()));
@@ -86,7 +102,11 @@ where DB::ErrorType: 'static,
     fill_background(&root, cfg.theme)?;
 
     let mut sorted: Vec<ImapNode> = nodes.to_vec();
-    sorted.sort_by(|a, b| b.market_cap.partial_cmp(&a.market_cap).unwrap_or(std::cmp::Ordering::Equal));
+    sorted.sort_by(|a, b| {
+        b.market_cap
+            .partial_cmp(&a.market_cap)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     let (title_area, body_area) = root.split_vertically(50);
     title_area
@@ -102,20 +122,34 @@ where DB::ErrorType: 'static,
 
     for (node, (rx, ry, rw, rh)) in sorted.iter().zip(rects.iter()) {
         let t = (node.pct_change.abs() / 5.0).clamp(0.15, 1.0);
-        let target = if node.pct_change >= 0.0 { cfg.theme.profit() } else { cfg.theme.loss() };
+        let target = if node.pct_change >= 0.0 {
+            cfg.theme.profit()
+        } else {
+            cfg.theme.loss()
+        };
         let bg = cfg.theme.background();
         let lerp = |a: u8, b: u8| (a as f64 + (b as f64 - a as f64) * t).round() as u8;
-        let color = RGBColor(lerp(bg.0, target.0), lerp(bg.1, target.1), lerp(bg.2, target.2));
+        let color = RGBColor(
+            lerp(bg.0, target.0),
+            lerp(bg.1, target.1),
+            lerp(bg.2, target.2),
+        );
 
         body_area
             .draw(&Rectangle::new(
-                [(*rx as i32, *ry as i32), ((*rx + *rw) as i32, (*ry + *rh) as i32)],
+                [
+                    (*rx as i32, *ry as i32),
+                    ((*rx + *rw) as i32, (*ry + *rh) as i32),
+                ],
                 color.filled(),
             ))
             .map_err(|e| BtError::Render(e.to_string()))?;
         body_area
             .draw(&Rectangle::new(
-                [(*rx as i32, *ry as i32), ((*rx + *rw) as i32, (*ry + *rh) as i32)],
+                [
+                    (*rx as i32, *ry as i32),
+                    ((*rx + *rw) as i32, (*ry + *rh) as i32),
+                ],
                 cfg.theme.border().stroke_width(1),
             ))
             .map_err(|e| BtError::Render(e.to_string()))?;
@@ -158,10 +192,20 @@ mod tests {
     #[test]
     fn renders() {
         let nodes: Vec<ImapNode> = (0..12)
-            .map(|i| ImapNode::new(format!("STK{}", i), (12 - i) as f64 * 1000.0, (i as f64 - 6.0) * 0.5))
+            .map(|i| {
+                ImapNode::new(
+                    format!("STK{}", i),
+                    (12 - i) as f64 * 1000.0,
+                    (i as f64 - 6.0) * 0.5,
+                )
+            })
             .collect();
         let cfg = ImapTreemapConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_imap_treemap.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_imap_treemap.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&nodes, &cfg, &path).unwrap();
     }
 }

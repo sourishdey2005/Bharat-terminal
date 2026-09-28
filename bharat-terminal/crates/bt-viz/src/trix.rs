@@ -19,15 +19,30 @@ pub struct TrixConfig {
 
 impl Default for TrixConfig {
     fn default() -> Self {
-        Self { title: "TRIX".to_string(), theme: Theme::Dark, period: 15 }
+        Self {
+            title: "TRIX".to_string(),
+            theme: Theme::Dark,
+            period: 15,
+        }
     }
 }
 
 impl TrixConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn period(mut self, p: usize) -> Self { self.period = p.max(2); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn period(mut self, p: usize) -> Self {
+        self.period = p.max(2);
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -35,7 +50,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &TrixConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -80,30 +96,42 @@ where DB::ErrorType: 'static,
     let t_max = series.candles.last().unwrap().t;
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(10)
         .x_label_area_size(30)
         .y_label_area_size(50)
         .build_cartesian_2d(t_min..t_max, -5.0..5.0)
         .map_err(|e| BtError::Render(e.to_string()))?;
 
-    chart.configure_mesh()
+    chart
+        .configure_mesh()
         .label_style((LABEL_FONT, 12).into_font().color(&cfg.theme.text()))
         .axis_style(&cfg.theme.border())
         .draw()
         .map_err(|e| BtError::Render(e.to_string()))?;
 
-    chart.draw_series(LineSeries::new(
-        series.candles.iter().enumerate().filter_map(|(i, c)| if !trix[i].is_nan() { Some((c.t, trix[i])) } else { None }),
-        cfg.theme.accent().stroke_width(2),
-    ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+    chart
+        .draw_series(LineSeries::new(
+            series.candles.iter().enumerate().filter_map(|(i, c)| {
+                if !trix[i].is_nan() {
+                    Some((c.t, trix[i]))
+                } else {
+                    None
+                }
+            }),
+            cfg.theme.accent().stroke_width(2),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
 
-    chart.draw_series(LineSeries::new(
-        vec![(t_min, 0.0), (t_max, 0.0)],
-        cfg.theme.border().stroke_width(1),
-    ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+    chart
+        .draw_series(LineSeries::new(
+            vec![(t_min, 0.0), (t_max, 0.0)],
+            cfg.theme.border().stroke_width(1),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
 
     draw_footer(&root, cfg.theme)?;
     root.present().map_err(|e| BtError::Render(e.to_string()))?;
@@ -127,7 +155,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = TrixConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_trix.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_trix.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

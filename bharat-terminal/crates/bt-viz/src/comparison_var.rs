@@ -28,10 +28,21 @@ impl Default for ComparisonVarConfig {
 }
 
 impl ComparisonVarConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, title: impl Into<String>) -> Self { self.title = title.into(); self }
-    pub fn theme(mut self, theme: Theme) -> Self { self.theme = theme; self }
-    pub fn confidence(mut self, v: f64) -> Self { self.confidence = v.clamp(0.5, 0.999); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
+        self
+    }
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
+    pub fn confidence(mut self, v: f64) -> Self {
+        self.confidence = v.clamp(0.5, 0.999);
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -56,8 +67,10 @@ where
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
-            format!("{} — VaR({:.1}%): {}={:.2}%, {}={:.2}%",
-                cfg.title, cfg.confidence, series_a.symbol, var_a, series_b.symbol, var_b),
+            format!(
+                "{} — VaR({:.1}%): {}={:.2}%, {}={:.2}%",
+                cfg.title, cfg.confidence, series_a.symbol, var_a, series_b.symbol, var_b
+            ),
             (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
         )
         .margin(10)
@@ -86,11 +99,21 @@ where
     Ok(())
 }
 
-pub fn render_png(series_a: &OhlcvSeries, series_b: &OhlcvSeries, cfg: &ComparisonVarConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    series_a: &OhlcvSeries,
+    series_b: &OhlcvSeries,
+    cfg: &ComparisonVarConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, series_a, series_b, cfg)
 }
 
-pub fn render_svg(series_a: &OhlcvSeries, series_b: &OhlcvSeries, cfg: &ComparisonVarConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    series_a: &OhlcvSeries,
+    series_b: &OhlcvSeries,
+    cfg: &ComparisonVarConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, series_a, series_b, cfg)
 }
 
@@ -104,7 +127,11 @@ mod tests {
         let a = synthetic_ohlcv("AAA", 100, 1, 100.0);
         let b = synthetic_ohlcv("BBB", 100, 2, 100.0);
         let cfg = ComparisonVarConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_comparison_var.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_comparison_var.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&a, &b, &cfg, &path).unwrap();
     }
 }

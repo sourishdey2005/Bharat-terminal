@@ -31,19 +31,37 @@ impl Default for GammaExposureConfig {
 }
 
 impl GammaExposureConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn strikes(mut self, s: Vec<f64>) -> Self { self.strikes = s; self }
-    pub fn gamma_values(mut self, g: Vec<f64>) -> Self { self.gamma_values = g; self }
-    pub fn spot(mut self, s: f64) -> Self { self.spot = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn strikes(mut self, s: Vec<f64>) -> Self {
+        self.strikes = s;
+        self
+    }
+    pub fn gamma_values(mut self, g: Vec<f64>) -> Self {
+        self.gamma_values = g;
+        self
+    }
+    pub fn spot(mut self, s: f64) -> Self {
+        self.spot = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
     root: plotters::drawing::DrawingArea<DB, plotters::coord::Shift>,
     cfg: &GammaExposureConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if cfg.strikes.is_empty() || cfg.gamma_values.is_empty() {
         return Err(BtError::EmptySeries("gamma exposure data".into()));
@@ -57,7 +75,10 @@ where DB::ErrorType: 'static,
     let pad = (y_max - y_min).max(0.001) * 0.15;
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(15)
         .x_label_area_size(35)
         .y_label_area_size(60)
@@ -81,11 +102,10 @@ where DB::ErrorType: 'static,
         .collect();
 
     chart
-        .draw_series(AreaSeries::new(
-            points.clone(),
-            0.0,
-            cfg.theme.profit().mix(0.35),
-        ).border_style(cfg.theme.profit().stroke_width(2)))
+        .draw_series(
+            AreaSeries::new(points.clone(), 0.0, cfg.theme.profit().mix(0.35))
+                .border_style(cfg.theme.profit().stroke_width(2)),
+        )
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart
@@ -134,7 +154,11 @@ mod tests {
             .strikes(vec![80.0, 90.0, 95.0, 100.0, 105.0, 110.0, 120.0])
             .gamma_values(vec![0.001, 0.005, 0.015, 0.025, 0.015, 0.005, 0.001])
             .spot(100.0);
-        let path = std::env::temp_dir().join("bt_test_gamma_exposure.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_gamma_exposure.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&cfg, &path).unwrap();
     }
 }

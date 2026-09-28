@@ -157,10 +157,7 @@ where
     let positions: Vec<(f64, f64)> = (0..n)
         .map(|i| {
             let angle = (i as f64 / n as f64) * std::f64::consts::TAU - std::f64::consts::FRAC_PI_2;
-            (
-                cx + radius * angle.cos(),
-                cy + radius * angle.sin(),
-            )
+            (cx + radius * angle.cos(), cy + radius * angle.sin())
         })
         .collect();
 
@@ -191,12 +188,8 @@ where
         let (x, y) = positions[i];
         let color = class_color(cfg.theme, &node.asset_class);
 
-        root.draw(&Circle::new(
-            (x as i32, y as i32),
-            18,
-            color.filled(),
-        ))
-        .map_err(|e| BtError::Render(e.to_string()))?;
+        root.draw(&Circle::new((x as i32, y as i32), 18, color.filled()))
+            .map_err(|e| BtError::Render(e.to_string()))?;
 
         root.draw(&Circle::new(
             (x as i32, y as i32),
@@ -218,8 +211,12 @@ where
     for (idx, class) in classes.iter().enumerate() {
         let lx = 20;
         let ly = 60 + idx as i32 * 20;
-        root.draw(&Circle::new((lx + 5, ly + 5), 6, class_color(cfg.theme, class).filled()))
-            .map_err(|e| BtError::Render(e.to_string()))?;
+        root.draw(&Circle::new(
+            (lx + 5, ly + 5),
+            6,
+            class_color(cfg.theme, class).filled(),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
         root.draw(&Text::new(
             *class,
             (lx + 18, ly),

@@ -62,11 +62,7 @@ struct Divergence {
     macd_val: f64,
 }
 
-fn find_divergences(
-    series: &OhlcvSeries,
-    macd_line: &[f64],
-    lookback: usize,
-) -> Vec<Divergence> {
+fn find_divergences(series: &OhlcvSeries, macd_line: &[f64], lookback: usize) -> Vec<Divergence> {
     let mut divergences = Vec::new();
     let n = series.candles.len();
 
@@ -244,7 +240,10 @@ where
     let y_max = macd_max + range * 0.2;
 
     let mut macd_chart = ChartBuilder::on(&macd_area)
-        .caption("MACD", (TITLE_FONT, 16).into_font().color(&cfg.theme.text()))
+        .caption(
+            "MACD",
+            (TITLE_FONT, 16).into_font().color(&cfg.theme.text()),
+        )
         .margin(10)
         .x_label_area_size(30)
         .y_label_area_size(60)

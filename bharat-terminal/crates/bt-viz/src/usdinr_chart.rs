@@ -91,9 +91,7 @@ where
     for i in (window - 1)..rates.len() {
         let slice = &rates[i + 1 - window..=i];
         let mean = slice.iter().sum::<f64>() / window as f64;
-        let std = (slice.iter().map(|r| (r - mean).powi(2)).sum::<f64>()
-            / window as f64)
-            .sqrt();
+        let std = (slice.iter().map(|r| (r - mean).powi(2)).sum::<f64>() / window as f64).sqrt();
         middle[i] = mean;
         upper[i] = mean + cfg.band_mult * std;
         lower[i] = mean - cfg.band_mult * std;
@@ -172,10 +170,7 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("SMA(20)")
         .legend(|(x, y)| {
-            PathElement::new(
-                vec![(x, y), (x + 15, y)],
-                cfg.theme.info().stroke_width(1),
-            )
+            PathElement::new(vec![(x, y), (x + 15, y)], cfg.theme.info().stroke_width(1))
         });
 
     // Rate line
@@ -185,7 +180,10 @@ where
         .map(|(i, &v)| (i as f64, v))
         .collect();
     chart
-        .draw_series(LineSeries::new(rate_pts, cfg.theme.accent().stroke_width(2)))
+        .draw_series(LineSeries::new(
+            rate_pts,
+            cfg.theme.accent().stroke_width(2),
+        ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("USD/INR")
         .legend(|(x, y)| {

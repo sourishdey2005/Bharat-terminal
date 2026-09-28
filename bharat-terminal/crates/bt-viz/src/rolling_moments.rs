@@ -74,16 +74,8 @@ where
         .chain(kurt.iter().filter(|v| !v.is_nan()))
         .copied()
         .collect();
-    let y_lo = all_vals
-        .iter()
-        .cloned()
-        .fold(f64::INFINITY, f64::min)
-        - 0.5;
-    let y_hi = all_vals
-        .iter()
-        .cloned()
-        .fold(f64::NEG_INFINITY, f64::max)
-        + 0.5;
+    let y_lo = all_vals.iter().cloned().fold(f64::INFINITY, f64::min) - 0.5;
+    let y_hi = all_vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max) + 0.5;
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
@@ -119,7 +111,10 @@ where
         .collect();
 
     chart
-        .draw_series(LineSeries::new(skew_pts, cfg.theme.accent().stroke_width(2)))
+        .draw_series(LineSeries::new(
+            skew_pts,
+            cfg.theme.accent().stroke_width(2),
+        ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Skewness")
         .legend(|(x, y)| {
@@ -141,10 +136,7 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Kurtosis (excess)")
         .legend(|(x, y)| {
-            PathElement::new(
-                vec![(x, y), (x + 15, y)],
-                cfg.theme.info().stroke_width(2),
-            )
+            PathElement::new(vec![(x, y), (x + 15, y)], cfg.theme.info().stroke_width(2))
         });
 
     chart

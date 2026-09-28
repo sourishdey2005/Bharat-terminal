@@ -17,14 +17,25 @@ pub struct MfAnalyticsConfig {
 
 impl Default for MfAnalyticsConfig {
     fn default() -> Self {
-        Self { title: "Mutual Fund Analytics".to_string(), theme: Theme::Dark }
+        Self {
+            title: "Mutual Fund Analytics".to_string(),
+            theme: Theme::Dark,
+        }
     }
 }
 
 impl MfAnalyticsConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
 }
 
 fn sample_funds() -> Vec<(String, f64, f64, f64)> {
@@ -45,7 +56,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &MfAnalyticsConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -68,7 +80,8 @@ where DB::ErrorType: 'static,
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     let mut chart = chart;
-    chart.configure_mesh()
+    chart
+        .configure_mesh()
         .label_style((LABEL_FONT, 11).into_font().color(&cfg.theme.text()))
         .axis_style(&cfg.theme.border())
         .x_labels(data.len())
@@ -76,8 +89,14 @@ where DB::ErrorType: 'static,
             let idx = *x as usize;
             if idx < data.len() {
                 let n = data[idx].0.clone();
-                if n.len() > 10 { n[..10].to_string() } else { n }
-            } else { String::new() }
+                if n.len() > 10 {
+                    n[..10].to_string()
+                } else {
+                    n
+                }
+            } else {
+                String::new()
+            }
         })
         .y_desc("1Y Return (%)")
         .draw()
@@ -85,12 +104,19 @@ where DB::ErrorType: 'static,
 
     let bar_w = 0.6 / 3.0;
     for (i, (name, ret, risk, _)) in data.iter().enumerate() {
-        let color = if *ret >= 12.0 { cfg.theme.profit() } else if *ret >= 10.0 { cfg.theme.accent() } else { cfg.theme.info() };
-        chart.draw_series(std::iter::once(Rectangle::new(
-            [(i as f64, 0.0), (i as f64 + bar_w * 0.9, *ret)],
-            color.filled(),
-        )))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        let color = if *ret >= 12.0 {
+            cfg.theme.profit()
+        } else if *ret >= 10.0 {
+            cfg.theme.accent()
+        } else {
+            cfg.theme.info()
+        };
+        chart
+            .draw_series(std::iter::once(Rectangle::new(
+                [(i as f64, 0.0), (i as f64 + bar_w * 0.9, *ret)],
+                color.filled(),
+            )))
+            .map_err(|e| BtError::Render(e.to_string()))?;
         let _ = (name, risk);
     }
 
@@ -100,7 +126,7 @@ where DB::ErrorType: 'static,
             (60 + i as i32 * ((w as i32 - 120) / data.len() as i32), 50),
             (LABEL_FONT, 10).into_font().color(&cfg.theme.text()),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
         let _ = name;
     }
 
@@ -126,7 +152,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("MF", 100, 1, 100.0);
         let cfg = MfAnalyticsConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_mf_analytics.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_mf_analytics.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

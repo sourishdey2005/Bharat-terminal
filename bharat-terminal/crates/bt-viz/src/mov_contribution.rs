@@ -19,7 +19,11 @@ pub struct MoverEntry {
 
 impl MoverEntry {
     pub fn new(symbol: impl Into<String>, contribution: f64, weight: f64) -> Self {
-        Self { symbol: symbol.into(), contribution, weight: weight.max(0.0) }
+        Self {
+            symbol: symbol.into(),
+            contribution,
+            weight: weight.max(0.0),
+        }
     }
 }
 
@@ -43,11 +47,25 @@ impl Default for MovContributionConfig {
 }
 
 impl MovContributionConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn top_n(mut self, n: usize) -> Self { self.top_n = n.max(3).min(30); self }
-    pub fn show_weights(mut self, s: bool) -> Self { self.show_weights = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn top_n(mut self, n: usize) -> Self {
+        self.top_n = n.max(3).min(30);
+        self
+    }
+    pub fn show_weights(mut self, s: bool) -> Self {
+        self.show_weights = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -55,7 +73,8 @@ fn render<DB: DrawingBackend>(
     movers: &[MoverEntry],
     cfg: &MovContributionConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if movers.is_empty() {
         return Err(BtError::EmptySeries("movers".into()));
@@ -63,11 +82,21 @@ where DB::ErrorType: 'static,
     fill_background(&root, cfg.theme)?;
 
     let mut sorted: Vec<MoverEntry> = movers.to_vec();
-    sorted.sort_by(|a, b| b.contribution.partial_cmp(&a.contribution).unwrap_or(std::cmp::Ordering::Equal));
+    sorted.sort_by(|a, b| {
+        b.contribution
+            .partial_cmp(&a.contribution)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     let top: Vec<MoverEntry> = sorted.into_iter().take(cfg.top_n).collect();
 
-    let c_min = top.iter().map(|m| m.contribution).fold(f64::INFINITY, f64::min);
-    let c_max = top.iter().map(|m| m.contribution).fold(f64::NEG_INFINITY, f64::max);
+    let c_min = top
+        .iter()
+        .map(|m| m.contribution)
+        .fold(f64::INFINITY, f64::min);
+    let c_max = top
+        .iter()
+        .map(|m| m.contribution)
+        .fold(f64::NEG_INFINITY, f64::max);
     let pad = (c_max - c_min).max(0.1) * 0.1;
 
     let mut chart = ChartBuilder::on(&root)
@@ -93,7 +122,11 @@ where DB::ErrorType: 'static,
 
     chart
         .draw_series(top.iter().enumerate().map(|(i, m)| {
-            let color = if m.contribution >= 0.0 { cfg.theme.profit() } else { cfg.theme.loss() };
+            let color = if m.contribution >= 0.0 {
+                cfg.theme.profit()
+            } else {
+                cfg.theme.loss()
+            };
             Rectangle::new(
                 [(i, 0.0_f64.max(c_min - pad)), (i + 1, m.contribution)],
                 color.filled(),
@@ -133,10 +166,20 @@ mod tests {
     #[test]
     fn renders() {
         let movers: Vec<MoverEntry> = (0..10)
-            .map(|i| MoverEntry::new(format!("STK{}", i), (10 - i) as f64 * 0.3, (10 - i) as f64 * 0.02))
+            .map(|i| {
+                MoverEntry::new(
+                    format!("STK{}", i),
+                    (10 - i) as f64 * 0.3,
+                    (10 - i) as f64 * 0.02,
+                )
+            })
             .collect();
         let cfg = MovContributionConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_mov_contribution.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_mov_contribution.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&movers, &cfg, &path).unwrap();
     }
 }

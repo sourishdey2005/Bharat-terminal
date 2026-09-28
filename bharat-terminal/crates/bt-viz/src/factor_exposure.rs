@@ -19,7 +19,11 @@ pub struct FactorExposure {
 
 impl FactorExposure {
     pub fn new(name: impl Into<String>, exposure: f64, contribution: f64) -> Self {
-        Self { name: name.into(), exposure, contribution }
+        Self {
+            name: name.into(),
+            exposure,
+            contribution,
+        }
     }
 }
 
@@ -41,10 +45,21 @@ impl Default for FactorExposureConfig {
 }
 
 impl FactorExposureConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn show_contribution(mut self, s: bool) -> Self { self.show_contribution = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn show_contribution(mut self, s: bool) -> Self {
+        self.show_contribution = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -52,7 +67,8 @@ fn render<DB: DrawingBackend>(
     factors: &[FactorExposure],
     cfg: &FactorExposureConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if factors.is_empty() {
         return Err(BtError::EmptySeries("factor exposures".into()));
@@ -94,8 +110,15 @@ where DB::ErrorType: 'static,
 
     chart
         .draw_series(factors.iter().enumerate().map(|(i, f)| {
-            let color = if f.exposure >= 0.0 { cfg.theme.profit() } else { cfg.theme.loss() };
-            Rectangle::new([(i, 0.0_f64.max(e_min - pad)), (i + 1, f.exposure)], color.filled())
+            let color = if f.exposure >= 0.0 {
+                cfg.theme.profit()
+            } else {
+                cfg.theme.loss()
+            };
+            Rectangle::new(
+                [(i, 0.0_f64.max(e_min - pad)), (i + 1, f.exposure)],
+                color.filled(),
+            )
         }))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Exposure")
@@ -106,13 +129,23 @@ where DB::ErrorType: 'static,
     if cfg.show_contribution {
         chart
             .draw_series(factors.iter().enumerate().map(|(i, f)| {
-                let color = if f.contribution >= 0.0 { cfg.theme.info() } else { cfg.theme.accent() };
-                Rectangle::new([(i, 0.0_f64.max(e_min - pad)), (i + 1, f.contribution)], color.mix(0.5).filled())
+                let color = if f.contribution >= 0.0 {
+                    cfg.theme.info()
+                } else {
+                    cfg.theme.accent()
+                };
+                Rectangle::new(
+                    [(i, 0.0_f64.max(e_min - pad)), (i + 1, f.contribution)],
+                    color.mix(0.5).filled(),
+                )
             }))
             .map_err(|e| BtError::Render(e.to_string()))?
             .label("Contribution")
             .legend(|(x, y)| {
-                Rectangle::new([(x, y - 5), (x + 20, y + 5)], cfg.theme.info().mix(0.5).filled())
+                Rectangle::new(
+                    [(x, y - 5), (x + 20, y + 5)],
+                    cfg.theme.info().mix(0.5).filled(),
+                )
             });
     }
 
@@ -129,11 +162,19 @@ where DB::ErrorType: 'static,
     Ok(())
 }
 
-pub fn render_png(factors: &[FactorExposure], cfg: &FactorExposureConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    factors: &[FactorExposure],
+    cfg: &FactorExposureConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, factors, cfg)
 }
 
-pub fn render_svg(factors: &[FactorExposure], cfg: &FactorExposureConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    factors: &[FactorExposure],
+    cfg: &FactorExposureConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, factors, cfg)
 }
 
@@ -144,10 +185,20 @@ mod tests {
     #[test]
     fn renders() {
         let factors: Vec<FactorExposure> = (0..8)
-            .map(|i| FactorExposure::new(format!("F{}", i), (8 - i) as f64 * 0.1 - 0.4, (8 - i) as f64 * 0.05 - 0.2))
+            .map(|i| {
+                FactorExposure::new(
+                    format!("F{}", i),
+                    (8 - i) as f64 * 0.1 - 0.4,
+                    (8 - i) as f64 * 0.05 - 0.2,
+                )
+            })
             .collect();
         let cfg = FactorExposureConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_factor_exposure.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_factor_exposure.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&factors, &cfg, &path).unwrap();
     }
 }

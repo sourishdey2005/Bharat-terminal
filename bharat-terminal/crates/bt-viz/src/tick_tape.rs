@@ -117,10 +117,7 @@ where
         .fold(f64::INFINITY, f64::min);
     let pad = (high - low).max(1.0) * 0.05;
 
-    let max_vol = ticks
-        .iter()
-        .map(|t| t.volume)
-        .fold(0.0_f64, f64::max);
+    let max_vol = ticks.iter().map(|t| t.volume).fold(0.0_f64, f64::max);
 
     let mut chart = ChartBuilder::on(&root)
         .caption(

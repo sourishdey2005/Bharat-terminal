@@ -5,7 +5,7 @@
 //! Fetches real OHLCV data, quotes, search results, and company profiles
 //! from Yahoo Finance's public endpoints.
 
-use crate::provider::{CompanyProfile, Interval, Quote, SymbolInfo, DataProvider};
+use crate::provider::{CompanyProfile, DataProvider, Interval, Quote, SymbolInfo};
 use bt_core::{BtError, Candle, OhlcvSeries, Result};
 use chrono::{DateTime, Utc};
 use reqwest::Client;

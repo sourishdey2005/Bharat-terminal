@@ -31,19 +31,37 @@ impl Default for VixTermConfig {
 }
 
 impl VixTermConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn tenors(mut self, t: Vec<f64>) -> Self { self.tenors = t; self }
-    pub fn vix_values(mut self, v: Vec<f64>) -> Self { self.vix_values = v; self }
-    pub fn spot_vix(mut self, s: f64) -> Self { self.spot_vix = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn tenors(mut self, t: Vec<f64>) -> Self {
+        self.tenors = t;
+        self
+    }
+    pub fn vix_values(mut self, v: Vec<f64>) -> Self {
+        self.vix_values = v;
+        self
+    }
+    pub fn spot_vix(mut self, s: f64) -> Self {
+        self.spot_vix = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
     root: plotters::drawing::DrawingArea<DB, plotters::coord::Shift>,
     cfg: &VixTermConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if cfg.tenors.is_empty() || cfg.vix_values.is_empty() {
         return Err(BtError::EmptySeries("VIX term data".into()));
@@ -57,7 +75,10 @@ where DB::ErrorType: 'static,
     let pad = (y_max - y_min).max(0.5) * 0.15;
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(15)
         .x_label_area_size(35)
         .y_label_area_size(60)
@@ -81,11 +102,18 @@ where DB::ErrorType: 'static,
         .collect();
 
     chart
-        .draw_series(LineSeries::new(points.clone(), cfg.theme.accent().stroke_width(3)))
+        .draw_series(LineSeries::new(
+            points.clone(),
+            cfg.theme.accent().stroke_width(3),
+        ))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart
-        .draw_series(points.iter().map(|&(x, y)| Circle::new((x, y), 5, cfg.theme.accent().filled())))
+        .draw_series(
+            points
+                .iter()
+                .map(|&(x, y)| Circle::new((x, y), 5, cfg.theme.accent().filled())),
+        )
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart
@@ -95,7 +123,9 @@ where DB::ErrorType: 'static,
         )))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label(format!("Spot VIX: {:.1}", cfg.spot_vix))
-        .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(2)));
+        .legend(move |(x, y)| {
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(2))
+        });
 
     chart
         .configure_series_labels()
@@ -129,7 +159,11 @@ mod tests {
             .tenors(vec![7.0, 14.0, 30.0, 60.0, 90.0, 180.0, 365.0])
             .vix_values(vec![18.0, 17.5, 16.8, 16.2, 15.8, 15.5, 15.2])
             .spot_vix(15.0);
-        let path = std::env::temp_dir().join("bt_test_vix_term.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_vix_term.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&cfg, &path).unwrap();
     }
 }

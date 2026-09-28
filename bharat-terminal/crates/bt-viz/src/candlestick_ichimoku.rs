@@ -61,7 +61,12 @@ impl CandlestickIchimokuConfig {
     }
 }
 
-fn ichimoku(series: &OhlcvSeries, tenkan: usize, kijun: usize, senkou_b_period: usize) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
+fn ichimoku(
+    series: &OhlcvSeries,
+    tenkan: usize,
+    kijun: usize,
+    senkou_b_period: usize,
+) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
     let n = series.candles.len();
     let mut tenkan_sen = vec![f64::NAN; n];
     let mut kijun_sen = vec![f64::NAN; n];
@@ -72,19 +77,28 @@ fn ichimoku(series: &OhlcvSeries, tenkan: usize, kijun: usize, senkou_b_period: 
     for i in 0..n {
         if i >= tenkan - 1 {
             let window = &series.candles[i + 1 - tenkan..=i];
-            let hh = window.iter().map(|c| c.high).fold(f64::NEG_INFINITY, f64::max);
+            let hh = window
+                .iter()
+                .map(|c| c.high)
+                .fold(f64::NEG_INFINITY, f64::max);
             let ll = window.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
             tenkan_sen[i] = (hh + ll) / 2.0;
         }
         if i >= kijun - 1 {
             let window = &series.candles[i + 1 - kijun..=i];
-            let hh = window.iter().map(|c| c.high).fold(f64::NEG_INFINITY, f64::max);
+            let hh = window
+                .iter()
+                .map(|c| c.high)
+                .fold(f64::NEG_INFINITY, f64::max);
             let ll = window.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
             kijun_sen[i] = (hh + ll) / 2.0;
         }
         if i >= senkou_b_period - 1 {
             let window = &series.candles[i + 1 - senkou_b_period..=i];
-            let hh = window.iter().map(|c| c.high).fold(f64::NEG_INFINITY, f64::max);
+            let hh = window
+                .iter()
+                .map(|c| c.high)
+                .fold(f64::NEG_INFINITY, f64::max);
             let ll = window.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
             senkou_b[i] = (hh + ll) / 2.0;
         }
@@ -112,11 +126,20 @@ where
 
     let t_min = series.candles.first().unwrap().t;
     let t_max = series.candles.last().unwrap().t;
-    let low = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
-    let high = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
+    let low = series
+        .candles
+        .iter()
+        .map(|c| c.low)
+        .fold(f64::MAX, f64::min);
+    let high = series
+        .candles
+        .iter()
+        .map(|c| c.high)
+        .fold(f64::MIN, f64::max);
     let pad = (high - low) * 0.05;
 
-    let (tenkan, kijun, senkou_a, senkou_b, _chikou) = ichimoku(series, cfg.tenkan, cfg.kijun, cfg.senkou_b);
+    let (tenkan, kijun, senkou_a, senkou_b, _chikou) =
+        ichimoku(series, cfg.tenkan, cfg.kijun, cfg.senkou_b);
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
@@ -147,14 +170,24 @@ where
                 cfg.theme.loss()
             };
             CandleStick::new(
-                c.t, c.open, c.high, c.low, c.close,
-                color.filled(), color.filled(), (candle_width * 10.0) as u32,
+                c.t,
+                c.open,
+                c.high,
+                c.low,
+                c.close,
+                color.filled(),
+                color.filled(),
+                (candle_width * 10.0) as u32,
             )
         }))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     for i in 0..series.candles.len().saturating_sub(1) {
-        if !senkou_a[i].is_nan() && !senkou_b[i].is_nan() && !senkou_a[i + 1].is_nan() && !senkou_b[i + 1].is_nan() {
+        if !senkou_a[i].is_nan()
+            && !senkou_b[i].is_nan()
+            && !senkou_a[i + 1].is_nan()
+            && !senkou_b[i + 1].is_nan()
+        {
             let c1 = &series.candles[i];
             let c2 = &series.candles[i + 1];
             let fill_color = if senkou_a[i] > senkou_b[i] {
@@ -179,46 +212,76 @@ where
     chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !tenkan[i].is_nan() { Some((c.t, tenkan[i])) } else { None }
+                if !tenkan[i].is_nan() {
+                    Some((c.t, tenkan[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.info().stroke_width(2),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Tenkan-sen")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(2)));
+        .legend(|(x, y)| {
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(2))
+        });
 
     chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !kijun[i].is_nan() { Some((c.t, kijun[i])) } else { None }
+                if !kijun[i].is_nan() {
+                    Some((c.t, kijun[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.loss().stroke_width(2),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Kijun-sen")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.loss().stroke_width(2)));
+        .legend(|(x, y)| {
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.loss().stroke_width(2))
+        });
 
     chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !senkou_a[i].is_nan() { Some((c.t, senkou_a[i])) } else { None }
+                if !senkou_a[i].is_nan() {
+                    Some((c.t, senkou_a[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.profit().stroke_width(1),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Senkou A")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.profit().stroke_width(1)));
+        .legend(|(x, y)| {
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.profit().stroke_width(1),
+            )
+        });
 
     chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !senkou_b[i].is_nan() { Some((c.t, senkou_b[i])) } else { None }
+                if !senkou_b[i].is_nan() {
+                    Some((c.t, senkou_b[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.accent().stroke_width(1),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Senkou B")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(1)));
+        .legend(|(x, y)| {
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.accent().stroke_width(1),
+            )
+        });
 
     chart
         .configure_series_labels()
@@ -250,7 +313,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = CandlestickIchimokuConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_candlestick_ichimoku.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_candlestick_ichimoku.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

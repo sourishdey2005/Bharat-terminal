@@ -16,15 +16,14 @@ pub mod indicators;
 pub mod risk;
 
 pub use indicators::{
-    adx, atr, bollinger, cci, cmf, donchian, ema, heikin_ashi, keltner, macd,
-    obv, parabolic_sar, renko, roc, rsi, sma, stochastic, vwap, williams_r,
+    adx, atr, bollinger, cci, cmf, donchian, ema, heikin_ashi, keltner, macd, obv, parabolic_sar,
+    renko, roc, rsi, sma, stochastic, vwap, williams_r,
 };
 pub use risk::{
-    alpha, beta, calmar, correlation, correlation_matrix, covariance_matrix,
-    cvar, drawdown_series, efficient_frontier, information_ratio, kurtosis,
-    max_drawdown, rolling_correlation, rolling_max_drawdown, rolling_moments,
-    rolling_sharpe, rolling_sortino, rolling_volatility, sharpe, skewness,
-    sortino, treynor, var_historical,
+    alpha, beta, calmar, correlation, correlation_matrix, covariance_matrix, cvar, drawdown_series,
+    efficient_frontier, information_ratio, kurtosis, max_drawdown, rolling_correlation,
+    rolling_max_drawdown, rolling_moments, rolling_sharpe, rolling_sortino, rolling_volatility,
+    sharpe, skewness, sortino, treynor, var_historical,
 };
 
 #[cfg(test)]
@@ -33,10 +32,19 @@ mod tests {
     use bt_core::{Candle, OhlcvSeries};
 
     fn sample_series() -> OhlcvSeries {
-        let candles = (0..50).map(|i| {
-            let base = 100.0 + i as f64 * 0.5;
-            Candle::new(i as f64, base, base + 2.0, base - 1.0, base + 0.5, 1000.0 + i as f64 * 10.0)
-        }).collect();
+        let candles = (0..50)
+            .map(|i| {
+                let base = 100.0 + i as f64 * 0.5;
+                Candle::new(
+                    i as f64,
+                    base,
+                    base + 2.0,
+                    base - 1.0,
+                    base + 0.5,
+                    1000.0 + i as f64 * 10.0,
+                )
+            })
+            .collect();
         OhlcvSeries::new("TEST", candles)
     }
 

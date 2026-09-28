@@ -35,21 +35,45 @@ impl Default for OptionPayoffConfig {
 }
 
 impl OptionPayoffConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn strike(mut self, s: f64) -> Self { self.strike = s; self }
-    pub fn premium(mut self, p: f64) -> Self { self.premium = p; self }
-    pub fn is_call(mut self, c: bool) -> Self { self.is_call = c; self }
-    pub fn is_long(mut self, l: bool) -> Self { self.is_long = l; self }
-    pub fn n_points(mut self, n: usize) -> Self { self.n_points = n; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn strike(mut self, s: f64) -> Self {
+        self.strike = s;
+        self
+    }
+    pub fn premium(mut self, p: f64) -> Self {
+        self.premium = p;
+        self
+    }
+    pub fn is_call(mut self, c: bool) -> Self {
+        self.is_call = c;
+        self
+    }
+    pub fn is_long(mut self, l: bool) -> Self {
+        self.is_long = l;
+        self
+    }
+    pub fn n_points(mut self, n: usize) -> Self {
+        self.n_points = n;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
     root: plotters::drawing::DrawingArea<DB, plotters::coord::Shift>,
     cfg: &OptionPayoffConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     fill_background(&root, cfg.theme)?;
 
@@ -79,7 +103,10 @@ where DB::ErrorType: 'static,
     let pad = (y_max - y_min).max(1.0) * 0.1;
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(15)
         .x_label_area_size(35)
         .y_label_area_size(60)
@@ -96,7 +123,10 @@ where DB::ErrorType: 'static,
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart
-        .draw_series(LineSeries::new(points.clone(), cfg.theme.accent().stroke_width(3)))
+        .draw_series(LineSeries::new(
+            points.clone(),
+            cfg.theme.accent().stroke_width(3),
+        ))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart
@@ -155,7 +185,11 @@ mod tests {
     #[test]
     fn renders() {
         let cfg = OptionPayoffConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_option_payoff.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_option_payoff.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&cfg, &path).unwrap();
     }
 }

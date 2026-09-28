@@ -17,14 +17,25 @@ pub struct IndiaMacroConfig {
 
 impl Default for IndiaMacroConfig {
     fn default() -> Self {
-        Self { title: "India Macro Dashboard".to_string(), theme: Theme::Dark }
+        Self {
+            title: "India Macro Dashboard".to_string(),
+            theme: Theme::Dark,
+        }
     }
 }
 
 impl IndiaMacroConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
 }
 
 fn sample_macro() -> Vec<(String, f64, f64, String)> {
@@ -33,7 +44,12 @@ fn sample_macro() -> Vec<(String, f64, f64, String)> {
         ("CPI Inflation".to_string(), 5.1, 5.5, "YoY %".to_string()),
         ("Core CPI".to_string(), 4.2, 4.5, "YoY %".to_string()),
         ("IIP Growth".to_string(), 4.9, 4.2, "YoY %".to_string()),
-        ("Trade Deficit".to_string(), -18.5, -20.2, "USD Bn".to_string()),
+        (
+            "Trade Deficit".to_string(),
+            -18.5,
+            -20.2,
+            "USD Bn".to_string(),
+        ),
         ("Fiscal Def".to_string(), -5.6, -5.9, "% GDP".to_string()),
         ("PMI Mfg".to_string(), 57.5, 56.8, "Index".to_string()),
         ("PMI Svcs".to_string(), 60.5, 59.2, "Index".to_string()),
@@ -47,7 +63,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &IndiaMacroConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -65,35 +82,73 @@ where DB::ErrorType: 'static,
     let row_h = (h as i32 - 100) / (data.len() as i32 + 1);
     let col_px = [10, 280, 480, 680, 880];
 
-    for (x, label) in col_px.iter().zip(["Indicator", "Current", "Previous", "Unit", "Signal"].iter()) {
-        root.draw(&Text::new(label.to_string(), ( *x, 45), (LABEL_FONT, 12).into_font().color(&cfg.theme.accent())))
-            .map_err(|e| BtError::Render(e.to_string()))?;
+    for (x, label) in col_px
+        .iter()
+        .zip(["Indicator", "Current", "Previous", "Unit", "Signal"].iter())
+    {
+        root.draw(&Text::new(
+            label.to_string(),
+            (*x, 45),
+            (LABEL_FONT, 12).into_font().color(&cfg.theme.accent()),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
     for (i, (name, cur, prev, unit)) in data.iter().enumerate() {
         let y = 45 + (i as i32 + 1) * row_h;
-        root.draw(&Text::new(name.clone(), ( col_px[0], y + row_h / 2 - 6), (LABEL_FONT, 12).into_font().color(&cfg.theme.text())))
-            .map_err(|e| BtError::Render(e.to_string()))?;
-        root.draw(&Text::new(format!("{:.1}", cur), ( col_px[1], y + row_h / 2 - 6), (LABEL_FONT, 12).into_font().color(&cfg.theme.text())))
-            .map_err(|e| BtError::Render(e.to_string()))?;
-        root.draw(&Text::new(format!("{:.1}", prev), ( col_px[2], y + row_h / 2 - 6), (LABEL_FONT, 12).into_font().color(&cfg.theme.text().mix(0.7))))
-            .map_err(|e| BtError::Render(e.to_string()))?;
-        root.draw(&Text::new(unit.clone(), ( col_px[3], y + row_h / 2 - 6), (LABEL_FONT, 12).into_font().color(&cfg.theme.text().mix(0.7))))
-            .map_err(|e| BtError::Render(e.to_string()))?;
-        let improving = if name.contains("Deficit") || name.contains("Unemployment") || name.contains("Inflation") {
+        root.draw(&Text::new(
+            name.clone(),
+            (col_px[0], y + row_h / 2 - 6),
+            (LABEL_FONT, 12).into_font().color(&cfg.theme.text()),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
+        root.draw(&Text::new(
+            format!("{:.1}", cur),
+            (col_px[1], y + row_h / 2 - 6),
+            (LABEL_FONT, 12).into_font().color(&cfg.theme.text()),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
+        root.draw(&Text::new(
+            format!("{:.1}", prev),
+            (col_px[2], y + row_h / 2 - 6),
+            (LABEL_FONT, 12)
+                .into_font()
+                .color(&cfg.theme.text().mix(0.7)),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
+        root.draw(&Text::new(
+            unit.clone(),
+            (col_px[3], y + row_h / 2 - 6),
+            (LABEL_FONT, 12)
+                .into_font()
+                .color(&cfg.theme.text().mix(0.7)),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
+        let improving = if name.contains("Deficit")
+            || name.contains("Unemployment")
+            || name.contains("Inflation")
+        {
             cur < prev
         } else {
             cur > prev
         };
         let signal = if improving { "Improving" } else { "Worsening" };
-        let sig_color = if improving { cfg.theme.profit() } else { cfg.theme.loss() };
-        root.draw(&Text::new(signal.to_string(), ( col_px[4], y + row_h / 2 - 6), (LABEL_FONT, 12).into_font().color(&sig_color)))
-            .map_err(|e| BtError::Render(e.to_string()))?;
+        let sig_color = if improving {
+            cfg.theme.profit()
+        } else {
+            cfg.theme.loss()
+        };
+        root.draw(&Text::new(
+            signal.to_string(),
+            (col_px[4], y + row_h / 2 - 6),
+            (LABEL_FONT, 12).into_font().color(&sig_color),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
         root.draw(&PathElement::new(
             vec![(0, y + row_h), (w as i32, y + row_h)],
             cfg.theme.border().stroke_width(1),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
     draw_footer(&root, cfg.theme)?;
@@ -118,7 +173,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("MACRO", 100, 1, 100.0);
         let cfg = IndiaMacroConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_india_macro.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_india_macro.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

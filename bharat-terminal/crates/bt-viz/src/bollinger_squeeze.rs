@@ -229,7 +229,10 @@ where
 
     width_chart
         .draw_series(LineSeries::new(
-            vec![(t_min, cfg.squeeze_threshold), (t_max, cfg.squeeze_threshold)],
+            vec![
+                (t_min, cfg.squeeze_threshold),
+                (t_max, cfg.squeeze_threshold),
+            ],
             cfg.theme.accent().mix(0.5).stroke_width(1),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
@@ -255,18 +258,19 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     width_chart
-        .draw_series(
-            series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !band_width[i].is_nan() && band_width[i] < cfg.squeeze_threshold {
-                    Some(Rectangle::new(
-                        [(c.t - candle_width, 0.0), (c.t + candle_width, band_width[i])],
-                        cfg.theme.accent().mix(0.3).filled(),
-                    ))
-                } else {
-                    None
-                }
-            }),
-        )
+        .draw_series(series.candles.iter().enumerate().filter_map(|(i, c)| {
+            if !band_width[i].is_nan() && band_width[i] < cfg.squeeze_threshold {
+                Some(Rectangle::new(
+                    [
+                        (c.t - candle_width, 0.0),
+                        (c.t + candle_width, band_width[i]),
+                    ],
+                    cfg.theme.accent().mix(0.3).filled(),
+                ))
+            } else {
+                None
+            }
+        }))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     price_chart

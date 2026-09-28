@@ -67,17 +67,15 @@ fn resample_series(series: &OhlcvSeries, factor: usize) -> OhlcvSeries {
         let chunk = &series.candles[i..end];
         let first = &chunk[0];
         let last = &chunk[chunk.len() - 1];
-        let high = chunk.iter().map(|c| c.high).fold(f64::NEG_INFINITY, f64::max);
+        let high = chunk
+            .iter()
+            .map(|c| c.high)
+            .fold(f64::NEG_INFINITY, f64::max);
         let low = chunk.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
         let volume: f64 = chunk.iter().map(|c| c.volume).sum();
 
         candles.push(bt_core::Candle::new(
-            first.t,
-            first.open,
-            high,
-            low,
-            last.close,
-            volume,
+            first.t, first.open, high, low, last.close, volume,
         ));
 
         i += factor;
@@ -126,7 +124,10 @@ where
         .margin(10)
         .x_label_area_size(30)
         .y_label_area_size(60)
-        .build_cartesian_2d(0.0..(series.candles.len() as f64), (all_low - pad)..(all_high + pad))
+        .build_cartesian_2d(
+            0.0..(series.candles.len() as f64),
+            (all_low - pad)..(all_high + pad),
+        )
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart
@@ -150,9 +151,10 @@ where
 
         chart
             .draw_series(LineSeries::new(
-                rs.candles.iter().enumerate().map(|(i, c)| {
-                    (i as f64 * cfg.timeframes[tf_idx] as f64 + offset, c.close)
-                }),
+                rs.candles
+                    .iter()
+                    .enumerate()
+                    .map(|(i, c)| (i as f64 * cfg.timeframes[tf_idx] as f64 + offset, c.close)),
                 color.stroke_width(2),
             ))
             .map_err(|e| BtError::Render(e.to_string()))?

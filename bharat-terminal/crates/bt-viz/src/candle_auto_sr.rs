@@ -68,12 +68,8 @@ fn detect_sr(series: &OhlcvSeries, lookback: usize, tolerance_pct: f64) -> (Vec<
         let window = &series.candles[i - lookback..i];
         let cur = &series.candles[i];
 
-        let is_low = window
-            .iter()
-            .all(|c| cur.low <= c.low * (1.0 + tol));
-        let is_high = window
-            .iter()
-            .all(|c| cur.high >= c.high * (1.0 - tol));
+        let is_low = window.iter().all(|c| cur.low <= c.low * (1.0 + tol));
+        let is_high = window.iter().all(|c| cur.high >= c.high * (1.0 - tol));
 
         if is_low {
             supports.push(cur.low);

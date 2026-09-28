@@ -3,7 +3,7 @@
 
 use bt_core::{BtError, Candle, Result};
 use chrono::{Duration, Utc};
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 use std::path::Path;
 use std::sync::Mutex;
 use tracing::instrument;
@@ -108,15 +108,7 @@ impl Cache {
 
             for c in candles {
                 stmt.execute(params![
-                    symbol,
-                    interval,
-                    c.t as i64,
-                    c.open,
-                    c.high,
-                    c.low,
-                    c.close,
-                    c.volume,
-                    now
+                    symbol, interval, c.t as i64, c.open, c.high, c.low, c.close, c.volume, now
                 ])
                 .map_err(to_bt_err)?;
             }

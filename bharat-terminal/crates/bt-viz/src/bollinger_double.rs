@@ -183,7 +183,10 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("+1σ")
         .legend(|(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(1))
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.accent().stroke_width(1),
+            )
         });
 
     chart
@@ -200,7 +203,10 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("-1σ")
         .legend(|(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(1))
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.accent().stroke_width(1),
+            )
         });
 
     chart

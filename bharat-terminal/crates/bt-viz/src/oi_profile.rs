@@ -19,7 +19,11 @@ pub struct OiStrike {
 
 impl OiStrike {
     pub fn new(strike: f64, call_oi: f64, put_oi: f64) -> Self {
-        Self { strike, call_oi: call_oi.max(0.0), put_oi: put_oi.max(0.0) }
+        Self {
+            strike,
+            call_oi: call_oi.max(0.0),
+            put_oi: put_oi.max(0.0),
+        }
     }
 }
 
@@ -41,10 +45,21 @@ impl Default for OiProfileConfig {
 }
 
 impl OiProfileConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn show_ratio(mut self, s: bool) -> Self { self.show_ratio = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn show_ratio(mut self, s: bool) -> Self {
+        self.show_ratio = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -52,7 +67,8 @@ fn render<DB: DrawingBackend>(
     strikes: &[OiStrike],
     cfg: &OiProfileConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if strikes.is_empty() {
         return Err(BtError::EmptySeries("OI strikes".into()));
@@ -81,41 +97,68 @@ where DB::ErrorType: 'static,
         .axis_style(&cfg.theme.border())
         .light_line_style(cfg.theme.border().mix(0.3))
         .x_labels(strikes.len())
-        .x_label_formatter(&|x| strikes.get(*x).map(|s| format!("{:.0}", s.strike)).unwrap_or_default())
+        .x_label_formatter(&|x| {
+            strikes
+                .get(*x)
+                .map(|s| format!("{:.0}", s.strike))
+                .unwrap_or_default()
+        })
         .draw()
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart
         .draw_series(strikes.iter().enumerate().map(|(i, s)| {
-            Rectangle::new([(i, 0.0), (i + 1, s.call_oi)], cfg.theme.profit().mix(0.6).filled())
+            Rectangle::new(
+                [(i, 0.0), (i + 1, s.call_oi)],
+                cfg.theme.profit().mix(0.6).filled(),
+            )
         }))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Call OI")
         .legend(|(x, y)| {
-            Rectangle::new([(x, y - 5), (x + 20, y + 5)], cfg.theme.profit().mix(0.6).filled())
+            Rectangle::new(
+                [(x, y - 5), (x + 20, y + 5)],
+                cfg.theme.profit().mix(0.6).filled(),
+            )
         });
 
     chart
         .draw_series(strikes.iter().enumerate().map(|(i, s)| {
-            Rectangle::new([(i, 0.0), (i + 1, -s.put_oi)], cfg.theme.loss().mix(0.6).filled())
+            Rectangle::new(
+                [(i, 0.0), (i + 1, -s.put_oi)],
+                cfg.theme.loss().mix(0.6).filled(),
+            )
         }))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Put OI")
         .legend(|(x, y)| {
-            Rectangle::new([(x, y - 5), (x + 20, y + 5)], cfg.theme.loss().mix(0.6).filled())
+            Rectangle::new(
+                [(x, y - 5), (x + 20, y + 5)],
+                cfg.theme.loss().mix(0.6).filled(),
+            )
         });
 
     if cfg.show_ratio {
         let max_ratio = strikes
             .iter()
-            .map(|s| if s.call_oi > 0.0 { s.put_oi / s.call_oi } else { 0.0 })
+            .map(|s| {
+                if s.call_oi > 0.0 {
+                    s.put_oi / s.call_oi
+                } else {
+                    0.0
+                }
+            })
             .fold(0.0_f64, f64::max);
 
         if max_ratio > 0.0 {
             chart
                 .draw_series(LineSeries::new(
                     strikes.iter().enumerate().map(|(i, s)| {
-                        let ratio = if s.call_oi > 0.0 { s.put_oi / s.call_oi } else { 0.0 };
+                        let ratio = if s.call_oi > 0.0 {
+                            s.put_oi / s.call_oi
+                        } else {
+                            0.0
+                        };
                         (i, ratio * max_oi * 0.5)
                     }),
                     cfg.theme.accent().stroke_width(2),
@@ -123,7 +166,10 @@ where DB::ErrorType: 'static,
                 .map_err(|e| BtError::Render(e.to_string()))?
                 .label("P/C Ratio")
                 .legend(|(x, y)| {
-                    PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(2))
+                    PathElement::new(
+                        vec![(x, y), (x + 20, y)],
+                        cfg.theme.accent().stroke_width(2),
+                    )
                 });
         }
     }
@@ -156,10 +202,20 @@ mod tests {
     #[test]
     fn renders() {
         let strikes: Vec<OiStrike> = (0..10)
-            .map(|i| OiStrike::new(90.0 + i as f64 * 5.0, (10 - i) as f64 * 1000.0, i as f64 * 1000.0))
+            .map(|i| {
+                OiStrike::new(
+                    90.0 + i as f64 * 5.0,
+                    (10 - i) as f64 * 1000.0,
+                    i as f64 * 1000.0,
+                )
+            })
             .collect();
         let cfg = OiProfileConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_oi_profile.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_oi_profile.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&strikes, &cfg, &path).unwrap();
     }
 }

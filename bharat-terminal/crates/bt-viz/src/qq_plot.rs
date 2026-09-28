@@ -114,22 +114,10 @@ where
     fill_background(&root, cfg.theme)?;
 
     let qq = qq_data(&returns);
-    let x_min = qq
-        .iter()
-        .map(|(t, _)| *t)
-        .fold(f64::INFINITY, f64::min);
-    let x_max = qq
-        .iter()
-        .map(|(t, _)| *t)
-        .fold(f64::NEG_INFINITY, f64::max);
-    let y_min = qq
-        .iter()
-        .map(|(_, s)| *s)
-        .fold(f64::INFINITY, f64::min);
-    let y_max = qq
-        .iter()
-        .map(|(_, s)| *s)
-        .fold(f64::NEG_INFINITY, f64::max);
+    let x_min = qq.iter().map(|(t, _)| *t).fold(f64::INFINITY, f64::min);
+    let x_max = qq.iter().map(|(t, _)| *t).fold(f64::NEG_INFINITY, f64::max);
+    let y_min = qq.iter().map(|(_, s)| *s).fold(f64::INFINITY, f64::min);
+    let y_max = qq.iter().map(|(_, s)| *s).fold(f64::NEG_INFINITY, f64::max);
 
     let x_pad = (x_max - x_min) * 0.05 + 0.01;
     let y_pad = (y_max - y_min).abs() * 0.1 + 0.001;
@@ -142,10 +130,7 @@ where
         .margin(15)
         .x_label_area_size(35)
         .y_label_area_size(55)
-        .build_cartesian_2d(
-            x_min - x_pad..x_max + x_pad,
-            y_min - y_pad..y_max + y_pad,
-        )
+        .build_cartesian_2d(x_min - x_pad..x_max + x_pad, y_min - y_pad..y_max + y_pad)
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart

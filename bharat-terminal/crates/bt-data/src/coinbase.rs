@@ -68,9 +68,10 @@ impl CoinbaseProvider {
         }
 
         let resp = self.fetch_with_retry(&url).await?;
-        let data: Vec<Vec<f64>> = resp.json().await.map_err(|e| {
-            BtError::InvalidInput(format!("JSON parse error: {}", e))
-        })?;
+        let data: Vec<Vec<f64>> = resp
+            .json()
+            .await
+            .map_err(|e| BtError::InvalidInput(format!("JSON parse error: {}", e)))?;
 
         let mut candles: Vec<Candle> = data
             .into_iter()
@@ -97,9 +98,10 @@ impl CoinbaseProvider {
     pub async fn fetch_ticker(&self, pair: &str) -> Result<Quote> {
         let url = format!("{}/products/{}/ticker", BASE_URL, pair);
         let resp = self.fetch_with_retry(&url).await?;
-        let data: CoinbaseTicker = resp.json().await.map_err(|e| {
-            BtError::InvalidInput(format!("JSON parse error: {}", e))
-        })?;
+        let data: CoinbaseTicker = resp
+            .json()
+            .await
+            .map_err(|e| BtError::InvalidInput(format!("JSON parse error: {}", e)))?;
 
         let price = data.price.parse().unwrap_or(0.0);
         let open = data.open_24h.parse().unwrap_or(0.0);
@@ -109,7 +111,11 @@ impl CoinbaseProvider {
             symbol: pair.to_string(),
             price,
             change: price - open,
-            change_pct: if open > 0.0 { ((price - open) / open) * 100.0 } else { 0.0 },
+            change_pct: if open > 0.0 {
+                ((price - open) / open) * 100.0
+            } else {
+                0.0
+            },
             volume: volume as u64,
             timestamp: Utc::now(),
         })
@@ -120,9 +126,12 @@ impl CoinbaseProvider {
         const MAX_RETRIES: u32 = 3;
 
         loop {
-            let resp = self.client.get(url).send().await.map_err(|e| {
-                BtError::InvalidInput(format!("Network error: {}", e))
-            })?;
+            let resp = self
+                .client
+                .get(url)
+                .send()
+                .await
+                .map_err(|e| BtError::InvalidInput(format!("Network error: {}", e)))?;
 
             if resp.status() == 429 {
                 attempts += 1;

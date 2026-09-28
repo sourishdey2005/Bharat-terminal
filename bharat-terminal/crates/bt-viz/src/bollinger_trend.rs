@@ -80,7 +80,11 @@ where
         })
         .collect();
 
-    let valid_ts: Vec<f64> = trend_strength.iter().filter(|v| !v.is_nan()).cloned().collect();
+    let valid_ts: Vec<f64> = trend_strength
+        .iter()
+        .filter(|v| !v.is_nan())
+        .cloned()
+        .collect();
     let avg_ts = if !valid_ts.is_empty() {
         valid_ts.iter().sum::<f64>() / valid_ts.len() as f64
     } else {
@@ -256,29 +260,33 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Trend")
         .legend(|(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(2))
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.accent().stroke_width(2),
+            )
         });
 
     ts_chart
-        .draw_series(
-            series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !trend_strength[i].is_nan() {
-                    let color = if trend_strength[i] > 0.3 {
-                        cfg.theme.profit().mix(0.3)
-                    } else if trend_strength[i] < -0.3 {
-                        cfg.theme.loss().mix(0.3)
-                    } else {
-                        cfg.theme.border().mix(0.2)
-                    };
-                    Some(Rectangle::new(
-                        [(c.t - candle_width, 0.0), (c.t + candle_width, trend_strength[i])],
-                        color.filled(),
-                    ))
+        .draw_series(series.candles.iter().enumerate().filter_map(|(i, c)| {
+            if !trend_strength[i].is_nan() {
+                let color = if trend_strength[i] > 0.3 {
+                    cfg.theme.profit().mix(0.3)
+                } else if trend_strength[i] < -0.3 {
+                    cfg.theme.loss().mix(0.3)
                 } else {
-                    None
-                }
-            }),
-        )
+                    cfg.theme.border().mix(0.2)
+                };
+                Some(Rectangle::new(
+                    [
+                        (c.t - candle_width, 0.0),
+                        (c.t + candle_width, trend_strength[i]),
+                    ],
+                    color.filled(),
+                ))
+            } else {
+                None
+            }
+        }))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     price_chart

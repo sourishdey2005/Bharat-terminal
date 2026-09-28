@@ -13,25 +13,73 @@ use crate::palette::Theme;
 #[derive(Debug, Clone)]
 pub struct SectorData {
     pub name: String,
-    pub momentum: f64,  // -1 to 1
+    pub momentum: f64,          // -1 to 1
     pub relative_strength: f64, // 0 to 2, 1 = market average
 }
 
 /// Sample sector data.
 fn sample_sectors() -> Vec<SectorData> {
     vec![
-        SectorData { name: "IT".to_string(), momentum: 0.75, relative_strength: 1.35 },
-        SectorData { name: "Banking".to_string(), momentum: 0.60, relative_strength: 1.22 },
-        SectorData { name: "Pharma".to_string(), momentum: 0.45, relative_strength: 1.10 },
-        SectorData { name: "FMCG".to_string(), momentum: 0.30, relative_strength: 1.05 },
-        SectorData { name: "Auto".to_string(), momentum: 0.55, relative_strength: 1.18 },
-        SectorData { name: "Metals".to_string(), momentum: 0.80, relative_strength: 1.42 },
-        SectorData { name: "Energy".to_string(), momentum: 0.20, relative_strength: 0.95 },
-        SectorData { name: "Realty".to_string(), momentum: -0.30, relative_strength: 0.78 },
-        SectorData { name: "Infra".to_string(), momentum: 0.40, relative_strength: 1.12 },
-        SectorData { name: "Media".to_string(), momentum: -0.15, relative_strength: 0.88 },
-        SectorData { name: "Chemicals".to_string(), momentum: 0.10, relative_strength: 0.98 },
-        SectorData { name: "Consumer".to_string(), momentum: 0.25, relative_strength: 1.02 },
+        SectorData {
+            name: "IT".to_string(),
+            momentum: 0.75,
+            relative_strength: 1.35,
+        },
+        SectorData {
+            name: "Banking".to_string(),
+            momentum: 0.60,
+            relative_strength: 1.22,
+        },
+        SectorData {
+            name: "Pharma".to_string(),
+            momentum: 0.45,
+            relative_strength: 1.10,
+        },
+        SectorData {
+            name: "FMCG".to_string(),
+            momentum: 0.30,
+            relative_strength: 1.05,
+        },
+        SectorData {
+            name: "Auto".to_string(),
+            momentum: 0.55,
+            relative_strength: 1.18,
+        },
+        SectorData {
+            name: "Metals".to_string(),
+            momentum: 0.80,
+            relative_strength: 1.42,
+        },
+        SectorData {
+            name: "Energy".to_string(),
+            momentum: 0.20,
+            relative_strength: 0.95,
+        },
+        SectorData {
+            name: "Realty".to_string(),
+            momentum: -0.30,
+            relative_strength: 0.78,
+        },
+        SectorData {
+            name: "Infra".to_string(),
+            momentum: 0.40,
+            relative_strength: 1.12,
+        },
+        SectorData {
+            name: "Media".to_string(),
+            momentum: -0.15,
+            relative_strength: 0.88,
+        },
+        SectorData {
+            name: "Chemicals".to_string(),
+            momentum: 0.10,
+            relative_strength: 0.98,
+        },
+        SectorData {
+            name: "Consumer".to_string(),
+            momentum: 0.25,
+            relative_strength: 1.02,
+        },
     ]
 }
 
@@ -92,10 +140,30 @@ where
 
     // Quadrant backgrounds
     let quadrants = [
-        (0.0, std::f64::consts::FRAC_PI_2, "Leading", cfg.theme.profit().mix(0.08)),
-        (std::f64::consts::FRAC_PI_2, std::f64::consts::PI, "Weakening", cfg.theme.loss().mix(0.08)),
-        (std::f64::consts::PI, std::f64::consts::PI * 1.5, "Lagging", cfg.theme.loss().mix(0.05)),
-        (std::f64::consts::PI * 1.5, std::f64::consts::TAU, "Improving", cfg.theme.info().mix(0.08)),
+        (
+            0.0,
+            std::f64::consts::FRAC_PI_2,
+            "Leading",
+            cfg.theme.profit().mix(0.08),
+        ),
+        (
+            std::f64::consts::FRAC_PI_2,
+            std::f64::consts::PI,
+            "Weakening",
+            cfg.theme.loss().mix(0.08),
+        ),
+        (
+            std::f64::consts::PI,
+            std::f64::consts::PI * 1.5,
+            "Lagging",
+            cfg.theme.loss().mix(0.05),
+        ),
+        (
+            std::f64::consts::PI * 1.5,
+            std::f64::consts::TAU,
+            "Improving",
+            cfg.theme.info().mix(0.08),
+        ),
     ];
 
     for (start, end, label, color) in &quadrants {
@@ -115,7 +183,10 @@ where
         let mid = (start + end) / 2.0;
         root.draw(&Text::new(
             *label,
-            ((cx + (r_max + 20.0) * mid.cos()) as i32 - 20, (cy + (r_max + 20.0) * mid.sin()) as i32),
+            (
+                (cx + (r_max + 20.0) * mid.cos()) as i32 - 20,
+                (cy + (r_max + 20.0) * mid.sin()) as i32,
+            ),
             (LABEL_FONT, 11)
                 .into_font()
                 .color(&cfg.theme.text().mix(0.6)),
@@ -125,12 +196,18 @@ where
 
     // Axis lines
     root.draw(&PathElement::new(
-        vec![(cx as i32, (cy - r_max) as i32), (cx as i32, (cy + r_max) as i32)],
+        vec![
+            (cx as i32, (cy - r_max) as i32),
+            (cx as i32, (cy + r_max) as i32),
+        ],
         cfg.theme.border().stroke_width(1),
     ))
     .map_err(|e| BtError::Render(e.to_string()))?;
     root.draw(&PathElement::new(
-        vec![((cx - r_max) as i32, cy as i32), ((cx + r_max) as i32, cy as i32)],
+        vec![
+            ((cx - r_max) as i32, cy as i32),
+            ((cx + r_max) as i32, cy as i32),
+        ],
         cfg.theme.border().stroke_width(1),
     ))
     .map_err(|e| BtError::Render(e.to_string()))?;

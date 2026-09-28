@@ -19,15 +19,30 @@ pub struct PriceVolume3DConfig {
 
 impl Default for PriceVolume3DConfig {
     fn default() -> Self {
-        Self { title: "3D Price-Volume".to_string(), theme: Theme::Dark, bars: 30 }
+        Self {
+            title: "3D Price-Volume".to_string(),
+            theme: Theme::Dark,
+            bars: 30,
+        }
     }
 }
 
 impl PriceVolume3DConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn bars(mut self, n: usize) -> Self { self.bars = n.clamp(5, 60); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn bars(mut self, n: usize) -> Self {
+        self.bars = n.clamp(5, 60);
+        self
+    }
 }
 
 fn project(x: f64, y: f64, z: f64, cx: f64, cy: f64) -> (i32, i32) {
@@ -50,7 +65,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &PriceVolume3DConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -68,9 +84,21 @@ where DB::ErrorType: 'static,
 
     let n = series.candles.len().min(cfg.bars);
     let step = series.candles.len() / n.max(1);
-    let max_vol = series.candles.iter().map(|c| c.volume).fold(0.0_f64, f64::max);
-    let min_p = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
-    let max_p = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
+    let max_vol = series
+        .candles
+        .iter()
+        .map(|c| c.volume)
+        .fold(0.0_f64, f64::max);
+    let min_p = series
+        .candles
+        .iter()
+        .map(|c| c.low)
+        .fold(f64::MAX, f64::min);
+    let max_p = series
+        .candles
+        .iter()
+        .map(|c| c.high)
+        .fold(f64::MIN, f64::max);
     let pr = (max_p - min_p).max(1e-9);
 
     let x_span = 340.0;
@@ -83,7 +111,11 @@ where DB::ErrorType: 'static,
         let y_base = ((c.close - min_p) / pr - 0.5) * y_span;
         let z = (c.volume / max_vol.max(1.0)) * z_span;
 
-        let base = if c.is_bullish() { cfg.theme.profit() } else { cfg.theme.loss() };
+        let base = if c.is_bullish() {
+            cfg.theme.profit()
+        } else {
+            cfg.theme.loss()
+        };
         let bw = 4.0;
         let bh = 6.0 + (c.high - c.low) / pr * 40.0;
 
@@ -115,7 +147,9 @@ where DB::ErrorType: 'static,
     root.draw(&Text::new(
         "X: time  Y: price  Z: volume",
         (w as i32 / 2 - 90, h as i32 - 40),
-        (LABEL_FONT, 11).into_font().color(&cfg.theme.text().mix(0.6)),
+        (LABEL_FONT, 11)
+            .into_font()
+            .color(&cfg.theme.text().mix(0.6)),
     ))
     .map_err(|e| BtError::Render(e.to_string()))?;
 
@@ -141,7 +175,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = PriceVolume3DConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_3d_price_volume.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_3d_price_volume.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

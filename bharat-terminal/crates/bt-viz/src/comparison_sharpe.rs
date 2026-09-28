@@ -30,11 +30,25 @@ impl Default for ComparisonSharpeConfig {
 }
 
 impl ComparisonSharpeConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, title: impl Into<String>) -> Self { self.title = title.into(); self }
-    pub fn theme(mut self, theme: Theme) -> Self { self.theme = theme; self }
-    pub fn risk_free(mut self, v: f64) -> Self { self.risk_free = v; self }
-    pub fn periods_per_year(mut self, v: usize) -> Self { self.periods_per_year = v.max(1); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
+        self
+    }
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
+    pub fn risk_free(mut self, v: f64) -> Self {
+        self.risk_free = v;
+        self
+    }
+    pub fn periods_per_year(mut self, v: usize) -> Self {
+        self.periods_per_year = v.max(1);
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -59,7 +73,10 @@ where
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
-            format!("{} — Sharpe: {}={:.2}, {}={:.2}", cfg.title, series_a.symbol, sharpe_a, series_b.symbol, sharpe_b),
+            format!(
+                "{} — Sharpe: {}={:.2}, {}={:.2}",
+                cfg.title, series_a.symbol, sharpe_a, series_b.symbol, sharpe_b
+            ),
             (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
         )
         .margin(10)
@@ -95,11 +112,21 @@ where
     Ok(())
 }
 
-pub fn render_png(series_a: &OhlcvSeries, series_b: &OhlcvSeries, cfg: &ComparisonSharpeConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    series_a: &OhlcvSeries,
+    series_b: &OhlcvSeries,
+    cfg: &ComparisonSharpeConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, series_a, series_b, cfg)
 }
 
-pub fn render_svg(series_a: &OhlcvSeries, series_b: &OhlcvSeries, cfg: &ComparisonSharpeConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    series_a: &OhlcvSeries,
+    series_b: &OhlcvSeries,
+    cfg: &ComparisonSharpeConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, series_a, series_b, cfg)
 }
 
@@ -113,7 +140,11 @@ mod tests {
         let a = synthetic_ohlcv("AAA", 100, 1, 100.0);
         let b = synthetic_ohlcv("BBB", 100, 2, 100.0);
         let cfg = ComparisonSharpeConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_comparison_sharpe.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_comparison_sharpe.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&a, &b, &cfg, &path).unwrap();
     }
 }

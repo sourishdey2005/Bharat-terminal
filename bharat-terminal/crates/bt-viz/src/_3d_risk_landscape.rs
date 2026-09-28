@@ -20,15 +20,30 @@ pub struct RiskLandscape3DConfig {
 
 impl Default for RiskLandscape3DConfig {
     fn default() -> Self {
-        Self { title: "3D Risk Landscape".to_string(), theme: Theme::Dark, max_horizon: 20 }
+        Self {
+            title: "3D Risk Landscape".to_string(),
+            theme: Theme::Dark,
+            max_horizon: 20,
+        }
     }
 }
 
 impl RiskLandscape3DConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn max_horizon(mut self, h: usize) -> Self { self.max_horizon = h.max(5); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn max_horizon(mut self, h: usize) -> Self {
+        self.max_horizon = h.max(5);
+        self
+    }
 }
 
 fn project(x: f64, y: f64, z: f64, cx: f64, cy: f64) -> (i32, i32) {
@@ -51,7 +66,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &RiskLandscape3DConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -69,7 +85,9 @@ where DB::ErrorType: 'static,
 
     let returns = series.returns();
     if returns.len() < 20 {
-        return Err(BtError::InvalidInput("series too short for VaR surface".into()));
+        return Err(BtError::InvalidInput(
+            "series too short for VaR surface".into(),
+        ));
     }
 
     let n_conf = 10;
@@ -100,7 +118,11 @@ where DB::ErrorType: 'static,
         vals.push(vrow);
     }
 
-    let max_var = vals.iter().flat_map(|r| r.iter().copied()).fold(0.0_f64, f64::max).max(1e-9);
+    let max_var = vals
+        .iter()
+        .flat_map(|r| r.iter().copied())
+        .fold(0.0_f64, f64::max)
+        .max(1e-9);
 
     for j in (0..n_h.saturating_sub(1)).rev() {
         for i in (0..n_conf.saturating_sub(1)).rev() {
@@ -114,7 +136,12 @@ where DB::ErrorType: 'static,
                 cfg.theme.profit().mix(0.7)
             };
             let depth_f = 0.4 + 0.6 * (j as f64 / n_h as f64);
-            let pts = vec![grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]];
+            let pts = vec![
+                grid[j][i],
+                grid[j][i + 1],
+                grid[j + 1][i + 1],
+                grid[j + 1][i],
+            ];
             root.draw(&Polygon::new(pts, shade(color, depth_f).filled()))
                 .map_err(|e| BtError::Render(e.to_string()))?;
         }
@@ -134,7 +161,9 @@ where DB::ErrorType: 'static,
     root.draw(&Text::new(
         "X: confidence  Y: VaR  Z: horizon (days)",
         (w as i32 / 2 - 120, h as i32 - 40),
-        (LABEL_FONT, 11).into_font().color(&cfg.theme.text().mix(0.6)),
+        (LABEL_FONT, 11)
+            .into_font()
+            .color(&cfg.theme.text().mix(0.6)),
     ))
     .map_err(|e| BtError::Render(e.to_string()))?;
 
@@ -160,7 +189,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = RiskLandscape3DConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_3d_risk_landscape.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_3d_risk_landscape.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

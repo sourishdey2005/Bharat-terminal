@@ -17,14 +17,25 @@ pub struct YieldCurveIndiaConfig {
 
 impl Default for YieldCurveIndiaConfig {
     fn default() -> Self {
-        Self { title: "India Yield Curve".to_string(), theme: Theme::Dark }
+        Self {
+            title: "India Yield Curve".to_string(),
+            theme: Theme::Dark,
+        }
     }
 }
 
 impl YieldCurveIndiaConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
 }
 
 fn sample_yields() -> Vec<(String, f64, f64, f64)> {
@@ -46,7 +57,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &YieldCurveIndiaConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -69,13 +81,18 @@ where DB::ErrorType: 'static,
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     let mut chart = chart;
-    chart.configure_mesh()
+    chart
+        .configure_mesh()
         .label_style((LABEL_FONT, 11).into_font().color(&cfg.theme.text()))
         .axis_style(&cfg.theme.border())
         .x_labels(data.len())
         .x_label_formatter(&|x| {
             let idx = *x as usize;
-            if idx < data.len() { data[idx].0.clone() } else { String::new() }
+            if idx < data.len() {
+                data[idx].0.clone()
+            } else {
+                String::new()
+            }
         })
         .y_desc("Yield (%)")
         .draw()
@@ -88,17 +105,29 @@ where DB::ErrorType: 'static,
     ];
 
     for (name, color, idx) in series_data {
-        let points: Vec<(f64, f64)> = data.iter().enumerate().map(|(i, row)| {
-            let v = match idx { 1 => row.1, 2 => row.2, _ => row.3 };
-            (i as f64, v)
-        }).collect();
-        chart.draw_series(LineSeries::new(points, color.stroke_width(3)))
+        let points: Vec<(f64, f64)> = data
+            .iter()
+            .enumerate()
+            .map(|(i, row)| {
+                let v = match idx {
+                    1 => row.1,
+                    2 => row.2,
+                    _ => row.3,
+                };
+                (i as f64, v)
+            })
+            .collect();
+        chart
+            .draw_series(LineSeries::new(points, color.stroke_width(3)))
             .map_err(|e| BtError::Render(e.to_string()))?
             .label(name)
-            .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], color.stroke_width(3)));
+            .legend(move |(x, y)| {
+                PathElement::new(vec![(x, y), (x + 20, y)], color.stroke_width(3))
+            });
     }
 
-    chart.configure_series_labels()
+    chart
+        .configure_series_labels()
         .border_style(&cfg.theme.border())
         .label_font((LABEL_FONT, 12).into_font().color(&cfg.theme.text()))
         .draw()
@@ -127,7 +156,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("YIELD", 100, 1, 100.0);
         let cfg = YieldCurveIndiaConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_yield_curve_india.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_yield_curve_india.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

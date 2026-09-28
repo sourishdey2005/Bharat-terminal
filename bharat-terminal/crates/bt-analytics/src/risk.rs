@@ -42,7 +42,11 @@ pub fn drawdown_series(series: &OhlcvSeries) -> Vec<f64> {
         if price > peak {
             peak = price;
         }
-        let dd = if peak > 0.0 { (peak - price) / peak * 100.0 } else { 0.0 };
+        let dd = if peak > 0.0 {
+            (peak - price) / peak * 100.0
+        } else {
+            0.0
+        };
         result.push(dd);
     }
 
@@ -291,11 +295,7 @@ pub fn correlation_matrix(series: &[(String, Vec<f64>)]) -> Vec<Vec<f64>> {
 }
 
 /// Rolling correlation between two series.
-pub fn rolling_correlation(
-    returns_a: &[f64],
-    returns_b: &[f64],
-    window: usize,
-) -> Vec<f64> {
+pub fn rolling_correlation(returns_a: &[f64], returns_b: &[f64], window: usize) -> Vec<f64> {
     if window == 0 || returns_a.len() < window || returns_b.len() < window {
         return vec![f64::NAN; returns_a.len()];
     }
@@ -356,8 +356,12 @@ pub fn efficient_frontier(
     }
 
     // Find min and max expected return
-    let min_ret = expected_returns.iter().fold(f64::INFINITY, |a, &b| a.min(b));
-    let max_ret = expected_returns.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+    let min_ret = expected_returns
+        .iter()
+        .fold(f64::INFINITY, |a, &b| a.min(b));
+    let max_ret = expected_returns
+        .iter()
+        .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
 
     if min_ret >= max_ret {
         return Vec::new();
@@ -403,7 +407,11 @@ pub fn information_ratio(
     }
 
     let mean = active_returns.iter().sum::<f64>() / n as f64;
-    let var = active_returns.iter().map(|r| (r - mean).powi(2)).sum::<f64>() / n as f64;
+    let var = active_returns
+        .iter()
+        .map(|r| (r - mean).powi(2))
+        .sum::<f64>()
+        / n as f64;
     let tracking_error = var.sqrt();
 
     if tracking_error == 0.0 {
@@ -462,7 +470,11 @@ pub fn rolling_volatility(returns: &[f64], window: usize, periods_per_year: usiz
         let window_returns = &returns[i + 1 - window..=i];
         let n = window_returns.len() as f64;
         let mean = window_returns.iter().sum::<f64>() / n;
-        let var = window_returns.iter().map(|r| (r - mean).powi(2)).sum::<f64>() / n;
+        let var = window_returns
+            .iter()
+            .map(|r| (r - mean).powi(2))
+            .sum::<f64>()
+            / n;
         result[i] = var.sqrt() * (periods_per_year as f64).sqrt();
     }
 
@@ -484,7 +496,11 @@ pub fn kurtosis(returns: &[f64]) -> f64 {
         return 0.0;
     }
 
-    let m4 = returns.iter().map(|r| ((r - mean) / std).powi(4)).sum::<f64>() / n;
+    let m4 = returns
+        .iter()
+        .map(|r| ((r - mean) / std).powi(4))
+        .sum::<f64>()
+        / n;
 
     m4 - 3.0
 }
@@ -504,7 +520,11 @@ pub fn skewness(returns: &[f64]) -> f64 {
         return 0.0;
     }
 
-    let m3 = returns.iter().map(|r| ((r - mean) / std).powi(3)).sum::<f64>() / n;
+    let m3 = returns
+        .iter()
+        .map(|r| ((r - mean) / std).powi(3))
+        .sum::<f64>()
+        / n;
 
     m3
 }
@@ -550,7 +570,9 @@ mod tests {
     }
 
     fn test_returns() -> Vec<f64> {
-        vec![0.01, 0.02, -0.01, 0.015, -0.005, 0.02, 0.01, -0.01, 0.015, 0.005]
+        vec![
+            0.01, 0.02, -0.01, 0.015, -0.005, 0.02, 0.01, -0.01, 0.015, 0.005,
+        ]
     }
 
     #[test]

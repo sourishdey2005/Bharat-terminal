@@ -132,7 +132,10 @@ where
         };
 
         root.draw(&Rectangle::new(
-            [(x0 as i32, top_pad as i32), (x1 as i32, (top_pad as f64 + chart_h) as i32)],
+            [
+                (x0 as i32, top_pad as i32),
+                (x1 as i32, (top_pad as f64 + chart_h) as i32),
+            ],
             color,
         ))
         .map_err(|e| BtError::Render(e.to_string()))?;

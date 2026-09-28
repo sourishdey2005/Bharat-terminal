@@ -30,11 +30,25 @@ impl Default for GpOverlayConfig {
 }
 
 impl GpOverlayConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn base_value(mut self, v: f64) -> Self { self.base_value = v.max(1.0); self }
-    pub fn adjustment_factor(mut self, f: f64) -> Self { self.adjustment_factor = f.max(0.0001); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn base_value(mut self, v: f64) -> Self {
+        self.base_value = v.max(1.0);
+        self
+    }
+    pub fn adjustment_factor(mut self, f: f64) -> Self {
+        self.adjustment_factor = f.max(0.0001);
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -42,9 +56,12 @@ fn render<DB: DrawingBackend>(
     series_list: &[OhlcvSeries],
     cfg: &GpOverlayConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
-    for s in series_list { s.validate()?; }
+    for s in series_list {
+        s.validate()?;
+    }
     fill_background(&root, cfg.theme)?;
 
     let colors = [
@@ -81,7 +98,10 @@ where DB::ErrorType: 'static,
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
-            format!("{} — Base {:.0} Adj {:.2}", cfg.title, cfg.base_value, cfg.adjustment_factor),
+            format!(
+                "{} — Base {:.0} Adj {:.2}",
+                cfg.title, cfg.base_value, cfg.adjustment_factor
+            ),
             (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
         )
         .margin(10)
@@ -151,7 +171,11 @@ mod tests {
         let b = synthetic_ohlcv("BBB", 100, 2, 100.0);
         let series_list = vec![a, b];
         let cfg = GpOverlayConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_gp_overlay.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_gp_overlay.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series_list, &cfg, &path).unwrap();
     }
 }

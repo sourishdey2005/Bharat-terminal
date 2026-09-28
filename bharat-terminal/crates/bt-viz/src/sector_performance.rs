@@ -1,4 +1,4 @@
-﻿// crates/bt-viz/src/sector_performance.rs
+// crates/bt-viz/src/sector_performance.rs
 // Author: Sourish Dey
 
 //! Tier 7 #69 â€” Sector Performance Bar Chart (ranked NSE sectors).
@@ -14,11 +14,11 @@ use crate::palette::Theme;
 #[derive(Debug, Clone)]
 pub struct SectorData {
     pub name: String,
-    pub change_pct: f64,      // period change %
-    pub market_cap: f64,      // total sector market cap (crores)
-    pub num_stocks: usize,    // number of stocks in sector
-    pub advance: usize,       // advancing stocks
-    pub decline: usize,       // declining stocks
+    pub change_pct: f64,   // period change %
+    pub market_cap: f64,   // total sector market cap (crores)
+    pub num_stocks: usize, // number of stocks in sector
+    pub advance: usize,    // advancing stocks
+    pub decline: usize,    // declining stocks
 }
 
 /// Configuration for sector performance chart.
@@ -63,21 +63,126 @@ impl SectorPerformanceConfig {
 /// Sample NSE sector data (replace with real data from bt-data)
 fn sample_sectors() -> Vec<SectorData> {
     vec![
-        SectorData { name: "IT".to_string(), change_pct: -0.5, market_cap: 2500000.0, num_stocks: 10, advance: 3, decline: 7 },
-        SectorData { name: "Banking".to_string(), change_pct: 1.8, market_cap: 3200000.0, num_stocks: 12, advance: 10, decline: 2 },
-        SectorData { name: "Oil & Gas".to_string(), change_pct: 1.2, market_cap: 2000000.0, num_stocks: 4, advance: 3, decline: 1 },
-        SectorData { name: "FMCG".to_string(), change_pct: -0.3, market_cap: 1500000.0, num_stocks: 8, advance: 2, decline: 6 },
-        SectorData { name: "Auto".to_string(), change_pct: 1.4, market_cap: 1000000.0, num_stocks: 8, advance: 6, decline: 2 },
-        SectorData { name: "Pharma".to_string(), change_pct: -0.8, market_cap: 800000.0, num_stocks: 6, advance: 1, decline: 5 },
-        SectorData { name: "Metals".to_string(), change_pct: 1.5, market_cap: 600000.0, num_stocks: 5, advance: 4, decline: 1 },
-        SectorData { name: "Consumer Durables".to_string(), change_pct: 0.7, market_cap: 400000.0, num_stocks: 3, advance: 2, decline: 1 },
-        SectorData { name: "Cement".to_string(), change_pct: 1.0, market_cap: 350000.0, num_stocks: 4, advance: 3, decline: 1 },
-        SectorData { name: "Telecom".to_string(), change_pct: 2.1, market_cap: 600000.0, num_stocks: 2, advance: 2, decline: 0 },
-        SectorData { name: "Power".to_string(), change_pct: 0.4, market_cap: 500000.0, num_stocks: 4, advance: 2, decline: 2 },
-        SectorData { name: "Financial Services".to_string(), change_pct: 1.1, market_cap: 700000.0, num_stocks: 5, advance: 4, decline: 1 },
-        SectorData { name: "Chemicals".to_string(), change_pct: 0.5, market_cap: 300000.0, num_stocks: 3, advance: 2, decline: 1 },
-        SectorData { name: "Construction".to_string(), change_pct: 1.8, market_cap: 450000.0, num_stocks: 2, advance: 2, decline: 0 },
-        SectorData { name: "Realty".to_string(), change_pct: 0.9, market_cap: 200000.0, num_stocks: 3, advance: 2, decline: 1 },
+        SectorData {
+            name: "IT".to_string(),
+            change_pct: -0.5,
+            market_cap: 2500000.0,
+            num_stocks: 10,
+            advance: 3,
+            decline: 7,
+        },
+        SectorData {
+            name: "Banking".to_string(),
+            change_pct: 1.8,
+            market_cap: 3200000.0,
+            num_stocks: 12,
+            advance: 10,
+            decline: 2,
+        },
+        SectorData {
+            name: "Oil & Gas".to_string(),
+            change_pct: 1.2,
+            market_cap: 2000000.0,
+            num_stocks: 4,
+            advance: 3,
+            decline: 1,
+        },
+        SectorData {
+            name: "FMCG".to_string(),
+            change_pct: -0.3,
+            market_cap: 1500000.0,
+            num_stocks: 8,
+            advance: 2,
+            decline: 6,
+        },
+        SectorData {
+            name: "Auto".to_string(),
+            change_pct: 1.4,
+            market_cap: 1000000.0,
+            num_stocks: 8,
+            advance: 6,
+            decline: 2,
+        },
+        SectorData {
+            name: "Pharma".to_string(),
+            change_pct: -0.8,
+            market_cap: 800000.0,
+            num_stocks: 6,
+            advance: 1,
+            decline: 5,
+        },
+        SectorData {
+            name: "Metals".to_string(),
+            change_pct: 1.5,
+            market_cap: 600000.0,
+            num_stocks: 5,
+            advance: 4,
+            decline: 1,
+        },
+        SectorData {
+            name: "Consumer Durables".to_string(),
+            change_pct: 0.7,
+            market_cap: 400000.0,
+            num_stocks: 3,
+            advance: 2,
+            decline: 1,
+        },
+        SectorData {
+            name: "Cement".to_string(),
+            change_pct: 1.0,
+            market_cap: 350000.0,
+            num_stocks: 4,
+            advance: 3,
+            decline: 1,
+        },
+        SectorData {
+            name: "Telecom".to_string(),
+            change_pct: 2.1,
+            market_cap: 600000.0,
+            num_stocks: 2,
+            advance: 2,
+            decline: 0,
+        },
+        SectorData {
+            name: "Power".to_string(),
+            change_pct: 0.4,
+            market_cap: 500000.0,
+            num_stocks: 4,
+            advance: 2,
+            decline: 2,
+        },
+        SectorData {
+            name: "Financial Services".to_string(),
+            change_pct: 1.1,
+            market_cap: 700000.0,
+            num_stocks: 5,
+            advance: 4,
+            decline: 1,
+        },
+        SectorData {
+            name: "Chemicals".to_string(),
+            change_pct: 0.5,
+            market_cap: 300000.0,
+            num_stocks: 3,
+            advance: 2,
+            decline: 1,
+        },
+        SectorData {
+            name: "Construction".to_string(),
+            change_pct: 1.8,
+            market_cap: 450000.0,
+            num_stocks: 2,
+            advance: 2,
+            decline: 0,
+        },
+        SectorData {
+            name: "Realty".to_string(),
+            change_pct: 0.9,
+            market_cap: 200000.0,
+            num_stocks: 3,
+            advance: 2,
+            decline: 1,
+        },
     ]
 }
 
@@ -111,8 +216,16 @@ where
         .y_label_area_size(140)
         .build_cartesian_2d(
             0.0..n as f64,
-            sorted.iter().map(|s| s.change_pct).fold(f64::INFINITY, f64::min) - 0.5
-                ..sorted.iter().map(|s| s.change_pct).fold(f64::NEG_INFINITY, f64::max) + 1.0,
+            sorted
+                .iter()
+                .map(|s| s.change_pct)
+                .fold(f64::INFINITY, f64::min)
+                - 0.5
+                ..sorted
+                    .iter()
+                    .map(|s| s.change_pct)
+                    .fold(f64::NEG_INFINITY, f64::max)
+                    + 1.0,
         )
         .map_err(|e| BtError::Render(e.to_string()))?;
 
@@ -122,7 +235,12 @@ where
         .axis_style(&cfg.theme.border())
         .light_line_style(cfg.theme.border().mix(0.3))
         .x_labels(n)
-        .x_label_formatter(&|i| sorted.get(*i as usize).map(|s| s.name.clone()).unwrap_or_default())
+        .x_label_formatter(&|i| {
+            sorted
+                .get(*i as usize)
+                .map(|s| s.name.clone())
+                .unwrap_or_default()
+        })
         .x_label_offset(10)
         .draw()
         .map_err(|e| BtError::Render(e.to_string()))?;
@@ -146,13 +264,21 @@ where
 
         chart
             .draw_series(std::iter::once(Rectangle::new(
-                [(i as f64 - bar_width / 2.0, 0.0), (i as f64 + bar_width / 2.0, sector.change_pct)],
+                [
+                    (i as f64 - bar_width / 2.0, 0.0),
+                    (i as f64 + bar_width / 2.0, sector.change_pct),
+                ],
                 color.mix(0.7).filled(),
             )))
             .map_err(|e| BtError::Render(e.to_string()))?;
 
         // Value label on bar
-        let label_y = sector.change_pct + if sector.change_pct >= 0.0 { 0.15 } else { -0.25 };
+        let label_y = sector.change_pct
+            + if sector.change_pct >= 0.0 {
+                0.15
+            } else {
+                -0.25
+            };
         chart
             .draw_series(std::iter::once(Text::new(
                 format!("{:+.1}%", sector.change_pct),
@@ -169,8 +295,17 @@ where
             chart
                 .draw_series(std::iter::once(Text::new(
                     ad_text,
-                    (i as f64, sorted.iter().map(|s| s.change_pct).fold(f64::INFINITY, f64::min) - 0.3),
-                    (LABEL_FONT, 9).into_font().color(&cfg.theme.text().mix(0.7)),
+                    (
+                        i as f64,
+                        sorted
+                            .iter()
+                            .map(|s| s.change_pct)
+                            .fold(f64::INFINITY, f64::min)
+                            - 0.3,
+                    ),
+                    (LABEL_FONT, 9)
+                        .into_font()
+                        .color(&cfg.theme.text().mix(0.7)),
                 )))
                 .map_err(|e| BtError::Render(e.to_string()))?;
         }
@@ -179,12 +314,20 @@ where
     // Market cap reference line (secondary y-axis would be better but complex)
     // Instead, add as tooltip-style text
     for (i, sector) in sorted.iter().enumerate() {
-        if i < 5 { // Top 5 sectors
+        if i < 5 {
+            // Top 5 sectors
             let mc_text = format!("â‚¹{:.0}k Cr", sector.market_cap / 1000.0);
             chart
                 .draw_series(std::iter::once(Text::new(
                     mc_text,
-                    (i as f64, sorted.iter().map(|s| s.change_pct).fold(f64::NEG_INFINITY, f64::max) + 0.3),
+                    (
+                        i as f64,
+                        sorted
+                            .iter()
+                            .map(|s| s.change_pct)
+                            .fold(f64::NEG_INFINITY, f64::max)
+                            + 0.3,
+                    ),
                     (LABEL_FONT, 9).into_font().color(&cfg.theme.accent()),
                 )))
                 .map_err(|e| BtError::Render(e.to_string()))?;

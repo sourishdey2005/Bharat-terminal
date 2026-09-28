@@ -1,4 +1,4 @@
-﻿// crates/bt-viz/src/candlestick_3d.rs
+// crates/bt-viz/src/candlestick_3d.rs
 // Author: Sourish Dey
 
 //! Tier 1 #10 â€” Candlestick 3D Perspective (pseudo-3D via depth-shading).
@@ -14,7 +14,7 @@ use crate::palette::Theme;
 pub struct Candlestick3DConfig {
     pub title: String,
     pub theme: Theme,
-    pub depth_factor: f64,    // 0.0 to 1.0, how much depth to show
+    pub depth_factor: f64, // 0.0 to 1.0, how much depth to show
     pub show_volume: bool,
 }
 
@@ -75,8 +75,16 @@ where
 
     let t_min = series.candles.first().unwrap().t;
     let t_max = series.candles.last().unwrap().t;
-    let low = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
-    let high = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
+    let low = series
+        .candles
+        .iter()
+        .map(|c| c.low)
+        .fold(f64::MAX, f64::min);
+    let high = series
+        .candles
+        .iter()
+        .map(|c| c.high)
+        .fold(f64::MIN, f64::max);
     let pad = (high - low) * 0.05;
 
     let mut chart = ChartBuilder::on(&chart_area)
@@ -136,7 +144,10 @@ where
             (x + w, body_top),
         ];
         chart
-            .draw_series(std::iter::once(Polygon::new(side_points, side_color.filled())))
+            .draw_series(std::iter::once(Polygon::new(
+                side_points,
+                side_color.filled(),
+            )))
             .map_err(|e| BtError::Render(e.to_string()))?;
 
         // Top face (for bullish, top of body; for bearish, bottom)
@@ -157,7 +168,10 @@ where
             (x + w, body_top),
         ];
         chart
-            .draw_series(std::iter::once(Polygon::new(top_points, top_color.filled())))
+            .draw_series(std::iter::once(Polygon::new(
+                top_points,
+                top_color.filled(),
+            )))
             .map_err(|e| BtError::Render(e.to_string()))?;
 
         // Front face (main body)
@@ -204,7 +218,11 @@ where
     }
 
     if let Some(vol_area) = volume_area {
-        let max_vol = series.candles.iter().map(|c| c.volume).fold(0.0_f64, f64::max);
+        let max_vol = series
+            .candles
+            .iter()
+            .map(|c| c.volume)
+            .fold(0.0_f64, f64::max);
         let mut vol_chart = ChartBuilder::on(&vol_area)
             .margin(10)
             .x_label_area_size(20)
@@ -224,7 +242,11 @@ where
         for i in (0..n).rev() {
             let c = &series.candles[i];
             let is_bullish = c.is_bullish();
-            let base_color = if is_bullish { cfg.theme.profit() } else { cfg.theme.loss() };
+            let base_color = if is_bullish {
+                cfg.theme.profit()
+            } else {
+                cfg.theme.loss()
+            };
             let side_color = RGBColor(
                 (base_color.0 as f64 * 0.6) as u8,
                 (base_color.1 as f64 * 0.6) as u8,
@@ -243,7 +265,10 @@ where
                 (x + w, c.volume),
             ];
             vol_chart
-                .draw_series(std::iter::once(Polygon::new(side_points, side_color.filled())))
+                .draw_series(std::iter::once(Polygon::new(
+                    side_points,
+                    side_color.filled(),
+                )))
                 .map_err(|e| BtError::Render(e.to_string()))?;
 
             // Top face
@@ -254,7 +279,10 @@ where
                 (x + w, c.volume),
             ];
             vol_chart
-                .draw_series(std::iter::once(Polygon::new(top_points, base_color.filled())))
+                .draw_series(std::iter::once(Polygon::new(
+                    top_points,
+                    base_color.filled(),
+                )))
                 .map_err(|e| BtError::Render(e.to_string()))?;
 
             // Front face

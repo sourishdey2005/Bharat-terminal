@@ -11,15 +11,15 @@ use clap::{Parser, ValueEnum};
 use tokio::time::sleep;
 
 use bt_core::{synthetic_correlated_returns, synthetic_ohlcv, APP_NAME, AUTHOR, TAGLINE};
+use bt_data::{DataService, Interval, COMPANY_LIST, DEFAULT_COMPANY};
 use bt_viz::palette::Theme as VizTheme;
 use bt_viz::{
-    acf_pacf, adx, bb_width, candlestick, candlestick_3d, candlestick_bollinger, candlestick_macd,
-    candlestick_ma, candlestick_rsi, correlation_heatmap, cumulative_delta, drawdown,
+    acf_pacf, adx, bb_width, candlestick, candlestick_3d, candlestick_bollinger, candlestick_ma,
+    candlestick_macd, candlestick_rsi, correlation_heatmap, cumulative_delta, drawdown,
     efficient_frontier, heikin_ashi, multi_indicator, nifty_treemap, price_volume_scatter, renko,
-    sector_performance, sector_treemap, sensex_heatmap, seasonality_polar, vol_smile, volume_profile,
-    yield_curve,
+    seasonality_polar, sector_performance, sector_treemap, sensex_heatmap, vol_smile,
+    volume_profile, yield_curve,
 };
-use bt_data::{DataService, Interval, COMPANY_LIST, DEFAULT_COMPANY};
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum ThemeArg {
@@ -87,7 +87,11 @@ impl RangeArg {
 
 /// BHARAT TERMINAL v2 — Bloomberg power. Zero cost. Made in India.
 #[derive(Debug, Parser)]
-#[command(name = "bt-cli", version, about = "Bharat Terminal v2 — render visualizations with real market data.")]
+#[command(
+    name = "bt-cli",
+    version,
+    about = "Bharat Terminal v2 — render visualizations with real market data."
+)]
 struct Cli {
     /// Symbol to fetch (e.g., RELIANCE.NS, AAPL, BTC-USD). Default: RELIANCE.NS
     #[arg(long, default_value = "RELIANCE.NS")]
@@ -149,21 +153,31 @@ async fn fetch_series(
 
     match service.fetch_ohlcv(symbol, interval, start, end).await {
         Ok(series) => {
-            println!("  ✓ Fetched {} candles for {} ({} days, {:?})", series.candles.len(), symbol, range.to_days(), interval);
+            println!(
+                "  ✓ Fetched {} candles for {} ({} days, {:?})",
+                series.candles.len(),
+                symbol,
+                range.to_days(),
+                interval
+            );
             series
         }
         Err(e) => {
-            eprintln!("  ✗ Failed to fetch {}: {}. Using synthetic fallback.", symbol, e);
-            let days = (range.to_days() as f64 / match interval {
-                Interval::Min1 => 1.0 / (24.0 * 60.0),
-                Interval::Min5 => 5.0 / (24.0 * 60.0),
-                Interval::Min15 => 15.0 / (24.0 * 60.0),
-                Interval::Min30 => 30.0 / (24.0 * 60.0),
-                Interval::Hour1 => 1.0 / 24.0,
-                Interval::Day1 => 1.0,
-                Interval::Week1 => 7.0,
-                Interval::Month1 => 30.0,
-            }) as usize;
+            eprintln!(
+                "  ✗ Failed to fetch {}: {}. Using synthetic fallback.",
+                symbol, e
+            );
+            let days = (range.to_days() as f64
+                / match interval {
+                    Interval::Min1 => 1.0 / (24.0 * 60.0),
+                    Interval::Min5 => 5.0 / (24.0 * 60.0),
+                    Interval::Min15 => 15.0 / (24.0 * 60.0),
+                    Interval::Min30 => 30.0 / (24.0 * 60.0),
+                    Interval::Hour1 => 1.0 / 24.0,
+                    Interval::Day1 => 1.0,
+                    Interval::Week1 => 7.0,
+                    Interval::Month1 => 30.0,
+                }) as usize;
             synthetic_ohlcv(symbol, days.max(50), 42, 100.0)
         }
     }
@@ -184,12 +198,18 @@ async fn render_all(
     let series = fetch_series(service, symbol, range).await;
 
     let timestamp = Utc::now().format("%H%M%S").to_string();
-    let prefix = if iteration > 1 { format!("{:03}_", iteration) } else { String::new() };
+    let prefix = if iteration > 1 {
+        format!("{:03}_", iteration)
+    } else {
+        String::new()
+    };
     let mut rendered = 0usize;
 
     // 1. Candlestick + Volume
     {
-        let cfg = candlestick::CandlestickConfig::new().title("Candlestick + Volume").theme(theme);
+        let cfg = candlestick::CandlestickConfig::new()
+            .title("Candlestick + Volume")
+            .theme(theme);
         let path = out_dir.join(format!("{}01_candlestick_{}.png", prefix, timestamp));
         candlestick::render_png(&series, &cfg, path.to_str().unwrap())?;
         println!("[1/25] Candlestick + Volume         -> {}", path.display());
@@ -198,7 +218,9 @@ async fn render_all(
 
     // 2. Candlestick + MA
     {
-        let cfg = candlestick_ma::CandlestickMAConfig::new().title("Candlestick + MA (20,50,200)").theme(theme);
+        let cfg = candlestick_ma::CandlestickMAConfig::new()
+            .title("Candlestick + MA (20,50,200)")
+            .theme(theme);
         let path = out_dir.join(format!("{}02_candlestick_ma_{}.png", prefix, timestamp));
         candlestick_ma::render_png(&series, &cfg, path.to_str().unwrap())?;
         println!("[2/25] Candlestick + MA             -> {}", path.display());
@@ -207,8 +229,13 @@ async fn render_all(
 
     // 3. Candlestick + Bollinger
     {
-        let cfg = candlestick_bollinger::CandlestickBollingerConfig::new().title("Candlestick + Bollinger Bands").theme(theme);
-        let path = out_dir.join(format!("{}03_candlestick_bollinger_{}.png", prefix, timestamp));
+        let cfg = candlestick_bollinger::CandlestickBollingerConfig::new()
+            .title("Candlestick + Bollinger Bands")
+            .theme(theme);
+        let path = out_dir.join(format!(
+            "{}03_candlestick_bollinger_{}.png",
+            prefix, timestamp
+        ));
         candlestick_bollinger::render_png(&series, &cfg, path.to_str().unwrap())?;
         println!("[3/25] Candlestick + Bollinger       -> {}", path.display());
         rendered += 1;
@@ -216,7 +243,9 @@ async fn render_all(
 
     // 4. Candlestick + RSI
     {
-        let cfg = candlestick_rsi::CandlestickRSIConfig::new().title("Candlestick + RSI(14)").theme(theme);
+        let cfg = candlestick_rsi::CandlestickRSIConfig::new()
+            .title("Candlestick + RSI(14)")
+            .theme(theme);
         let path = out_dir.join(format!("{}04_candlestick_rsi_{}.png", prefix, timestamp));
         candlestick_rsi::render_png(&series, &cfg, path.to_str().unwrap())?;
         println!("[4/25] Candlestick + RSI            -> {}", path.display());
@@ -225,7 +254,9 @@ async fn render_all(
 
     // 5. Candlestick + MACD
     {
-        let cfg = candlestick_macd::CandlestickMACDConfig::new().title("Candlestick + MACD").theme(theme);
+        let cfg = candlestick_macd::CandlestickMACDConfig::new()
+            .title("Candlestick + MACD")
+            .theme(theme);
         let path = out_dir.join(format!("{}05_candlestick_macd_{}.png", prefix, timestamp));
         candlestick_macd::render_png(&series, &cfg, path.to_str().unwrap())?;
         println!("[5/25] Candlestick + MACD           -> {}", path.display());
@@ -234,7 +265,9 @@ async fn render_all(
 
     // 6. Heikin-Ashi
     {
-        let cfg = heikin_ashi::HeikinAshiConfig::new().title("Heikin-Ashi").theme(theme);
+        let cfg = heikin_ashi::HeikinAshiConfig::new()
+            .title("Heikin-Ashi")
+            .theme(theme);
         let path = out_dir.join(format!("{}06_heikin_ashi_{}.png", prefix, timestamp));
         heikin_ashi::render_png(&series, &cfg, path.to_str().unwrap())?;
         println!("[6/25] Heikin-Ashi                  -> {}", path.display());
@@ -243,7 +276,10 @@ async fn render_all(
 
     // 7. Renko
     {
-        let cfg = renko::RenkoConfig::new().title("Renko").theme(theme).brick_size(10.0);
+        let cfg = renko::RenkoConfig::new()
+            .title("Renko")
+            .theme(theme)
+            .brick_size(10.0);
         let path = out_dir.join(format!("{}07_renko_{}.png", prefix, timestamp));
         renko::render_png(&series, &cfg, path.to_str().unwrap())?;
         println!("[7/25] Renko                        -> {}", path.display());
@@ -252,7 +288,9 @@ async fn render_all(
 
     // 8. Volume Profile
     {
-        let cfg = volume_profile::VolumeProfileConfig::new().title("Volume Profile").theme(theme);
+        let cfg = volume_profile::VolumeProfileConfig::new()
+            .title("Volume Profile")
+            .theme(theme);
         let path = out_dir.join(format!("{}08_volume_profile_{}.png", prefix, timestamp));
         volume_profile::render_png(&series, &cfg, path.to_str().unwrap())?;
         println!("[8/25] Volume Profile               -> {}", path.display());
@@ -261,7 +299,9 @@ async fn render_all(
 
     // 9. Multi-Indicator Dashboard
     {
-        let cfg = multi_indicator::MultiIndicatorConfig::new().title("Multi-Indicator Dashboard").theme(theme);
+        let cfg = multi_indicator::MultiIndicatorConfig::new()
+            .title("Multi-Indicator Dashboard")
+            .theme(theme);
         let path = out_dir.join(format!("{}09_multi_indicator_{}.png", prefix, timestamp));
         multi_indicator::render_png(&series, &cfg, path.to_str().unwrap())?;
         println!("[9/25] Multi-Indicator Dashboard     -> {}", path.display());
@@ -270,7 +310,9 @@ async fn render_all(
 
     // 10. Bollinger Band Width
     {
-        let cfg = bb_width::BBWidthConfig::new().title("Bollinger Band Width").theme(theme);
+        let cfg = bb_width::BBWidthConfig::new()
+            .title("Bollinger Band Width")
+            .theme(theme);
         let path = out_dir.join(format!("{}10_bb_width_{}.png", prefix, timestamp));
         bb_width::render_png(&series, &cfg, path.to_str().unwrap())?;
         println!("[10/25] Bollinger Band Width         -> {}", path.display());
@@ -288,7 +330,9 @@ async fn render_all(
 
     // 12. Nifty 50 Treemap (sample data)
     {
-        let cfg = nifty_treemap::NiftyTreemapConfig::new().title("Nifty 50 Treemap").theme(theme);
+        let cfg = nifty_treemap::NiftyTreemapConfig::new()
+            .title("Nifty 50 Treemap")
+            .theme(theme);
         let path = out_dir.join(format!("{}12_nifty_treemap_{}.png", prefix, timestamp));
         nifty_treemap::render_sample_png(&cfg, path.to_str().unwrap())?;
         println!("[12/25] Nifty 50 Treemap            -> {}", path.display());
@@ -297,7 +341,9 @@ async fn render_all(
 
     // 13. Sensex Heatmap (sample data)
     {
-        let cfg = sensex_heatmap::SensexHeatmapConfig::new().title("Sensex Heatmap").theme(theme);
+        let cfg = sensex_heatmap::SensexHeatmapConfig::new()
+            .title("Sensex Heatmap")
+            .theme(theme);
         let path = out_dir.join(format!("{}13_sensex_heatmap_{}.png", prefix, timestamp));
         sensex_heatmap::render_sample_png(&cfg, path.to_str().unwrap())?;
         println!("[13/25] Sensex Heatmap              -> {}", path.display());
@@ -306,7 +352,9 @@ async fn render_all(
 
     // 14. Sector Performance (sample data)
     {
-        let cfg = sector_performance::SectorPerformanceConfig::new().title("Sector Performance").theme(theme);
+        let cfg = sector_performance::SectorPerformanceConfig::new()
+            .title("Sector Performance")
+            .theme(theme);
         let path = out_dir.join(format!("{}14_sector_performance_{}.png", prefix, timestamp));
         sector_performance::render_sample_png(&cfg, path.to_str().unwrap())?;
         println!("[14/25] Sector Performance           -> {}", path.display());
@@ -315,7 +363,9 @@ async fn render_all(
 
     // 15. Candlestick 3D
     {
-        let cfg = candlestick_3d::Candlestick3DConfig::new().title("Candlestick 3D").theme(theme);
+        let cfg = candlestick_3d::Candlestick3DConfig::new()
+            .title("Candlestick 3D")
+            .theme(theme);
         let path = out_dir.join(format!("{}15_candlestick_3d_{}.png", prefix, timestamp));
         candlestick_3d::render_png(&series, &cfg, path.to_str().unwrap())?;
         println!("[15/25] Candlestick 3D              -> {}", path.display());
@@ -324,8 +374,13 @@ async fn render_all(
 
     // 16. Price-Volume Scatter
     {
-        let cfg = price_volume_scatter::PriceVolumeScatterConfig::new().title("Price-Volume Scatter").theme(theme);
-        let path = out_dir.join(format!("{}16_price_volume_scatter_{}.png", prefix, timestamp));
+        let cfg = price_volume_scatter::PriceVolumeScatterConfig::new()
+            .title("Price-Volume Scatter")
+            .theme(theme);
+        let path = out_dir.join(format!(
+            "{}16_price_volume_scatter_{}.png",
+            prefix, timestamp
+        ));
         price_volume_scatter::render_png(&series, &cfg, path.to_str().unwrap())?;
         println!("[16/25] Price-Volume Scatter        -> {}", path.display());
         rendered += 1;
@@ -351,14 +406,24 @@ async fn render_all(
 
     // 19. Correlation Heatmap (multi-symbol)
     {
-        let symbols = ["RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS", "ICICIBANK.NS", "ITC.NS"];
+        let symbols = [
+            "RELIANCE.NS",
+            "TCS.NS",
+            "INFY.NS",
+            "HDFCBANK.NS",
+            "ICICIBANK.NS",
+            "ITC.NS",
+        ];
         let mut all_data = Vec::new();
         for sym in symbols {
             let s = fetch_series(service, sym, range).await;
             all_data.push((sym.to_string(), s.returns()));
         }
         let cfg = correlation_heatmap::CorrelationHeatmapConfig::new().theme(theme);
-        let path = out_dir.join(format!("{}19_correlation_heatmap_{}.png", prefix, timestamp));
+        let path = out_dir.join(format!(
+            "{}19_correlation_heatmap_{}.png",
+            prefix, timestamp
+        ));
         correlation_heatmap::render_png(&all_data, &cfg, path.to_str().unwrap())?;
         println!("[19/25] Correlation Heatmap          -> {}", path.display());
         rendered += 1;
@@ -382,9 +447,20 @@ async fn render_all(
     {
         let expected_returns = vec![0.09, 0.14, 0.11, 0.16, 0.07, 0.10];
         let cov: Vec<Vec<f64>> = (0..6)
-            .map(|i| (0..6).map(|j| if i == j { 0.03 + i as f64 * 0.006 } else { 0.006 }).collect())
+            .map(|i| {
+                (0..6)
+                    .map(|j| {
+                        if i == j {
+                            0.03 + i as f64 * 0.006
+                        } else {
+                            0.006
+                        }
+                    })
+                    .collect()
+            })
             .collect();
-        let portfolios = efficient_frontier::simulate_portfolios(&expected_returns, &cov, 0.065, 2000, seed + 4);
+        let portfolios =
+            efficient_frontier::simulate_portfolios(&expected_returns, &cov, 0.065, 2000, seed + 4);
         let cfg = efficient_frontier::EfficientFrontierConfig::new().theme(theme);
         let path = out_dir.join(format!("{}21_efficient_frontier_{}.png", prefix, timestamp));
         efficient_frontier::render_png(&portfolios, &cfg, path.to_str().unwrap())?;
@@ -414,7 +490,9 @@ async fn render_all(
             sector_treemap::TreemapNode::new("L&T", 420_000.0, 0.9),
             sector_treemap::TreemapNode::new("Bharti Airtel", 610_000.0, -0.3),
         ];
-        let cfg = sector_treemap::TreemapConfig::new().title("BMAP -- NIFTY Sector Map").theme(theme);
+        let cfg = sector_treemap::TreemapConfig::new()
+            .title("BMAP -- NIFTY Sector Map")
+            .theme(theme);
         let path = out_dir.join(format!("{}23_sector_treemap_{}.png", prefix, timestamp));
         sector_treemap::render_png(&nodes, &cfg, path.to_str().unwrap())?;
         println!("[23/25] Sector Treemap (BMAP)        -> {}", path.display());
@@ -429,7 +507,9 @@ async fn render_all(
             yield_curve::synthetic_curve("2026-07-15", 6.6, -1.0, 0.5, &tenors),
             yield_curve::synthetic_curve("2026-09-20", 6.5, -0.8, 0.6, &tenors),
         ];
-        let cfg = yield_curve::YieldCurveConfig::new().title("GOVT -- India Sovereign Yield Curve").theme(theme);
+        let cfg = yield_curve::YieldCurveConfig::new()
+            .title("GOVT -- India Sovereign Yield Curve")
+            .theme(theme);
         let path = out_dir.join(format!("{}24_yield_curve_{}.png", prefix, timestamp));
         yield_curve::render_png(&curves, &cfg, path.to_str().unwrap())?;
         println!("[24/25] Yield Curve Family           -> {}", path.display());
@@ -463,7 +543,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     std::fs::create_dir_all(&cli.out_dir)?;
     println!("Rendering into: {}", cli.out_dir.display());
-    println!("Symbol: {} | Range: {:?} | Theme: {:?} | Live: {}\n", cli.symbol, cli.range, cli.theme, cli.live);
+    println!(
+        "Symbol: {} | Range: {:?} | Theme: {:?} | Live: {}\n",
+        cli.symbol, cli.range, cli.theme, cli.live
+    );
 
     let service = DataService::new()?;
     let start = Instant::now();
@@ -472,11 +555,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         let iter_start = Instant::now();
-        let rendered = render_all(&service, &cli.symbol, cli.range, theme, cli.seed, &cli.out_dir, iteration).await?;
+        let rendered = render_all(
+            &service,
+            &cli.symbol,
+            cli.range,
+            theme,
+            cli.seed,
+            &cli.out_dir,
+            iteration,
+        )
+        .await?;
         total_rendered += rendered;
         let iter_elapsed = iter_start.elapsed();
 
-        println!("\n--- Iteration {} completed in {:.2?} ({} charts) ---", iteration, iter_elapsed, rendered);
+        println!(
+            "\n--- Iteration {} completed in {:.2?} ({} charts) ---",
+            iteration, iter_elapsed, rendered
+        );
 
         if !cli.live {
             break;
@@ -490,7 +585,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let elapsed = start.elapsed();
     println!("\n================================================================");
-    println!(" Total rendered: {} charts in {:.2?}", total_rendered, elapsed);
+    println!(
+        " Total rendered: {} charts in {:.2?}",
+        total_rendered, elapsed
+    );
     println!(" {APP_NAME} v2 -- Made by {AUTHOR}");
     println!("================================================================");
 

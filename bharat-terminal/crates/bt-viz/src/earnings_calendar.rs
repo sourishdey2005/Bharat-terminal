@@ -22,26 +22,146 @@ pub struct EarningsEvent {
 /// Sample earnings calendar data.
 fn sample_earnings() -> Vec<EarningsEvent> {
     vec![
-        EarningsEvent { symbol: "TCS".to_string(), date: "10 Oct".to_string(), eps_estimate: 38.50, eps_actual: Some(39.20), surprise_pct: Some(1.82) },
-        EarningsEvent { symbol: "INFY".to_string(), date: "10 Oct".to_string(), eps_estimate: 16.80, eps_actual: Some(16.50), surprise_pct: Some(-1.79) },
-        EarningsEvent { symbol: "HDFCBANK".to_string(), date: "11 Oct".to_string(), eps_estimate: 21.20, eps_actual: Some(21.80), surprise_pct: Some(2.83) },
-        EarningsEvent { symbol: "RELIANCE".to_string(), date: "11 Oct".to_string(), eps_estimate: 28.40, eps_actual: Some(27.90), surprise_pct: Some(-1.76) },
-        EarningsEvent { symbol: "ICICIBANK".to_string(), date: "12 Oct".to_string(), eps_estimate: 10.50, eps_actual: Some(10.85), surprise_pct: Some(3.33) },
-        EarningsEvent { symbol: "SBIN".to_string(), date: "12 Oct".to_string(), eps_estimate: 7.80, eps_actual: Some(7.65), surprise_pct: Some(-1.92) },
-        EarningsEvent { symbol: "WIPRO".to_string(), date: "14 Oct".to_string(), eps_estimate: 5.20, eps_actual: Some(5.45), surprise_pct: Some(4.81) },
-        EarningsEvent { symbol: "HCLTECH".to_string(), date: "14 Oct".to_string(), eps_estimate: 15.60, eps_actual: Some(15.30), surprise_pct: Some(-1.92) },
-        EarningsEvent { symbol: "BHARTIARTL".to_string(), date: "15 Oct".to_string(), eps_estimate: 8.90, eps_actual: Some(9.25), surprise_pct: Some(3.93) },
-        EarningsEvent { symbol: "ITC".to_string(), date: "15 Oct".to_string(), eps_estimate: 4.85, eps_actual: Some(4.90), surprise_pct: Some(1.03) },
-        EarningsEvent { symbol: "LT".to_string(), date: "16 Oct".to_string(), eps_estimate: 32.40, eps_actual: Some(33.10), surprise_pct: Some(2.16) },
-        EarningsEvent { symbol: "KOTAKBANK".to_string(), date: "16 Oct".to_string(), eps_estimate: 12.30, eps_actual: Some(12.10), surprise_pct: Some(-1.63) },
-        EarningsEvent { symbol: "MARUTI".to_string(), date: "17 Oct".to_string(), eps_estimate: 42.80, eps_actual: Some(44.50), surprise_pct: Some(3.97) },
-        EarningsEvent { symbol: "SUNPHARMA".to_string(), date: "17 Oct".to_string(), eps_estimate: 14.20, eps_actual: Some(13.80), surprise_pct: Some(-2.82) },
-        EarningsEvent { symbol: "TATAMOTORS".to_string(), date: "18 Oct".to_string(), eps_estimate: 8.50, eps_actual: Some(9.10), surprise_pct: Some(7.06) },
-        EarningsEvent { symbol: "ULTRACEMCO".to_string(), date: "18 Oct".to_string(), eps_estimate: 72.30, eps_actual: Some(70.50), surprise_pct: Some(-2.49) },
-        EarningsEvent { symbol: "NTPC".to_string(), date: "21 Oct".to_string(), eps_estimate: 5.60, eps_actual: Some(5.75), surprise_pct: Some(2.68) },
-        EarningsEvent { symbol: "TATASTEEL".to_string(), date: "21 Oct".to_string(), eps_estimate: 3.20, eps_actual: Some(2.95), surprise_pct: Some(-7.81) },
-        EarningsEvent { symbol: "BAJFINANCE".to_string(), date: "22 Oct".to_string(), eps_estimate: 68.40, eps_actual: Some(71.20), surprise_pct: Some(4.09) },
-        EarningsEvent { symbol: "ADANIENT".to_string(), date: "22 Oct".to_string(), eps_estimate: 22.50, eps_actual: Some(21.80), surprise_pct: Some(-3.11) },
+        EarningsEvent {
+            symbol: "TCS".to_string(),
+            date: "10 Oct".to_string(),
+            eps_estimate: 38.50,
+            eps_actual: Some(39.20),
+            surprise_pct: Some(1.82),
+        },
+        EarningsEvent {
+            symbol: "INFY".to_string(),
+            date: "10 Oct".to_string(),
+            eps_estimate: 16.80,
+            eps_actual: Some(16.50),
+            surprise_pct: Some(-1.79),
+        },
+        EarningsEvent {
+            symbol: "HDFCBANK".to_string(),
+            date: "11 Oct".to_string(),
+            eps_estimate: 21.20,
+            eps_actual: Some(21.80),
+            surprise_pct: Some(2.83),
+        },
+        EarningsEvent {
+            symbol: "RELIANCE".to_string(),
+            date: "11 Oct".to_string(),
+            eps_estimate: 28.40,
+            eps_actual: Some(27.90),
+            surprise_pct: Some(-1.76),
+        },
+        EarningsEvent {
+            symbol: "ICICIBANK".to_string(),
+            date: "12 Oct".to_string(),
+            eps_estimate: 10.50,
+            eps_actual: Some(10.85),
+            surprise_pct: Some(3.33),
+        },
+        EarningsEvent {
+            symbol: "SBIN".to_string(),
+            date: "12 Oct".to_string(),
+            eps_estimate: 7.80,
+            eps_actual: Some(7.65),
+            surprise_pct: Some(-1.92),
+        },
+        EarningsEvent {
+            symbol: "WIPRO".to_string(),
+            date: "14 Oct".to_string(),
+            eps_estimate: 5.20,
+            eps_actual: Some(5.45),
+            surprise_pct: Some(4.81),
+        },
+        EarningsEvent {
+            symbol: "HCLTECH".to_string(),
+            date: "14 Oct".to_string(),
+            eps_estimate: 15.60,
+            eps_actual: Some(15.30),
+            surprise_pct: Some(-1.92),
+        },
+        EarningsEvent {
+            symbol: "BHARTIARTL".to_string(),
+            date: "15 Oct".to_string(),
+            eps_estimate: 8.90,
+            eps_actual: Some(9.25),
+            surprise_pct: Some(3.93),
+        },
+        EarningsEvent {
+            symbol: "ITC".to_string(),
+            date: "15 Oct".to_string(),
+            eps_estimate: 4.85,
+            eps_actual: Some(4.90),
+            surprise_pct: Some(1.03),
+        },
+        EarningsEvent {
+            symbol: "LT".to_string(),
+            date: "16 Oct".to_string(),
+            eps_estimate: 32.40,
+            eps_actual: Some(33.10),
+            surprise_pct: Some(2.16),
+        },
+        EarningsEvent {
+            symbol: "KOTAKBANK".to_string(),
+            date: "16 Oct".to_string(),
+            eps_estimate: 12.30,
+            eps_actual: Some(12.10),
+            surprise_pct: Some(-1.63),
+        },
+        EarningsEvent {
+            symbol: "MARUTI".to_string(),
+            date: "17 Oct".to_string(),
+            eps_estimate: 42.80,
+            eps_actual: Some(44.50),
+            surprise_pct: Some(3.97),
+        },
+        EarningsEvent {
+            symbol: "SUNPHARMA".to_string(),
+            date: "17 Oct".to_string(),
+            eps_estimate: 14.20,
+            eps_actual: Some(13.80),
+            surprise_pct: Some(-2.82),
+        },
+        EarningsEvent {
+            symbol: "TATAMOTORS".to_string(),
+            date: "18 Oct".to_string(),
+            eps_estimate: 8.50,
+            eps_actual: Some(9.10),
+            surprise_pct: Some(7.06),
+        },
+        EarningsEvent {
+            symbol: "ULTRACEMCO".to_string(),
+            date: "18 Oct".to_string(),
+            eps_estimate: 72.30,
+            eps_actual: Some(70.50),
+            surprise_pct: Some(-2.49),
+        },
+        EarningsEvent {
+            symbol: "NTPC".to_string(),
+            date: "21 Oct".to_string(),
+            eps_estimate: 5.60,
+            eps_actual: Some(5.75),
+            surprise_pct: Some(2.68),
+        },
+        EarningsEvent {
+            symbol: "TATASTEEL".to_string(),
+            date: "21 Oct".to_string(),
+            eps_estimate: 3.20,
+            eps_actual: Some(2.95),
+            surprise_pct: Some(-7.81),
+        },
+        EarningsEvent {
+            symbol: "BAJFINANCE".to_string(),
+            date: "22 Oct".to_string(),
+            eps_estimate: 68.40,
+            eps_actual: Some(71.20),
+            surprise_pct: Some(4.09),
+        },
+        EarningsEvent {
+            symbol: "ADANIENT".to_string(),
+            date: "22 Oct".to_string(),
+            eps_estimate: 22.50,
+            eps_actual: Some(21.80),
+            surprise_pct: Some(-3.11),
+        },
     ]
 }
 
@@ -80,7 +200,11 @@ fn lerp(a: u8, b: u8, t: f64) -> u8 {
 
 fn surprise_color(theme: Theme, v: f64) -> RGBColor {
     let bg = theme.background();
-    let target = if v >= 0.0 { theme.profit() } else { theme.loss() };
+    let target = if v >= 0.0 {
+        theme.profit()
+    } else {
+        theme.loss()
+    };
     let t = (v.abs() / 10.0).min(1.0);
     RGBColor(
         lerp(bg.0, target.0, t),

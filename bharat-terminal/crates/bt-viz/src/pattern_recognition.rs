@@ -19,7 +19,11 @@ pub struct PatternMatch {
 
 impl PatternMatch {
     pub fn new(index: usize, name: impl Into<String>, signal: impl Into<String>) -> Self {
-        Self { index, name: name.into(), signal: signal.into() }
+        Self {
+            index,
+            name: name.into(),
+            signal: signal.into(),
+        }
     }
 }
 
@@ -41,10 +45,21 @@ impl Default for PatternRecognitionConfig {
 }
 
 impl PatternRecognitionConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn patterns(mut self, p: Vec<String>) -> Self { self.patterns = p; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn patterns(mut self, p: Vec<String>) -> Self {
+        self.patterns = p;
+        self
+    }
 }
 
 fn detect_patterns(series: &OhlcvSeries) -> Vec<PatternMatch> {
@@ -85,7 +100,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &PatternRecognitionConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -94,8 +110,16 @@ where DB::ErrorType: 'static,
 
     let t_min = series.candles.first().map(|c| c.t).unwrap_or(0.0);
     let t_max = series.candles.last().map(|c| c.t).unwrap_or(1.0);
-    let low = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
-    let high = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
+    let low = series
+        .candles
+        .iter()
+        .map(|c| c.low)
+        .fold(f64::MAX, f64::min);
+    let high = series
+        .candles
+        .iter()
+        .map(|c| c.high)
+        .fold(f64::MIN, f64::max);
     let pad = (high - low).max(1.0) * 0.05;
 
     let mut chart = ChartBuilder::on(&root)
@@ -121,7 +145,11 @@ where DB::ErrorType: 'static,
 
     chart
         .draw_series(series.candles.iter().map(|c| {
-            let color = if c.is_bullish() { cfg.theme.profit() } else { cfg.theme.loss() };
+            let color = if c.is_bullish() {
+                cfg.theme.profit()
+            } else {
+                cfg.theme.loss()
+            };
             CandleStick::new(
                 c.t,
                 c.open,
@@ -178,7 +206,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = PatternRecognitionConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_pattern_recognition.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_pattern_recognition.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

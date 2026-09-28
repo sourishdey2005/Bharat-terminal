@@ -30,11 +30,25 @@ impl Default for VarBacktestConfig {
 }
 
 impl VarBacktestConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn confidence(mut self, c: f64) -> Self { self.confidence = c; self }
-    pub fn window(mut self, w: usize) -> Self { self.window = w; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn confidence(mut self, c: f64) -> Self {
+        self.confidence = c;
+        self
+    }
+    pub fn window(mut self, w: usize) -> Self {
+        self.window = w;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -42,14 +56,17 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &VarBacktestConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
 
     let returns = series.returns();
     if returns.len() < cfg.window {
-        return Err(BtError::InvalidInput("insufficient data for VaR window".into()));
+        return Err(BtError::InvalidInput(
+            "insufficient data for VaR window".into(),
+        ));
     }
 
     let mut var_series = Vec::with_capacity(returns.len());
@@ -65,15 +82,14 @@ where DB::ErrorType: 'static,
         }
     }
 
-    let y_max = cvar_series
-        .iter()
-        .cloned()
-        .fold(0.0_f64, f64::max)
-        .max(0.1);
+    let y_max = cvar_series.iter().cloned().fold(0.0_f64, f64::max).max(0.1);
     let n = returns.len() as f64;
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(15)
         .x_label_area_size(35)
         .y_label_area_size(60)
@@ -101,24 +117,26 @@ where DB::ErrorType: 'static,
         .collect();
 
     chart
-        .draw_series(AreaSeries::new(
-            var_points.clone(),
-            0.0,
-            cfg.theme.info().mix(0.25),
-        ).border_style(cfg.theme.info().stroke_width(2)))
+        .draw_series(
+            AreaSeries::new(var_points.clone(), 0.0, cfg.theme.info().mix(0.25))
+                .border_style(cfg.theme.info().stroke_width(2)),
+        )
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("VaR")
-        .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(2)));
+        .legend(move |(x, y)| {
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(2))
+        });
 
     chart
-        .draw_series(AreaSeries::new(
-            cvar_points.clone(),
-            0.0,
-            cfg.theme.loss().mix(0.25),
-        ).border_style(cfg.theme.loss().stroke_width(2)))
+        .draw_series(
+            AreaSeries::new(cvar_points.clone(), 0.0, cfg.theme.loss().mix(0.25))
+                .border_style(cfg.theme.loss().stroke_width(2)),
+        )
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("CVaR")
-        .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.loss().stroke_width(2)));
+        .legend(move |(x, y)| {
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.loss().stroke_width(2))
+        });
 
     chart
         .configure_series_labels()
@@ -150,7 +168,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = VarBacktestConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_var_backtest.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_var_backtest.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

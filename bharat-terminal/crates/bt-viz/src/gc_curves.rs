@@ -19,7 +19,11 @@ pub struct YieldCurve {
 
 impl YieldCurve {
     pub fn new(name: impl Into<String>, tenors: Vec<f64>, yields: Vec<f64>) -> Self {
-        Self { name: name.into(), tenors, yields }
+        Self {
+            name: name.into(),
+            tenors,
+            yields,
+        }
     }
 }
 
@@ -41,10 +45,21 @@ impl Default for GcCurvesConfig {
 }
 
 impl GcCurvesConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn show_labels(mut self, s: bool) -> Self { self.show_labels = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn show_labels(mut self, s: bool) -> Self {
+        self.show_labels = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -52,7 +67,8 @@ fn render<DB: DrawingBackend>(
     curves: &[YieldCurve],
     cfg: &GcCurvesConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if curves.is_empty() {
         return Err(BtError::EmptySeries("yield curves".into()));
@@ -131,9 +147,11 @@ where DB::ErrorType: 'static,
 
         if cfg.show_labels {
             chart
-                .draw_series(points.iter().map(|&(t, y)| {
-                    Circle::new((t, y), 3, color.filled())
-                }))
+                .draw_series(
+                    points
+                        .iter()
+                        .map(|&(t, y)| Circle::new((t, y), 3, color.filled())),
+                )
                 .map_err(|e| BtError::Render(e.to_string()))?;
         }
     }
@@ -166,11 +184,23 @@ mod tests {
     #[test]
     fn renders() {
         let curves = vec![
-            YieldCurve::new("Curve A", vec![0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0], vec![3.5, 3.7, 4.0, 4.3, 4.8, 5.2, 5.5]),
-            YieldCurve::new("Curve B", vec![0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0], vec![3.2, 3.4, 3.8, 4.1, 4.5, 4.9, 5.1]),
+            YieldCurve::new(
+                "Curve A",
+                vec![0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0],
+                vec![3.5, 3.7, 4.0, 4.3, 4.8, 5.2, 5.5],
+            ),
+            YieldCurve::new(
+                "Curve B",
+                vec![0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0],
+                vec![3.2, 3.4, 3.8, 4.1, 4.5, 4.9, 5.1],
+            ),
         ];
         let cfg = GcCurvesConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_gc_curves.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_gc_curves.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&curves, &cfg, &path).unwrap();
     }
 }

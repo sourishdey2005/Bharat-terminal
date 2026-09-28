@@ -26,9 +26,17 @@ impl Default for ComparisonDrawdownConfig {
 }
 
 impl ComparisonDrawdownConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, title: impl Into<String>) -> Self { self.title = title.into(); self }
-    pub fn theme(mut self, theme: Theme) -> Self { self.theme = theme; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
+        self
+    }
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -50,7 +58,12 @@ where
     let n = dd_a.len().min(dd_b.len());
     let t_min = 0.0;
     let t_max = n as f64;
-    let max_dd = dd_a.iter().chain(dd_b.iter()).copied().fold(0.0_f64, f64::max) * 1.1;
+    let max_dd = dd_a
+        .iter()
+        .chain(dd_b.iter())
+        .copied()
+        .fold(0.0_f64, f64::max)
+        * 1.1;
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
@@ -78,7 +91,12 @@ where
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label(&series_a.symbol)
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.profit().stroke_width(2)));
+        .legend(|(x, y)| {
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.profit().stroke_width(2),
+            )
+        });
 
     chart
         .draw_series(LineSeries::new(
@@ -87,7 +105,9 @@ where
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label(&series_b.symbol)
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.loss().stroke_width(2)));
+        .legend(|(x, y)| {
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.loss().stroke_width(2))
+        });
 
     chart
         .configure_series_labels()
@@ -102,11 +122,21 @@ where
     Ok(())
 }
 
-pub fn render_png(series_a: &OhlcvSeries, series_b: &OhlcvSeries, cfg: &ComparisonDrawdownConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    series_a: &OhlcvSeries,
+    series_b: &OhlcvSeries,
+    cfg: &ComparisonDrawdownConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, series_a, series_b, cfg)
 }
 
-pub fn render_svg(series_a: &OhlcvSeries, series_b: &OhlcvSeries, cfg: &ComparisonDrawdownConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    series_a: &OhlcvSeries,
+    series_b: &OhlcvSeries,
+    cfg: &ComparisonDrawdownConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, series_a, series_b, cfg)
 }
 
@@ -120,7 +150,11 @@ mod tests {
         let a = synthetic_ohlcv("AAA", 100, 1, 100.0);
         let b = synthetic_ohlcv("BBB", 100, 2, 100.0);
         let cfg = ComparisonDrawdownConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_comparison_drawdown.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_comparison_drawdown.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&a, &b, &cfg, &path).unwrap();
     }
 }

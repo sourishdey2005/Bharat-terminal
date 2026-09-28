@@ -64,8 +64,16 @@ where
 
     let t_min = series.candles.first().unwrap().t;
     let t_max = series.candles.last().unwrap().t;
-    let low = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
-    let high = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
+    let low = series
+        .candles
+        .iter()
+        .map(|c| c.low)
+        .fold(f64::MAX, f64::min);
+    let high = series
+        .candles
+        .iter()
+        .map(|c| c.high)
+        .fold(f64::MIN, f64::max);
     let pad = (high - low) * 0.05;
 
     let (adx_vals, plus_di, minus_di) = adx(series, cfg.period);
@@ -99,8 +107,14 @@ where
                 cfg.theme.loss()
             };
             CandleStick::new(
-                c.t, c.open, c.high, c.low, c.close,
-                color.filled(), color.filled(), (candle_width * 10.0) as u32,
+                c.t,
+                c.open,
+                c.high,
+                c.low,
+                c.close,
+                color.filled(),
+                color.filled(),
+                (candle_width * 10.0) as u32,
             )
         }))
         .map_err(|e| BtError::Render(e.to_string()))?;
@@ -134,35 +148,56 @@ where
     adx_chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !adx_vals[i].is_nan() { Some((c.t, adx_vals[i])) } else { None }
+                if !adx_vals[i].is_nan() {
+                    Some((c.t, adx_vals[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.info().stroke_width(2),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("ADX")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(2)));
+        .legend(|(x, y)| {
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(2))
+        });
 
     adx_chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !plus_di[i].is_nan() { Some((c.t, plus_di[i])) } else { None }
+                if !plus_di[i].is_nan() {
+                    Some((c.t, plus_di[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.profit().stroke_width(1),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("+DI")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.profit().stroke_width(1)));
+        .legend(|(x, y)| {
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.profit().stroke_width(1),
+            )
+        });
 
     adx_chart
         .draw_series(LineSeries::new(
             series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !minus_di[i].is_nan() { Some((c.t, minus_di[i])) } else { None }
+                if !minus_di[i].is_nan() {
+                    Some((c.t, minus_di[i]))
+                } else {
+                    None
+                }
             }),
             cfg.theme.loss().stroke_width(1),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("-DI")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.loss().stroke_width(1)));
+        .legend(|(x, y)| {
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.loss().stroke_width(1))
+        });
 
     adx_chart
         .configure_series_labels()
@@ -194,7 +229,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = CandlestickAdxConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_candlestick_adx.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_candlestick_adx.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

@@ -1,4 +1,4 @@
-﻿// crates/bt-viz/src/candlestick_ma.rs
+// crates/bt-viz/src/candlestick_ma.rs
 // Author: Sourish Dey
 
 //! Tier 1 #2 â€” Candlestick + Moving Averages (SMA20/50, EMA200).
@@ -90,14 +90,34 @@ where
 
     let t_min = series.candles.first().unwrap().t;
     let t_max = series.candles.last().unwrap().t;
-    let low = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
-    let high = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
+    let low = series
+        .candles
+        .iter()
+        .map(|c| c.low)
+        .fold(f64::MAX, f64::min);
+    let high = series
+        .candles
+        .iter()
+        .map(|c| c.high)
+        .fold(f64::MIN, f64::max);
     let pad = (high - low) * 0.05;
 
     // Compute indicators
-    let sma20 = if cfg.show_sma20 { Some(sma(series, 20)) } else { None };
-    let sma50 = if cfg.show_sma50 { Some(sma(series, 50)) } else { None };
-    let ema200 = if cfg.show_ema200 { Some(ema(series, 200)) } else { None };
+    let sma20 = if cfg.show_sma20 {
+        Some(sma(series, 20))
+    } else {
+        None
+    };
+    let sma50 = if cfg.show_sma50 {
+        Some(sma(series, 50))
+    } else {
+        None
+    };
+    let ema200 = if cfg.show_ema200 {
+        Some(ema(series, 200))
+    } else {
+        None
+    };
 
     let mut chart = ChartBuilder::on(&chart_area)
         .caption(
@@ -128,8 +148,14 @@ where
                 cfg.theme.loss()
             };
             CandleStick::new(
-                c.t, c.open, c.high, c.low, c.close,
-                color.filled(), color.filled(), (candle_width * 10.0) as u32,
+                c.t,
+                c.open,
+                c.high,
+                c.low,
+                c.close,
+                color.filled(),
+                color.filled(),
+                (candle_width * 10.0) as u32,
             )
         }))
         .map_err(|e| BtError::Render(e.to_string()))?;
@@ -139,13 +165,19 @@ where
         chart
             .draw_series(LineSeries::new(
                 series.candles.iter().enumerate().filter_map(|(i, c)| {
-                    if !sma20[i].is_nan() { Some((c.t, sma20[i])) } else { None }
+                    if !sma20[i].is_nan() {
+                        Some((c.t, sma20[i]))
+                    } else {
+                        None
+                    }
                 }),
                 cfg.theme.info().stroke_width(2),
             ))
             .map_err(|e| BtError::Render(e.to_string()))?
             .label("SMA20")
-            .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(2)));
+            .legend(|(x, y)| {
+                PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.info().stroke_width(2))
+            });
     }
 
     // Draw SMA50
@@ -153,13 +185,22 @@ where
         chart
             .draw_series(LineSeries::new(
                 series.candles.iter().enumerate().filter_map(|(i, c)| {
-                    if !sma50[i].is_nan() { Some((c.t, sma50[i])) } else { None }
+                    if !sma50[i].is_nan() {
+                        Some((c.t, sma50[i]))
+                    } else {
+                        None
+                    }
                 }),
                 cfg.theme.accent().stroke_width(2),
             ))
             .map_err(|e| BtError::Render(e.to_string()))?
             .label("SMA50")
-            .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(2)));
+            .legend(|(x, y)| {
+                PathElement::new(
+                    vec![(x, y), (x + 20, y)],
+                    cfg.theme.accent().stroke_width(2),
+                )
+            });
     }
 
     // Draw EMA200
@@ -167,13 +208,19 @@ where
         chart
             .draw_series(LineSeries::new(
                 series.candles.iter().enumerate().filter_map(|(i, c)| {
-                    if !ema200[i].is_nan() { Some((c.t, ema200[i])) } else { None }
+                    if !ema200[i].is_nan() {
+                        Some((c.t, ema200[i]))
+                    } else {
+                        None
+                    }
                 }),
                 cfg.theme.loss().stroke_width(2),
             ))
             .map_err(|e| BtError::Render(e.to_string()))?
             .label("EMA200")
-            .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.loss().stroke_width(2)));
+            .legend(|(x, y)| {
+                PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.loss().stroke_width(2))
+            });
     }
 
     if cfg.show_sma20 || cfg.show_sma50 || cfg.show_ema200 {
@@ -187,7 +234,11 @@ where
     }
 
     if let Some(vol_area) = volume_area {
-        let max_vol = series.candles.iter().map(|c| c.volume).fold(0.0_f64, f64::max);
+        let max_vol = series
+            .candles
+            .iter()
+            .map(|c| c.volume)
+            .fold(0.0_f64, f64::max);
         let mut vol_chart = ChartBuilder::on(&vol_area)
             .margin(10)
             .x_label_area_size(20)

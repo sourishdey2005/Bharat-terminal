@@ -26,9 +26,17 @@ impl Default for ComparisonCorrelationConfig {
 }
 
 impl ComparisonCorrelationConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, title: impl Into<String>) -> Self { self.title = title.into(); self }
-    pub fn theme(mut self, theme: Theme) -> Self { self.theme = theme; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
+        self
+    }
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -54,7 +62,10 @@ where
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
-            format!("{} — {} vs {} (r={:.3})", cfg.title, series_a.symbol, series_b.symbol, corr),
+            format!(
+                "{} — {} vs {} (r={:.3})",
+                cfg.title, series_a.symbol, series_b.symbol, corr
+            ),
             (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
         )
         .margin(10)
@@ -84,7 +95,9 @@ where
 
     chart
         .draw_series(
-            points.iter().map(|(x, y)| Circle::new((*x, *y), 2, cfg.theme.info().mix(0.5).filled())),
+            points
+                .iter()
+                .map(|(x, y)| Circle::new((*x, *y), 2, cfg.theme.info().mix(0.5).filled())),
         )
         .map_err(|e| BtError::Render(e.to_string()))?;
 
@@ -100,11 +113,21 @@ where
     Ok(())
 }
 
-pub fn render_png(series_a: &OhlcvSeries, series_b: &OhlcvSeries, cfg: &ComparisonCorrelationConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    series_a: &OhlcvSeries,
+    series_b: &OhlcvSeries,
+    cfg: &ComparisonCorrelationConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, series_a, series_b, cfg)
 }
 
-pub fn render_svg(series_a: &OhlcvSeries, series_b: &OhlcvSeries, cfg: &ComparisonCorrelationConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    series_a: &OhlcvSeries,
+    series_b: &OhlcvSeries,
+    cfg: &ComparisonCorrelationConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, series_a, series_b, cfg)
 }
 
@@ -118,7 +141,11 @@ mod tests {
         let a = synthetic_ohlcv("AAA", 100, 1, 100.0);
         let b = synthetic_ohlcv("BBB", 100, 2, 100.0);
         let cfg = ComparisonCorrelationConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_comparison_correlation.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_comparison_correlation.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&a, &b, &cfg, &path).unwrap();
     }
 }

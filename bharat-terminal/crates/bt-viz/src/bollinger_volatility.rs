@@ -269,29 +269,33 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Width")
         .legend(|(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(2))
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.accent().stroke_width(2),
+            )
         });
 
     vol_chart
-        .draw_series(
-            series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !band_width[i].is_nan() {
-                    let color = if band_width[i] > p75 {
-                        cfg.theme.profit().mix(0.3)
-                    } else if band_width[i] < p25 {
-                        cfg.theme.loss().mix(0.3)
-                    } else {
-                        cfg.theme.border().mix(0.2)
-                    };
-                    Some(Rectangle::new(
-                        [(c.t - candle_width, bw_min), (c.t + candle_width, band_width[i])],
-                        color.filled(),
-                    ))
+        .draw_series(series.candles.iter().enumerate().filter_map(|(i, c)| {
+            if !band_width[i].is_nan() {
+                let color = if band_width[i] > p75 {
+                    cfg.theme.profit().mix(0.3)
+                } else if band_width[i] < p25 {
+                    cfg.theme.loss().mix(0.3)
                 } else {
-                    None
-                }
-            }),
-        )
+                    cfg.theme.border().mix(0.2)
+                };
+                Some(Rectangle::new(
+                    [
+                        (c.t - candle_width, bw_min),
+                        (c.t + candle_width, band_width[i]),
+                    ],
+                    color.filled(),
+                ))
+            } else {
+                None
+            }
+        }))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     price_chart

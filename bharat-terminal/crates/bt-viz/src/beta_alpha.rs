@@ -28,10 +28,21 @@ impl Default for BetaAlphaConfig {
 }
 
 impl BetaAlphaConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn benchmark(mut self, b: OhlcvSeries) -> Self { self.benchmark = b; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn benchmark(mut self, b: OhlcvSeries) -> Self {
+        self.benchmark = b;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -39,7 +50,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &BetaAlphaConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -55,7 +67,10 @@ where DB::ErrorType: 'static,
     let a = alpha(&asset_returns, &bench_returns, 0.05, 252);
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(15)
         .x_label_area_size(35)
         .y_label_area_size(60)
@@ -117,7 +132,11 @@ mod tests {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let bench = synthetic_ohlcv("BENCH", 100, 2, 100.0);
         let cfg = BetaAlphaConfig::new().theme(Theme::Dark).benchmark(bench);
-        let path = std::env::temp_dir().join("bt_test_beta_alpha.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_beta_alpha.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

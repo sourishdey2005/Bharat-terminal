@@ -102,7 +102,12 @@ where
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
-            format!("{} — {} ({} signals)", cfg.title, series.symbol, signals.len()),
+            format!(
+                "{} — {} ({} signals)",
+                cfg.title,
+                series.symbol,
+                signals.len()
+            ),
             (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
         )
         .margin(10)
@@ -247,11 +252,19 @@ where
     Ok(())
 }
 
-pub fn render_png(series: &OhlcvSeries, cfg: &BollingerMeanReversionConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    series: &OhlcvSeries,
+    cfg: &BollingerMeanReversionConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, series, cfg)
 }
 
-pub fn render_svg(series: &OhlcvSeries, cfg: &BollingerMeanReversionConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    series: &OhlcvSeries,
+    cfg: &BollingerMeanReversionConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, series, cfg)
 }
 

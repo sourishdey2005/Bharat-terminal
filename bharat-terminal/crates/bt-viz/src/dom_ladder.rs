@@ -19,7 +19,11 @@ pub struct DomLevel {
 
 impl DomLevel {
     pub fn new(price: f64, bid_size: f64, ask_size: f64) -> Self {
-        Self { price, bid_size, ask_size }
+        Self {
+            price,
+            bid_size,
+            ask_size,
+        }
     }
 }
 
@@ -43,11 +47,25 @@ impl Default for DomLadderConfig {
 }
 
 impl DomLadderConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn levels(mut self, l: usize) -> Self { self.levels = l.max(5).min(50); self }
-    pub fn max_depth(mut self, d: f64) -> Self { self.max_depth = d.max(1.0); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn levels(mut self, l: usize) -> Self {
+        self.levels = l.max(5).min(50);
+        self
+    }
+    pub fn max_depth(mut self, d: f64) -> Self {
+        self.max_depth = d.max(1.0);
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -55,7 +73,8 @@ fn render<DB: DrawingBackend>(
     levels: &[DomLevel],
     cfg: &DomLadderConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if levels.is_empty() {
         return Err(BtError::EmptySeries("DOM levels".into()));
@@ -83,7 +102,10 @@ where DB::ErrorType: 'static,
         let bid_w = (mid_x as f64 * bid_frac) as i32;
         body_area
             .draw(&Rectangle::new(
-                [(mid_x as i32 - bid_w, y as i32), (mid_x as i32, (y + row_h) as i32)],
+                [
+                    (mid_x as i32 - bid_w, y as i32),
+                    (mid_x as i32, (y + row_h) as i32),
+                ],
                 cfg.theme.profit().mix(0.4).filled(),
             ))
             .map_err(|e| BtError::Render(e.to_string()))?;
@@ -91,7 +113,10 @@ where DB::ErrorType: 'static,
         let ask_w = (mid_x as f64 * ask_frac) as i32;
         body_area
             .draw(&Rectangle::new(
-                [(mid_x as i32, y as i32), (mid_x as i32 + ask_w, (y + row_h) as i32)],
+                [
+                    (mid_x as i32, y as i32),
+                    (mid_x as i32 + ask_w, (y + row_h) as i32),
+                ],
                 cfg.theme.loss().mix(0.4).filled(),
             ))
             .map_err(|e| BtError::Render(e.to_string()))?;
@@ -140,10 +165,20 @@ mod tests {
     #[test]
     fn renders() {
         let levels: Vec<DomLevel> = (0..15)
-            .map(|i| DomLevel::new(100.0 + i as f64 * 0.5, (15 - i) as f64 * 500.0, i as f64 * 500.0))
+            .map(|i| {
+                DomLevel::new(
+                    100.0 + i as f64 * 0.5,
+                    (15 - i) as f64 * 500.0,
+                    i as f64 * 500.0,
+                )
+            })
             .collect();
         let cfg = DomLadderConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_dom_ladder.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_dom_ladder.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&levels, &cfg, &path).unwrap();
     }
 }

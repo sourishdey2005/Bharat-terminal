@@ -34,12 +34,29 @@ impl Default for MonteCarlo3DConfig {
 }
 
 impl MonteCarlo3DConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn n_paths(mut self, n: usize) -> Self { self.n_paths = n.max(10); self }
-    pub fn horizon(mut self, h: usize) -> Self { self.horizon = h.max(5); self }
-    pub fn seed(mut self, s: u64) -> Self { self.seed = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn n_paths(mut self, n: usize) -> Self {
+        self.n_paths = n.max(10);
+        self
+    }
+    pub fn horizon(mut self, h: usize) -> Self {
+        self.horizon = h.max(5);
+        self
+    }
+    pub fn seed(mut self, s: u64) -> Self {
+        self.seed = s;
+        self
+    }
 }
 
 fn project(x: f64, y: f64, z: f64, cx: f64, cy: f64) -> (i32, i32) {
@@ -53,7 +70,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &MonteCarlo3DConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -95,8 +113,14 @@ where DB::ErrorType: 'static,
         all_paths.push(path);
     }
 
-    let y_min = all_paths.iter().flat_map(|p| p.iter().copied()).fold(f64::MAX, f64::min);
-    let y_max = all_paths.iter().flat_map(|p| p.iter().copied()).fold(f64::MIN, f64::max);
+    let y_min = all_paths
+        .iter()
+        .flat_map(|p| p.iter().copied())
+        .fold(f64::MAX, f64::min);
+    let y_max = all_paths
+        .iter()
+        .flat_map(|p| p.iter().copied())
+        .fold(f64::MIN, f64::max);
     let yr = (y_max - y_min).max(1e-9);
 
     for (p_idx, path) in all_paths.iter().enumerate() {
@@ -125,7 +149,9 @@ where DB::ErrorType: 'static,
     root.draw(&Text::new(
         "X: time  Y: price  Z: path index",
         (w as i32 / 2 - 100, h as i32 - 40),
-        (LABEL_FONT, 11).into_font().color(&cfg.theme.text().mix(0.6)),
+        (LABEL_FONT, 11)
+            .into_font()
+            .color(&cfg.theme.text().mix(0.6)),
     ))
     .map_err(|e| BtError::Render(e.to_string()))?;
 
@@ -151,7 +177,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = MonteCarlo3DConfig::new().theme(Theme::Dark).n_paths(500);
-        let path = std::env::temp_dir().join("bt_test_3d_monte_carlo.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_3d_monte_carlo.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

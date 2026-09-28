@@ -32,12 +32,29 @@ impl Default for SharpeSurfaceConfig {
 }
 
 impl SharpeSurfaceConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn windows(mut self, w: Vec<usize>) -> Self { self.windows = w; self }
-    pub fn risk_free(mut self, r: f64) -> Self { self.risk_free = r; self }
-    pub fn periods_per_year(mut self, p: usize) -> Self { self.periods_per_year = p; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn windows(mut self, w: Vec<usize>) -> Self {
+        self.windows = w;
+        self
+    }
+    pub fn risk_free(mut self, r: f64) -> Self {
+        self.risk_free = r;
+        self
+    }
+    pub fn periods_per_year(mut self, p: usize) -> Self {
+        self.periods_per_year = p;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -45,7 +62,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &SharpeSurfaceConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -83,7 +101,10 @@ where DB::ErrorType: 'static,
 
     let n_windows = cfg.windows.len();
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(15)
         .x_label_area_size(35)
         .y_label_area_size(60)
@@ -97,7 +118,10 @@ where DB::ErrorType: 'static,
         .x_labels(5)
         .y_labels(n_windows)
         .y_label_formatter(&|idx| {
-            cfg.windows.get(*idx).map(|w| format!("{}d", w)).unwrap_or_default()
+            cfg.windows
+                .get(*idx)
+                .map(|w| format!("{}d", w))
+                .unwrap_or_default()
         })
         .draw()
         .map_err(|e| BtError::Render(e.to_string()))?;
@@ -150,7 +174,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 200, 1, 100.0);
         let cfg = SharpeSurfaceConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_sharpe_surface.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_sharpe_surface.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

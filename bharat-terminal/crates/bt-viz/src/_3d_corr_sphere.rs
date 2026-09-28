@@ -5,7 +5,7 @@
 //! Made by Sourish Dey.
 
 use bt_analytics::correlation_matrix;
-use bt_core::{BtError, OhlcvSeries, Result, synthetic_correlated_returns};
+use bt_core::{synthetic_correlated_returns, BtError, OhlcvSeries, Result};
 use plotters::prelude::*;
 
 use crate::common::{draw_footer, fill_background, png_root, svg_root, LABEL_FONT, TITLE_FONT};
@@ -20,15 +20,30 @@ pub struct CorrSphere3DConfig {
 
 impl Default for CorrSphere3DConfig {
     fn default() -> Self {
-        Self { title: "3D Correlation Sphere".to_string(), theme: Theme::Dark, rotation: 0.6 }
+        Self {
+            title: "3D Correlation Sphere".to_string(),
+            theme: Theme::Dark,
+            rotation: 0.6,
+        }
     }
 }
 
 impl CorrSphere3DConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn rotation(mut self, v: f64) -> Self { self.rotation = v; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn rotation(mut self, v: f64) -> Self {
+        self.rotation = v;
+        self
+    }
 }
 
 fn project(x: f64, y: f64, z: f64, cx: f64, cy: f64) -> (i32, i32, f64) {
@@ -51,7 +66,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &CorrSphere3DConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -107,13 +123,21 @@ where DB::ErrorType: 'static,
             }
         }
     }
-    edges.sort_by(|a, b| a.1.abs().partial_cmp(&b.1.abs()).unwrap_or(std::cmp::Ordering::Equal));
+    edges.sort_by(|a, b| {
+        a.1.abs()
+            .partial_cmp(&b.1.abs())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     for ((i, j), c) in &edges {
         let (p1, _) = nodes[*i];
         let (p2, _) = nodes[*j];
         let depth = (p1.2 + p2.2) / 2.0;
-        let color = if *c > 0.0 { cfg.theme.profit() } else { cfg.theme.loss() };
+        let color = if *c > 0.0 {
+            cfg.theme.profit()
+        } else {
+            cfg.theme.loss()
+        };
         let alpha = (c.abs() * depth).clamp(0.15, 0.9);
         root.draw(&PathElement::new(
             vec![(p1.0, p1.1), (p2.0, p2.1)],
@@ -122,17 +146,27 @@ where DB::ErrorType: 'static,
         .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
-    nodes.sort_by(|a, b| a.0 .2.partial_cmp(&b.0 .2).unwrap_or(std::cmp::Ordering::Equal));
+    nodes.sort_by(|a, b| {
+        a.0 .2
+            .partial_cmp(&b.0 .2)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     for ((sx, sy, s), idx) in &nodes {
         let size = (4.0 * s) as i32 + 2;
         root.draw(&Circle::new((*sx, *sy), size, cfg.theme.accent().filled()))
             .map_err(|e| BtError::Render(e.to_string()))?;
-        root.draw(&Circle::new((*sx, *sy), size + 2, cfg.theme.accent().stroke_width(1)))
-            .map_err(|e| BtError::Render(e.to_string()))?;
+        root.draw(&Circle::new(
+            (*sx, *sy),
+            size + 2,
+            cfg.theme.accent().stroke_width(1),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
         root.draw(&Text::new(
             symbols[*idx],
             (sx + size + 4, sy - 5),
-            (LABEL_FONT, 10).into_font().color(&cfg.theme.text().mix(0.8)),
+            (LABEL_FONT, 10)
+                .into_font()
+                .color(&cfg.theme.text().mix(0.8)),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?;
     }
@@ -140,7 +174,9 @@ where DB::ErrorType: 'static,
     root.draw(&Text::new(
         "Node proximity = correlation strength",
         (w as i32 / 2 - 110, h as i32 - 40),
-        (LABEL_FONT, 11).into_font().color(&cfg.theme.text().mix(0.6)),
+        (LABEL_FONT, 11)
+            .into_font()
+            .color(&cfg.theme.text().mix(0.6)),
     ))
     .map_err(|e| BtError::Render(e.to_string()))?;
 
@@ -166,7 +202,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = CorrSphere3DConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_3d_corr_sphere.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_3d_corr_sphere.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

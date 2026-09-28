@@ -18,7 +18,10 @@ pub struct AttributionEntry {
 
 impl AttributionEntry {
     pub fn new(name: impl Into<String>, value: f64) -> Self {
-        Self { name: name.into(), value }
+        Self {
+            name: name.into(),
+            value,
+        }
     }
 }
 
@@ -40,10 +43,21 @@ impl Default for PortAttributionConfig {
 }
 
 impl PortAttributionConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn show_total(mut self, s: bool) -> Self { self.show_total = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn show_total(mut self, s: bool) -> Self {
+        self.show_total = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -51,7 +65,8 @@ fn render<DB: DrawingBackend>(
     entries: &[AttributionEntry],
     cfg: &PortAttributionConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if entries.is_empty() {
         return Err(BtError::EmptySeries("attribution entries".into()));
@@ -68,8 +83,14 @@ where DB::ErrorType: 'static,
         waterfall.push((start, cumulative));
     }
 
-    let v_min = waterfall.iter().map(|(s, e)| (*s).min(*e)).fold(f64::INFINITY, f64::min);
-    let v_max = waterfall.iter().map(|(s, e)| (*s).max(*e)).fold(f64::NEG_INFINITY, f64::max);
+    let v_min = waterfall
+        .iter()
+        .map(|(s, e)| (*s).min(*e))
+        .fold(f64::INFINITY, f64::min);
+    let v_max = waterfall
+        .iter()
+        .map(|(s, e)| (*s).max(*e))
+        .fold(f64::NEG_INFINITY, f64::max);
     let pad = (v_max - v_min).max(0.1) * 0.1;
 
     let n_bars = entries.len() + if cfg.show_total { 1 } else { 0 };
@@ -96,7 +117,11 @@ where DB::ErrorType: 'static,
 
     for (i, (start, end)) in waterfall.iter().enumerate() {
         let value = end - start;
-        let color = if value >= 0.0 { cfg.theme.profit() } else { cfg.theme.loss() };
+        let color = if value >= 0.0 {
+            cfg.theme.profit()
+        } else {
+            cfg.theme.loss()
+        };
         let y_start = (*start).min(*end);
         let y_end = (*start).max(*end);
 
@@ -129,11 +154,19 @@ where DB::ErrorType: 'static,
     Ok(())
 }
 
-pub fn render_png(entries: &[AttributionEntry], cfg: &PortAttributionConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    entries: &[AttributionEntry],
+    cfg: &PortAttributionConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, entries, cfg)
 }
 
-pub fn render_svg(entries: &[AttributionEntry], cfg: &PortAttributionConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    entries: &[AttributionEntry],
+    cfg: &PortAttributionConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, entries, cfg)
 }
 
@@ -150,7 +183,11 @@ mod tests {
             AttributionEntry::new("Currency", -0.1),
         ];
         let cfg = PortAttributionConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_port_attribution.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_port_attribution.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&entries, &cfg, &path).unwrap();
     }
 }

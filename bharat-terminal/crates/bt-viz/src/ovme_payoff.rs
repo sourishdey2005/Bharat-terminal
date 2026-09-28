@@ -34,20 +34,41 @@ impl Default for OvmePayoffConfig {
 }
 
 impl OvmePayoffConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn strike(mut self, s: f64) -> Self { self.strike = s.max(0.0); self }
-    pub fn premium(mut self, p: f64) -> Self { self.premium = p.max(0.0); self }
-    pub fn is_call(mut self, c: bool) -> Self { self.is_call = c; self }
-    pub fn quantity(mut self, q: i32) -> Self { self.quantity = q.max(1); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn strike(mut self, s: f64) -> Self {
+        self.strike = s.max(0.0);
+        self
+    }
+    pub fn premium(mut self, p: f64) -> Self {
+        self.premium = p.max(0.0);
+        self
+    }
+    pub fn is_call(mut self, c: bool) -> Self {
+        self.is_call = c;
+        self
+    }
+    pub fn quantity(mut self, q: i32) -> Self {
+        self.quantity = q.max(1);
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
     root: plotters::drawing::DrawingArea<DB, plotters::coord::Shift>,
     cfg: &OvmePayoffConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     fill_background(&root, cfg.theme)?;
 
@@ -69,12 +90,21 @@ where DB::ErrorType: 'static,
         .collect();
 
     let pnl_min = payoff.iter().map(|(_, p)| *p).fold(f64::INFINITY, f64::min);
-    let pnl_max = payoff.iter().map(|(_, p)| *p).fold(f64::NEG_INFINITY, f64::max);
+    let pnl_max = payoff
+        .iter()
+        .map(|(_, p)| *p)
+        .fold(f64::NEG_INFINITY, f64::max);
     let pad = (pnl_max - pnl_min).max(1.0) * 0.1;
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
-            format!("{} — {} {} @ {:.0}", cfg.title, cfg.quantity, if cfg.is_call { "Call" } else { "Put" }, cfg.strike),
+            format!(
+                "{} — {} {} @ {:.0}",
+                cfg.title,
+                cfg.quantity,
+                if cfg.is_call { "Call" } else { "Put" },
+                cfg.strike
+            ),
             (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
         )
         .margin(10)
@@ -101,11 +131,17 @@ where DB::ErrorType: 'static,
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart
-        .draw_series(LineSeries::new(payoff.clone(), cfg.theme.accent().stroke_width(2)))
+        .draw_series(LineSeries::new(
+            payoff.clone(),
+            cfg.theme.accent().stroke_width(2),
+        ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Payoff")
         .legend(|(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(2))
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.accent().stroke_width(2),
+            )
         });
 
     let strike_pnl = -cfg.premium;
@@ -145,7 +181,11 @@ mod tests {
     #[test]
     fn renders() {
         let cfg = OvmePayoffConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_ovme_payoff.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_ovme_payoff.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&cfg, &path).unwrap();
     }
 }

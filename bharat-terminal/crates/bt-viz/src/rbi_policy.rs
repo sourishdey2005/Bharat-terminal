@@ -17,14 +17,25 @@ pub struct RbiPolicyConfig {
 
 impl Default for RbiPolicyConfig {
     fn default() -> Self {
-        Self { title: "RBI Monetary Policy".to_string(), theme: Theme::Dark }
+        Self {
+            title: "RBI Monetary Policy".to_string(),
+            theme: Theme::Dark,
+        }
     }
 }
 
 impl RbiPolicyConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
 }
 
 fn sample_policy() -> Vec<(String, f64, f64, f64, f64)> {
@@ -45,7 +56,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &RbiPolicyConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -68,13 +80,18 @@ where DB::ErrorType: 'static,
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     let mut chart = chart;
-    chart.configure_mesh()
+    chart
+        .configure_mesh()
         .label_style((LABEL_FONT, 11).into_font().color(&cfg.theme.text()))
         .axis_style(&cfg.theme.border())
         .x_labels(data.len())
         .x_label_formatter(&|x| {
             let idx = *x as usize;
-            if idx < data.len() { data[idx].0.clone() } else { String::new() }
+            if idx < data.len() {
+                data[idx].0.clone()
+            } else {
+                String::new()
+            }
         })
         .y_desc("Rate (%)")
         .draw()
@@ -87,18 +104,19 @@ where DB::ErrorType: 'static,
         let bar_w = 0.6 / vals.len() as f64;
         for (j, &v) in vals.iter().enumerate() {
             let x0 = i as f64 + j as f64 * bar_w;
-            chart.draw_series(std::iter::once(Rectangle::new(
-                [(x0, 0.0), (x0 + bar_w * 0.9, v)],
-                color.filled(),
-            )))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+            chart
+                .draw_series(std::iter::once(Rectangle::new(
+                    [(x0, 0.0), (x0 + bar_w * 0.9, v)],
+                    color.filled(),
+                )))
+                .map_err(|e| BtError::Render(e.to_string()))?;
         }
         root.draw(&Text::new(
             format!("{:.2}", r1),
             (60 + i as i32 * ((w as i32 - 120) / data.len() as i32), 50),
             (LABEL_FONT, 10).into_font().color(&cfg.theme.text()),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
         let _ = name;
     }
 
@@ -124,7 +142,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("RBI", 100, 1, 100.0);
         let cfg = RbiPolicyConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_rbi_policy.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_rbi_policy.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

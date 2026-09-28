@@ -29,18 +29,33 @@ impl Default for SkewEvolutionConfig {
 }
 
 impl SkewEvolutionConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn expiries(mut self, e: Vec<f64>) -> Self { self.expiries = e; self }
-    pub fn skew_values(mut self, s: Vec<f64>) -> Self { self.skew_values = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn expiries(mut self, e: Vec<f64>) -> Self {
+        self.expiries = e;
+        self
+    }
+    pub fn skew_values(mut self, s: Vec<f64>) -> Self {
+        self.skew_values = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
     root: plotters::drawing::DrawingArea<DB, plotters::coord::Shift>,
     cfg: &SkewEvolutionConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if cfg.expiries.is_empty() || cfg.skew_values.is_empty() {
         return Err(BtError::EmptySeries("skew data".into()));
@@ -54,7 +69,10 @@ where DB::ErrorType: 'static,
     let pad = (y_max - y_min).max(0.1) * 0.15;
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(15)
         .x_label_area_size(35)
         .y_label_area_size(60)
@@ -78,11 +96,18 @@ where DB::ErrorType: 'static,
         .collect();
 
     chart
-        .draw_series(LineSeries::new(points.clone(), cfg.theme.accent().stroke_width(3)))
+        .draw_series(LineSeries::new(
+            points.clone(),
+            cfg.theme.accent().stroke_width(3),
+        ))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart
-        .draw_series(points.iter().map(|&(x, y)| Circle::new((x, y), 5, cfg.theme.accent().filled())))
+        .draw_series(
+            points
+                .iter()
+                .map(|&(x, y)| Circle::new((x, y), 5, cfg.theme.accent().filled())),
+        )
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart
@@ -115,7 +140,11 @@ mod tests {
             .theme(Theme::Dark)
             .expiries(vec![0.1, 0.25, 0.5, 1.0, 2.0])
             .skew_values(vec![-0.3, -0.25, -0.2, -0.15, -0.1]);
-        let path = std::env::temp_dir().join("bt_test_skew_evolution.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_skew_evolution.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&cfg, &path).unwrap();
     }
 }

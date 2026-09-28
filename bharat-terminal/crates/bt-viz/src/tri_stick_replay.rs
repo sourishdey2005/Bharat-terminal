@@ -73,16 +73,8 @@ where
 
     let t_min = sub.candles.first().unwrap().t;
     let t_max = sub.candles.last().unwrap().t;
-    let low = sub
-        .candles
-        .iter()
-        .map(|c| c.low)
-        .fold(f64::MAX, f64::min);
-    let high = sub
-        .candles
-        .iter()
-        .map(|c| c.high)
-        .fold(f64::MIN, f64::max);
+    let low = sub.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
+    let high = sub.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
     let pad = (high - low).max(1.0) * 0.08;
 
     let mut chart = ChartBuilder::on(&root)

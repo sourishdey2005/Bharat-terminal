@@ -26,9 +26,17 @@ impl Default for ComparisonBetaConfig {
 }
 
 impl ComparisonBetaConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, title: impl Into<String>) -> Self { self.title = title.into(); self }
-    pub fn theme(mut self, theme: Theme) -> Self { self.theme = theme; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
+        self
+    }
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -54,7 +62,10 @@ where
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
-            format!("{} — {} vs {} (β={:.3})", cfg.title, series_a.symbol, series_b.symbol, beta_val),
+            format!(
+                "{} — {} vs {} (β={:.3})",
+                cfg.title, series_a.symbol, series_b.symbol, beta_val
+            ),
             (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
         )
         .margin(10)
@@ -91,7 +102,10 @@ where
 
     chart
         .draw_series(LineSeries::new(
-            vec![(t_min, beta_val * returns_b.iter().sum::<f64>() / n as f64), (t_max, beta_val * returns_b.iter().sum::<f64>() / n as f64)],
+            vec![
+                (t_min, beta_val * returns_b.iter().sum::<f64>() / n as f64),
+                (t_max, beta_val * returns_b.iter().sum::<f64>() / n as f64),
+            ],
             cfg.theme.accent().stroke_width(2),
         ))
         .map_err(|e| BtError::Render(e.to_string()))?;
@@ -101,11 +115,21 @@ where
     Ok(())
 }
 
-pub fn render_png(series_a: &OhlcvSeries, series_b: &OhlcvSeries, cfg: &ComparisonBetaConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    series_a: &OhlcvSeries,
+    series_b: &OhlcvSeries,
+    cfg: &ComparisonBetaConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, series_a, series_b, cfg)
 }
 
-pub fn render_svg(series_a: &OhlcvSeries, series_b: &OhlcvSeries, cfg: &ComparisonBetaConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    series_a: &OhlcvSeries,
+    series_b: &OhlcvSeries,
+    cfg: &ComparisonBetaConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, series_a, series_b, cfg)
 }
 
@@ -119,7 +143,11 @@ mod tests {
         let a = synthetic_ohlcv("AAA", 100, 1, 100.0);
         let b = synthetic_ohlcv("BBB", 100, 2, 100.0);
         let cfg = ComparisonBetaConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_comparison_beta.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_comparison_beta.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&a, &b, &cfg, &path).unwrap();
     }
 }

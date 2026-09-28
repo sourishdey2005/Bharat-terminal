@@ -19,7 +19,11 @@ pub struct VolSmileSlice {
 
 impl VolSmileSlice {
     pub fn new(name: impl Into<String>, strikes: Vec<f64>, vols: Vec<f64>) -> Self {
-        Self { name: name.into(), strikes, vols }
+        Self {
+            name: name.into(),
+            strikes,
+            vols,
+        }
     }
 }
 
@@ -41,10 +45,21 @@ impl Default for VolsSmileConfig {
 }
 
 impl VolsSmileConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn show_atm(mut self, s: bool) -> Self { self.show_atm = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn show_atm(mut self, s: bool) -> Self {
+        self.show_atm = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -52,7 +67,8 @@ fn render<DB: DrawingBackend>(
     slices: &[VolSmileSlice],
     cfg: &VolsSmileConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if slices.is_empty() {
         return Err(BtError::EmptySeries("vol smile slices".into()));
@@ -130,9 +146,11 @@ where DB::ErrorType: 'static,
             });
 
         chart
-            .draw_series(points.iter().map(|&(k, v)| {
-                Circle::new((k, v), 3, color.filled())
-            }))
+            .draw_series(
+                points
+                    .iter()
+                    .map(|&(k, v)| Circle::new((k, v), 3, color.filled())),
+            )
             .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
@@ -146,7 +164,10 @@ where DB::ErrorType: 'static,
             .map_err(|e| BtError::Render(e.to_string()))?
             .label("ATM")
             .legend(|(x, y)| {
-                PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.border().mix(0.5).stroke_width(1))
+                PathElement::new(
+                    vec![(x, y), (x + 20, y)],
+                    cfg.theme.border().mix(0.5).stroke_width(1),
+                )
             });
     }
 
@@ -178,11 +199,23 @@ mod tests {
     #[test]
     fn renders() {
         let slices = vec![
-            VolSmileSlice::new("1M", vec![90.0, 95.0, 100.0, 105.0, 110.0], vec![25.0, 22.0, 20.0, 21.0, 24.0]),
-            VolSmileSlice::new("3M", vec![90.0, 95.0, 100.0, 105.0, 110.0], vec![28.0, 25.0, 23.0, 24.0, 27.0]),
+            VolSmileSlice::new(
+                "1M",
+                vec![90.0, 95.0, 100.0, 105.0, 110.0],
+                vec![25.0, 22.0, 20.0, 21.0, 24.0],
+            ),
+            VolSmileSlice::new(
+                "3M",
+                vec![90.0, 95.0, 100.0, 105.0, 110.0],
+                vec![28.0, 25.0, 23.0, 24.0, 27.0],
+            ),
         ];
         let cfg = VolsSmileConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_vols_smile.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_vols_smile.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&slices, &cfg, &path).unwrap();
     }
 }

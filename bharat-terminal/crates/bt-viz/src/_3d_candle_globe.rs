@@ -19,15 +19,30 @@ pub struct CandleGlobe3DConfig {
 
 impl Default for CandleGlobe3DConfig {
     fn default() -> Self {
-        Self { title: "3D Candle Globe".to_string(), theme: Theme::Dark, hour: 14.0 }
+        Self {
+            title: "3D Candle Globe".to_string(),
+            theme: Theme::Dark,
+            hour: 14.0,
+        }
     }
 }
 
 impl CandleGlobe3DConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn hour(mut self, h: f64) -> Self { self.hour = h.rem_euclid(24.0); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn hour(mut self, h: f64) -> Self {
+        self.hour = h.rem_euclid(24.0);
+        self
+    }
 }
 
 fn project(x: f64, y: f64, z: f64, cx: f64, cy: f64) -> (i32, i32, f64) {
@@ -50,7 +65,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &CandleGlobe3DConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -60,7 +76,10 @@ where DB::ErrorType: 'static,
     let cy = h as f64 / 2.0 + 30.0;
 
     root.draw(&Text::new(
-        format!("{} — {} ({:02}:00)", cfg.title, series.symbol, cfg.hour as i32),
+        format!(
+            "{} — {} ({:02}:00)",
+            cfg.title, series.symbol, cfg.hour as i32
+        ),
         (w as i32 / 2 - 150, 14),
         (TITLE_FONT, 20).into_font().color(&cfg.theme.text()),
     ))
@@ -68,8 +87,16 @@ where DB::ErrorType: 'static,
 
     let n = series.candles.len().min(24);
     let step = series.candles.len() / n.max(1);
-    let min_p = series.candles.iter().map(|c| c.low).fold(f64::MAX, f64::min);
-    let max_p = series.candles.iter().map(|c| c.high).fold(f64::MIN, f64::max);
+    let min_p = series
+        .candles
+        .iter()
+        .map(|c| c.low)
+        .fold(f64::MAX, f64::min);
+    let max_p = series
+        .candles
+        .iter()
+        .map(|c| c.high)
+        .fold(f64::MIN, f64::max);
     let pr = (max_p - min_p).max(1e-9);
 
     let radius = 130.0;
@@ -93,8 +120,11 @@ where DB::ErrorType: 'static,
                 (sx, sy)
             })
             .collect();
-        root.draw(&PathElement::new(pts, cfg.theme.border().mix(0.4).stroke_width(1)))
-            .map_err(|e| BtError::Render(e.to_string()))?;
+        root.draw(&PathElement::new(
+            pts,
+            cfg.theme.border().mix(0.4).stroke_width(1),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
     }
     for lon in 0..12 {
         let theta = lon as f64 / 12.0 * std::f64::consts::TAU;
@@ -111,8 +141,11 @@ where DB::ErrorType: 'static,
                 (sx, sy)
             })
             .collect();
-        root.draw(&PathElement::new(pts, cfg.theme.border().mix(0.4).stroke_width(1)))
-            .map_err(|e| BtError::Render(e.to_string()))?;
+        root.draw(&PathElement::new(
+            pts,
+            cfg.theme.border().mix(0.4).stroke_width(1),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
     // Candles on globe surface
@@ -132,11 +165,19 @@ where DB::ErrorType: 'static,
         candles_3d.push(((sx, sy, s), c.is_bullish(), (c.high - c.low) / pr));
     }
 
-    candles_3d.sort_by(|a, b| a.0 .2.partial_cmp(&b.0 .2).unwrap_or(std::cmp::Ordering::Equal));
+    candles_3d.sort_by(|a, b| {
+        a.0 .2
+            .partial_cmp(&b.0 .2)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     for ((sx, sy, s), is_bullish, body_h) in &candles_3d {
         let size = (3.0 * s) as i32 + 1;
-        let color = if *is_bullish { cfg.theme.profit() } else { cfg.theme.loss() };
+        let color = if *is_bullish {
+            cfg.theme.profit()
+        } else {
+            cfg.theme.loss()
+        };
         let h = (body_h * 30.0 * s) as i32 + 2;
         root.draw(&Rectangle::new(
             [(*sx - size, *sy - h / 2), (*sx + size, *sy + h / 2)],
@@ -148,7 +189,9 @@ where DB::ErrorType: 'static,
     root.draw(&Text::new(
         "24h cycle — candles on rotating globe",
         (w as i32 / 2 - 110, h as i32 - 40),
-        (LABEL_FONT, 11).into_font().color(&cfg.theme.text().mix(0.6)),
+        (LABEL_FONT, 11)
+            .into_font()
+            .color(&cfg.theme.text().mix(0.6)),
     ))
     .map_err(|e| BtError::Render(e.to_string()))?;
 
@@ -174,7 +217,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("TEST", 100, 1, 100.0);
         let cfg = CandleGlobe3DConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_3d_candle_globe.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_3d_candle_globe.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

@@ -50,7 +50,11 @@ pub fn simulate_portfolios(
             }
         }
         let risk = var.max(0.0).sqrt();
-        let sharpe = if risk > 1e-9 { (ret - risk_free) / risk } else { 0.0 };
+        let sharpe = if risk > 1e-9 {
+            (ret - risk_free) / risk
+        } else {
+            0.0
+        };
         out.push(Portfolio { risk, ret, sharpe });
     }
     out
@@ -107,7 +111,10 @@ where
     let pad = (ret_max - ret_min).max(0.01) * 0.1;
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(&cfg.title, (TITLE_FONT, 22).into_font().color(&cfg.theme.text()))
+        .caption(
+            &cfg.title,
+            (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
+        )
         .margin(15)
         .x_label_area_size(35)
         .y_label_area_size(60)
@@ -132,7 +139,10 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     // Highlight the max-Sharpe portfolio (the tangency point).
-    if let Some(best) = portfolios.iter().max_by(|a, b| a.sharpe.partial_cmp(&b.sharpe).unwrap()) {
+    if let Some(best) = portfolios
+        .iter()
+        .max_by(|a, b| a.sharpe.partial_cmp(&b.sharpe).unwrap())
+    {
         chart
             .draw_series(std::iter::once(Circle::new(
                 (best.risk, best.ret),
@@ -160,11 +170,19 @@ fn blend(a: RGBColor, b: RGBColor, t: f64) -> RGBColor {
     RGBColor(lerp(a.0, b.0), lerp(a.1, b.1), lerp(a.2, b.2))
 }
 
-pub fn render_png(portfolios: &[Portfolio], cfg: &EfficientFrontierConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    portfolios: &[Portfolio],
+    cfg: &EfficientFrontierConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, portfolios, cfg)
 }
 
-pub fn render_svg(portfolios: &[Portfolio], cfg: &EfficientFrontierConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    portfolios: &[Portfolio],
+    cfg: &EfficientFrontierConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, portfolios, cfg)
 }
 

@@ -54,10 +54,7 @@ struct FootprintRow {
     ask: f64,
 }
 
-fn compute_footprint(
-    series: &OhlcvSeries,
-    num_rows: usize,
-) -> Vec<(f64, Vec<FootprintRow>)> {
+fn compute_footprint(series: &OhlcvSeries, num_rows: usize) -> Vec<(f64, Vec<FootprintRow>)> {
     let mut result = Vec::new();
 
     for candle in &series.candles {
@@ -145,7 +142,10 @@ where
 
             let bid_rect = Rectangle::new(
                 [
-                    (*t - bar_width, row.price - (high - low) / cfg.num_rows as f64 * 0.4),
+                    (
+                        *t - bar_width,
+                        row.price - (high - low) / cfg.num_rows as f64 * 0.4,
+                    ),
                     (*t, row.price + (high - low) / cfg.num_rows as f64 * 0.4),
                 ],
                 cfg.theme.profit().mix(bid_frac * 0.7).filled(),
@@ -154,7 +154,10 @@ where
             let ask_rect = Rectangle::new(
                 [
                     (*t, row.price - (high - low) / cfg.num_rows as f64 * 0.4),
-                    (*t + bar_width, row.price + (high - low) / cfg.num_rows as f64 * 0.4),
+                    (
+                        *t + bar_width,
+                        row.price + (high - low) / cfg.num_rows as f64 * 0.4,
+                    ),
                 ],
                 cfg.theme.loss().mix((1.0 - bid_frac) * 0.7).filled(),
             );

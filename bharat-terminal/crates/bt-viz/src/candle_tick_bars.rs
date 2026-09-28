@@ -47,7 +47,10 @@ impl CandleTickBarsConfig {
     }
 }
 
-fn build_tick_bars(series: &OhlcvSeries, ticks_per_bar: usize) -> Vec<(f64, f64, f64, f64, f64, usize)> {
+fn build_tick_bars(
+    series: &OhlcvSeries,
+    ticks_per_bar: usize,
+) -> Vec<(f64, f64, f64, f64, f64, usize)> {
     let mut bars = Vec::new();
     let mut cur: Option<(f64, f64, f64, f64, f64, usize)> = None;
 
@@ -61,14 +64,7 @@ fn build_tick_bars(series: &OhlcvSeries, ticks_per_bar: usize) -> Vec<(f64, f64,
                     bars.push((t0, o, h, l, c.close, count));
                     cur = Some((c.t, c.close, c.close, c.close, c.close, 1));
                 } else {
-                    cur = Some((
-                        t0,
-                        o,
-                        h.max(c.high),
-                        l.min(c.low),
-                        c.close,
-                        count + 1,
-                    ));
+                    cur = Some((t0, o, h.max(c.high), l.min(c.low), c.close, count + 1));
                 }
             }
         }

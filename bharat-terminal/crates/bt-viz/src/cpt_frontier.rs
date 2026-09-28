@@ -32,19 +32,37 @@ impl Default for CptFrontierConfig {
 }
 
 impl CptFrontierConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn n_points(mut self, n: usize) -> Self { self.n_points = n.max(5).min(100); self }
-    pub fn show_assets(mut self, s: bool) -> Self { self.show_assets = s; self }
-    pub fn risk_free(mut self, r: f64) -> Self { self.risk_free = r.max(0.0); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn n_points(mut self, n: usize) -> Self {
+        self.n_points = n.max(5).min(100);
+        self
+    }
+    pub fn show_assets(mut self, s: bool) -> Self {
+        self.show_assets = s;
+        self
+    }
+    pub fn risk_free(mut self, r: f64) -> Self {
+        self.risk_free = r.max(0.0);
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
     root: plotters::drawing::DrawingArea<DB, plotters::coord::Shift>,
     cfg: &CptFrontierConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     fill_background(&root, cfg.theme)?;
 
@@ -89,7 +107,10 @@ where DB::ErrorType: 'static,
         .margin(10)
         .x_label_area_size(40)
         .y_label_area_size(60)
-        .build_cartesian_2d((r_min - r_pad)..(r_max + r_pad), (ret_min - ret_pad)..(ret_max + ret_pad))
+        .build_cartesian_2d(
+            (r_min - r_pad)..(r_max + r_pad),
+            (ret_min - ret_pad)..(ret_max + ret_pad),
+        )
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart
@@ -103,18 +124,26 @@ where DB::ErrorType: 'static,
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     chart
-        .draw_series(LineSeries::new(frontier.clone(), cfg.theme.accent().stroke_width(2)))
+        .draw_series(LineSeries::new(
+            frontier.clone(),
+            cfg.theme.accent().stroke_width(2),
+        ))
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Efficient Frontier")
         .legend(|(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(2))
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.accent().stroke_width(2),
+            )
         });
 
     if cfg.show_assets {
         chart
-            .draw_series(assets.iter().map(|(risk, ret)| {
-                Circle::new((*risk, *ret), 5, cfg.theme.info().filled())
-            }))
+            .draw_series(
+                assets
+                    .iter()
+                    .map(|(risk, ret)| Circle::new((*risk, *ret), 5, cfg.theme.info().filled())),
+            )
             .map_err(|e| BtError::Render(e.to_string()))?
             .label("Assets")
             .legend(|(x, y)| Circle::new((x + 10, y), 4, cfg.theme.info().filled()));
@@ -148,7 +177,11 @@ mod tests {
     #[test]
     fn renders() {
         let cfg = CptFrontierConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_cpt_frontier.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_cpt_frontier.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&cfg, &path).unwrap();
     }
 }

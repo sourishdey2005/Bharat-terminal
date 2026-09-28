@@ -95,9 +95,15 @@ where
     }
 
     let vol_min = points.iter().map(|(v, _)| *v).fold(f64::INFINITY, f64::min);
-    let vol_max = points.iter().map(|(v, _)| *v).fold(f64::NEG_INFINITY, f64::max);
+    let vol_max = points
+        .iter()
+        .map(|(v, _)| *v)
+        .fold(f64::NEG_INFINITY, f64::max);
     let change_min = points.iter().map(|(_, c)| *c).fold(f64::INFINITY, f64::min);
-    let change_max = points.iter().map(|(_, c)| *c).fold(f64::NEG_INFINITY, f64::max);
+    let change_max = points
+        .iter()
+        .map(|(_, c)| *c)
+        .fold(f64::NEG_INFINITY, f64::max);
 
     let vol_pad = (vol_max - vol_min) * 0.05;
     let change_pad = (change_max - change_min) * 0.1;
@@ -191,7 +197,12 @@ where
                 ))
                 .map_err(|e| BtError::Render(e.to_string()))?
                 .label(format!("Regression (r={:.3})", correlation))
-                .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(2)));
+                .legend(|(x, y)| {
+                    PathElement::new(
+                        vec![(x, y), (x + 20, y)],
+                        cfg.theme.accent().stroke_width(2),
+                    )
+                });
 
             // Show correlation text
             if cfg.show_correlation {

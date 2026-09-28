@@ -234,24 +234,25 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("%B")
         .legend(|(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.accent().stroke_width(2))
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                cfg.theme.accent().stroke_width(2),
+            )
         });
 
     pb_chart
-        .draw_series(
-            series.candles.iter().enumerate().filter_map(|(i, c)| {
-                if !percent_b[i].is_nan() && (percent_b[i] > 1.0 || percent_b[i] < 0.0) {
-                    let color = if percent_b[i] > 1.0 {
-                        cfg.theme.profit()
-                    } else {
-                        cfg.theme.loss()
-                    };
-                    Some(Circle::new((c.t, percent_b[i]), 3, color.filled()))
+        .draw_series(series.candles.iter().enumerate().filter_map(|(i, c)| {
+            if !percent_b[i].is_nan() && (percent_b[i] > 1.0 || percent_b[i] < 0.0) {
+                let color = if percent_b[i] > 1.0 {
+                    cfg.theme.profit()
                 } else {
-                    None
-                }
-            }),
-        )
+                    cfg.theme.loss()
+                };
+                Some(Circle::new((c.t, percent_b[i]), 3, color.filled()))
+            } else {
+                None
+            }
+        }))
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     price_chart

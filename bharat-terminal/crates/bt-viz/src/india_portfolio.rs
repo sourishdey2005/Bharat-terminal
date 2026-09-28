@@ -17,14 +17,25 @@ pub struct IndiaPortfolioConfig {
 
 impl Default for IndiaPortfolioConfig {
     fn default() -> Self {
-        Self { title: "India Portfolio".to_string(), theme: Theme::Dark }
+        Self {
+            title: "India Portfolio".to_string(),
+            theme: Theme::Dark,
+        }
     }
 }
 
 impl IndiaPortfolioConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
 }
 
 fn sample_portfolio() -> Vec<(String, f64, f64, f64, f64)> {
@@ -45,7 +56,8 @@ fn render<DB: DrawingBackend>(
     series: &OhlcvSeries,
     cfg: &IndiaPortfolioConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     series.validate()?;
     fill_background(&root, cfg.theme)?;
@@ -63,32 +75,74 @@ where DB::ErrorType: 'static,
     let row_h = (h as i32 - 100) / (data.len() as i32 + 1);
     let col_px = [10, 200, 380, 560, 740, 920];
 
-    for (x, label) in col_px.iter().zip(["Symbol", "Invested (L)", "Current (L)", "P&L %", "Div (L)", "Tax (L)"].iter()) {
-        root.draw(&Text::new(label.to_string(), ( *x, 45), (LABEL_FONT, 12).into_font().color(&cfg.theme.accent())))
-            .map_err(|e| BtError::Render(e.to_string()))?;
+    for (x, label) in col_px.iter().zip(
+        [
+            "Symbol",
+            "Invested (L)",
+            "Current (L)",
+            "P&L %",
+            "Div (L)",
+            "Tax (L)",
+        ]
+        .iter(),
+    ) {
+        root.draw(&Text::new(
+            label.to_string(),
+            (*x, 45),
+            (LABEL_FONT, 12).into_font().color(&cfg.theme.accent()),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
     for (i, (symbol, inv, cur, pnl, div)) in data.iter().enumerate() {
         let y = 45 + (i as i32 + 1) * row_h;
-        root.draw(&Text::new(symbol.clone(), ( col_px[0], y + row_h / 2 - 6), (LABEL_FONT, 12).into_font().color(&cfg.theme.text())))
-            .map_err(|e| BtError::Render(e.to_string()))?;
-        root.draw(&Text::new(format!("{:.1}", inv), ( col_px[1], y + row_h / 2 - 6), (LABEL_FONT, 12).into_font().color(&cfg.theme.text())))
-            .map_err(|e| BtError::Render(e.to_string()))?;
-        root.draw(&Text::new(format!("{:.1}", cur), ( col_px[2], y + row_h / 2 - 6), (LABEL_FONT, 12).into_font().color(&cfg.theme.text())))
-            .map_err(|e| BtError::Render(e.to_string()))?;
-        let pnl_color = if *pnl >= 0.0 { cfg.theme.profit() } else { cfg.theme.loss() };
-        root.draw(&Text::new(format!("{:+.1}%", pnl), ( col_px[3], y + row_h / 2 - 6), (LABEL_FONT, 12).into_font().color(&pnl_color)))
-            .map_err(|e| BtError::Render(e.to_string()))?;
-        root.draw(&Text::new(format!("{:.2}", div), ( col_px[4], y + row_h / 2 - 6), (LABEL_FONT, 12).into_font().color(&cfg.theme.info())))
-            .map_err(|e| BtError::Render(e.to_string()))?;
+        root.draw(&Text::new(
+            symbol.clone(),
+            (col_px[0], y + row_h / 2 - 6),
+            (LABEL_FONT, 12).into_font().color(&cfg.theme.text()),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
+        root.draw(&Text::new(
+            format!("{:.1}", inv),
+            (col_px[1], y + row_h / 2 - 6),
+            (LABEL_FONT, 12).into_font().color(&cfg.theme.text()),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
+        root.draw(&Text::new(
+            format!("{:.1}", cur),
+            (col_px[2], y + row_h / 2 - 6),
+            (LABEL_FONT, 12).into_font().color(&cfg.theme.text()),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
+        let pnl_color = if *pnl >= 0.0 {
+            cfg.theme.profit()
+        } else {
+            cfg.theme.loss()
+        };
+        root.draw(&Text::new(
+            format!("{:+.1}%", pnl),
+            (col_px[3], y + row_h / 2 - 6),
+            (LABEL_FONT, 12).into_font().color(&pnl_color),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
+        root.draw(&Text::new(
+            format!("{:.2}", div),
+            (col_px[4], y + row_h / 2 - 6),
+            (LABEL_FONT, 12).into_font().color(&cfg.theme.info()),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
         let tax = div * 0.10 + if *pnl > 0.0 { (cur - inv) * 0.15 } else { 0.0 };
-        root.draw(&Text::new(format!("{:.2}", tax), ( col_px[5], y + row_h / 2 - 6), (LABEL_FONT, 12).into_font().color(&cfg.theme.loss())))
-            .map_err(|e| BtError::Render(e.to_string()))?;
+        root.draw(&Text::new(
+            format!("{:.2}", tax),
+            (col_px[5], y + row_h / 2 - 6),
+            (LABEL_FONT, 12).into_font().color(&cfg.theme.loss()),
+        ))
+        .map_err(|e| BtError::Render(e.to_string()))?;
         root.draw(&PathElement::new(
             vec![(0, y + row_h), (w as i32, y + row_h)],
             cfg.theme.border().stroke_width(1),
         ))
-    .map_err(|e| BtError::Render(e.to_string()))?;
+        .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
     draw_footer(&root, cfg.theme)?;
@@ -113,7 +167,11 @@ mod tests {
     fn renders() {
         let series = synthetic_ohlcv("PORT", 100, 1, 100.0);
         let cfg = IndiaPortfolioConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_india_portfolio.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_india_portfolio.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&series, &cfg, &path).unwrap();
     }
 }

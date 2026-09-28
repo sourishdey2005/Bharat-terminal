@@ -144,10 +144,7 @@ where
         .map_err(|e| BtError::Render(e.to_string()))?
         .label("Lower")
         .legend(|(x, y)| {
-            PathElement::new(
-                vec![(x, y), (x + 20, y)],
-                cfg.theme.loss().stroke_width(2),
-            )
+            PathElement::new(vec![(x, y), (x + 20, y)], cfg.theme.loss().stroke_width(2))
         });
 
     chart

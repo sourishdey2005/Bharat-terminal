@@ -116,7 +116,10 @@ where
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
-            format!("{} — {} (Range: ₹{:.2})", cfg.title, series.symbol, cfg.range),
+            format!(
+                "{} — {} (Range: ₹{:.2})",
+                cfg.title, series.symbol, cfg.range
+            ),
             (TITLE_FONT, 22).into_font().color(&cfg.theme.text()),
         )
         .margin(10)

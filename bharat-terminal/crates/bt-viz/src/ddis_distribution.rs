@@ -19,7 +19,11 @@ pub struct MaturityBucket {
 
 impl MaturityBucket {
     pub fn new(label: impl Into<String>, amount: f64, rate: f64) -> Self {
-        Self { label: label.into(), amount: amount.max(0.0), rate }
+        Self {
+            label: label.into(),
+            amount: amount.max(0.0),
+            rate,
+        }
     }
 }
 
@@ -43,11 +47,25 @@ impl Default for DdisDistributionConfig {
 }
 
 impl DdisDistributionConfig {
-    pub fn new() -> Self { Self::default() }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = t.into(); self }
-    pub fn theme(mut self, t: Theme) -> Self { self.theme = t; self }
-    pub fn buckets(mut self, b: usize) -> Self { self.buckets = b.max(3).min(20); self }
-    pub fn show_rates(mut self, s: bool) -> Self { self.show_rates = s; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = t.into();
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+    pub fn buckets(mut self, b: usize) -> Self {
+        self.buckets = b.max(3).min(20);
+        self
+    }
+    pub fn show_rates(mut self, s: bool) -> Self {
+        self.show_rates = s;
+        self
+    }
 }
 
 fn render<DB: DrawingBackend>(
@@ -55,7 +73,8 @@ fn render<DB: DrawingBackend>(
     buckets: &[MaturityBucket],
     cfg: &DdisDistributionConfig,
 ) -> Result<()>
-where DB::ErrorType: 'static,
+where
+    DB::ErrorType: 'static,
 {
     if buckets.is_empty() {
         return Err(BtError::EmptySeries("maturity buckets".into()));
@@ -94,14 +113,19 @@ where DB::ErrorType: 'static,
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     amount_chart
-        .draw_series(buckets.iter().enumerate().map(|(i, b)| {
-            Rectangle::new([(i, 0.0), (i + 1, b.amount)], cfg.theme.info().filled())
-        }))
+        .draw_series(
+            buckets.iter().enumerate().map(|(i, b)| {
+                Rectangle::new([(i, 0.0), (i + 1, b.amount)], cfg.theme.info().filled())
+            }),
+        )
         .map_err(|e| BtError::Render(e.to_string()))?;
 
     if let Some(rate_area) = rate_area {
         let mut rate_chart = ChartBuilder::on(&rate_area)
-            .caption("Rates", (TITLE_FONT, 16).into_font().color(&cfg.theme.text()))
+            .caption(
+                "Rates",
+                (TITLE_FONT, 16).into_font().color(&cfg.theme.text()),
+            )
             .margin(10)
             .x_label_area_size(30)
             .y_label_area_size(60)
@@ -124,9 +148,12 @@ where DB::ErrorType: 'static,
             .map_err(|e| BtError::Render(e.to_string()))?;
 
         rate_chart
-            .draw_series(buckets.iter().enumerate().map(|(i, b)| {
-                Circle::new((i, b.rate), 4, cfg.theme.accent().filled())
-            }))
+            .draw_series(
+                buckets
+                    .iter()
+                    .enumerate()
+                    .map(|(i, b)| Circle::new((i, b.rate), 4, cfg.theme.accent().filled())),
+            )
             .map_err(|e| BtError::Render(e.to_string()))?;
     }
 
@@ -135,11 +162,19 @@ where DB::ErrorType: 'static,
     Ok(())
 }
 
-pub fn render_png(buckets: &[MaturityBucket], cfg: &DdisDistributionConfig, path: &str) -> Result<()> {
+pub fn render_png(
+    buckets: &[MaturityBucket],
+    cfg: &DdisDistributionConfig,
+    path: &str,
+) -> Result<()> {
     render(png_root(path)?, buckets, cfg)
 }
 
-pub fn render_svg(buckets: &[MaturityBucket], cfg: &DdisDistributionConfig, path: &str) -> Result<()> {
+pub fn render_svg(
+    buckets: &[MaturityBucket],
+    cfg: &DdisDistributionConfig,
+    path: &str,
+) -> Result<()> {
     render(svg_root(path)?, buckets, cfg)
 }
 
@@ -150,10 +185,20 @@ mod tests {
     #[test]
     fn renders() {
         let buckets: Vec<MaturityBucket> = (0..8)
-            .map(|i| MaturityBucket::new(format!("{}Y", i + 1), (8 - i) as f64 * 100.0, 5.0 + i as f64 * 0.3))
+            .map(|i| {
+                MaturityBucket::new(
+                    format!("{}Y", i + 1),
+                    (8 - i) as f64 * 100.0,
+                    5.0 + i as f64 * 0.3,
+                )
+            })
             .collect();
         let cfg = DdisDistributionConfig::new().theme(Theme::Dark);
-        let path = std::env::temp_dir().join("bt_test_ddis_distribution.png").to_str().unwrap().to_string();
+        let path = std::env::temp_dir()
+            .join("bt_test_ddis_distribution.png")
+            .to_str()
+            .unwrap()
+            .to_string();
         render_png(&buckets, &cfg, &path).unwrap();
     }
 }

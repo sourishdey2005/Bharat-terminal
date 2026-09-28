@@ -57,10 +57,7 @@ struct VolumeBar {
     volume: f64,
 }
 
-fn resample_by_volume(
-    series: &OhlcvSeries,
-    target_bars: usize,
-) -> Vec<VolumeBar> {
+fn resample_by_volume(series: &OhlcvSeries, target_bars: usize) -> Vec<VolumeBar> {
     let total_vol: f64 = series.candles.iter().map(|c| c.volume).sum();
     let vol_per_bar = total_vol / target_bars as f64;
 
@@ -184,7 +181,15 @@ where
 
         chart
             .draw_series(std::iter::once(Rectangle::new(
-                [(bar.t - candle_width, low - pad), (bar.t + candle_width, low - pad + bar.volume / bars.iter().map(|b| b.volume).fold(0.0_f64, f64::max) * pad)],
+                [
+                    (bar.t - candle_width, low - pad),
+                    (
+                        bar.t + candle_width,
+                        low - pad
+                            + bar.volume / bars.iter().map(|b| b.volume).fold(0.0_f64, f64::max)
+                                * pad,
+                    ),
+                ],
                 color.mix(0.3).filled(),
             )))
             .map_err(|e| BtError::Render(e.to_string()))?;
