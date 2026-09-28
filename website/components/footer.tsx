@@ -4,7 +4,7 @@ import { Logo } from "./brand";
 import { ThemeToggle } from "./theme-toggle";
 
 const COLS: Array<{ title: string; links: Array<[string, string]> }> = [
-  { title: "Product", links: [["Features", "/features"], ["Downloads", "/download"], ["Pricing", "/pricing"], ["Changelog", "/changelog"], ["Roadmap", "/roadmap"]] },
+  { title: "Product", links: [["Downloads", "/download"], ["Pricing", "/pricing"], ["Changelog", "/changelog"], ["Roadmap", "/roadmap"]] },
   { title: "Docs", links: [["Install", "/docs/install"], ["CLI", "/docs/cli"], ["API", "/docs/api"], ["Companies", "/docs/companies"], ["FAQ", "/faq"]] },
   { title: "Company", links: [["About", "/about"], ["Blog", "/blog"], ["Contact", "/contact"], ["Privacy", "/privacy"], ["Terms", "/terms"]] },
   { title: "Community", links: [["GitHub", "https://github.com/sourishdey/bharat-terminal"], ["Discord", "https://discord.gg/bharat-terminal"], ["Twitter", "https://twitter.com"], ["Reddit", "https://reddit.com"]] },

@@ -1,6 +1,5 @@
 "use client";
-import { AnimatePresence, motion, useReducedMotion, useScroll, useSpring, useTransform, type Variants } from "framer-motion";
-import { useRef } from "react";
+import { AnimatePresence, motion, useReducedMotion, useScroll, useSpring, type Variants } from "framer-motion";
 import { Download, Github } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -19,12 +18,7 @@ const heroItem: Variants = {
 };
 
 export function Hero() {
-  const reduce = useReducedMotion();
   const [stars, setStars] = useState("2,400");
-  const sectionRef = useRef<HTMLElement>(null);
-  const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start start", "end start"] });
-  const y = useTransform(scrollYProgress, [0, 1], [0, reduce ? 0 : 120]);
-  const opacity = useTransform(scrollYProgress, [0, 0.5, 1], [1, 0.6, 0]);
 
   useEffect(() => {
     fetch(`https://api.github.com/repos/${SITE.githubRepo}`)
@@ -35,59 +29,60 @@ export function Hero() {
 
   return (
     <>
-    <section ref={sectionRef} className="hero-glow relative overflow-hidden" aria-label="Hero">
-      <motion.div
-        style={{ y, opacity }}
-        className="pointer-events-none absolute inset-0 opacity-[0.08]"
-        aria-hidden
-      >
-        <svg width="100%" height="100%" preserveAspectRatio="none" viewBox="0 0 800 400">
-          {Array.from({ length: 40 }).map((_, i) => {
-            const x = 20 + i * 19;
-            const h = 20 + ((i * 37) % 60);
-            const yPos = 150 + ((i * 53) % 80) - h / 2;
-            const up = i % 3 !== 0;
-            return (
-              <g key={i}>
-                <line x1={x} y1={yPos - h / 3} x2={x} y2={yPos + h} stroke={up ? "#00E676" : "#FF3D71"} strokeWidth="2" />
-                <rect x={x - 5} y={yPos} width={10} height={h / 2} fill={up ? "#00E676" : "#FF3D71"} />
-              </g>
-            );
-          })}
-        </svg>
-      </motion.div>
-      <Container className="relative pb-16 pt-16 text-center sm:pt-24">
+    <section className="relative overflow-hidden" aria-label="Hero" style={{ height: "100vh", minHeight: "600px" }}>
+      {/* Video Plate - Cinematic Background */}
+      <div className="video-plate" aria-hidden="true">
+        <video
+          className="plate-video"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          poster="/hero-poster.jpg"
+        >
+          <source
+            src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260808_112712_da9d53df-6d27-4b12-bdf6-aa9dc2622bdf.mp4"
+            type="video/mp4"
+          />
+        </video>
+      </div>
+
+      <div style={{ zIndex: 5, height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <Container className="relative pb-20 pt-20 text-center sm:pt-28">
         <motion.div variants={heroContainer} initial="hidden" animate="show">
           <motion.div variants={heroItem}>
             <Badge variant="india">🇮🇳 Made in India · MIT License · 100% Free</Badge>
           </motion.div>
-          <motion.p variants={heroItem} className="mt-4 text-xs font-semibold uppercase tracking-widest text-tertiary">
-            Made by <span className="text-amber">Sourish Dey</span>
+          <motion.p variants={heroItem} className="mt-4 text-xs font-semibold uppercase tracking-widest text-[var(--muted)]">
+            Made by Sourish Dey
           </motion.p>
-          <motion.h1 variants={heroItem} className="mx-auto mt-2 max-w-4xl font-display text-5xl font-extrabold leading-[1.05] tracking-tight text-primary sm:text-6xl lg:text-7xl">
+          <motion.h1 variants={heroItem} className="mx-auto mt-3 max-w-4xl font-display text-5xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-6xl lg:text-7xl px-6 py-3 bg-black/70 backdrop-blur-sm rounded-xl">
             Bharat Terminal
           </motion.h1>
-          <motion.p variants={heroItem} className="mx-auto mt-6 max-w-2xl text-xl text-secondary">
-            140+ visualizations. Real market data. Built in Rust. Made in India.
+          <motion.p variants={heroItem} className="mx-auto mt-6 max-w-2xl text-xl font-medium text-[var(--muted)] leading-relaxed">
+            The terminal India built. For the markets the world watches.
           </motion.p>
-          <motion.div variants={heroItem} className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <motion.span whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} className="inline-flex">
-              <Link href="/download" className="cta-gradient inline-flex min-h-[48px] items-center gap-2 rounded-xl px-7 text-base font-bold shadow-glow hover:brightness-110" aria-label="Download Bharat Terminal">
+          <motion.div variants={heroItem} className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <motion.span whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="inline-flex">
+              <Link href="/download" className="pill min-h-[52px] px-9 text-base font-bold shadow-[0_0_24px_rgba(232,180,60,0.35)]" aria-label="Download Bharat Terminal">
                 <Download size={18} /> Download for Windows
               </Link>
             </motion.span>
-            <motion.span whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} className="inline-flex">
-              <a href={SITE.github} target="_blank" rel="noreferrer" className="inline-flex min-h-[48px] items-center gap-2 rounded-xl border border-strong bg-panel px-7 text-base font-semibold text-primary hover:border-amber hover:text-amber" aria-label="View on GitHub">
+            <motion.span whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="inline-flex">
+              <a href={SITE.github} target="_blank" rel="noreferrer" className="inline-flex min-h-[52px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-9 text-base font-semibold text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--panel-elevated)]" aria-label="View on GitHub">
                 <Github size={18} /> View on GitHub · {stars}
               </a>
             </motion.span>
           </motion.div>
-          <motion.div variants={heroItem}>
+          <motion.div variants={heroItem} className="mt-12">
             <SpecStrip />
           </motion.div>
+          
         </motion.div>
 
       </Container>
+      </div>
     </section>
     <Ticker />
     </>

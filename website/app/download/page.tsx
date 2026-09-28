@@ -36,7 +36,7 @@ function FileRow({ file, index }: { file: string; index: number }) {
       <motion.a
         whileHover={{ scale: 1.04 }}
         whileTap={{ scale: 0.97 }}
-        href="https://github.com/sourishdey/bharat-terminal/releases"
+        href="https://github.com/sourishdey2005/Bharat-terminal-exe/releases"
         aria-label={`Download ${file}`}
         className="pill"
       >
@@ -59,7 +59,7 @@ export default function DownloadPage() {
         <motion.a
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.98 }}
-          href="https://github.com/sourishdey/bharat-terminal/releases"
+          href="https://github.com/sourishdey2005/Bharat-terminal-exe/releases"
           aria-label="Download for Windows"
           className="pill min-h-[52px] px-8 text-base font-bold shadow-[0_0_24px_rgba(232,180,60,0.3)]"
         >
@@ -110,7 +110,7 @@ export default function DownloadPage() {
         <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[var(--muted)]">
           <li>Windows 10+ · 200 MB disk · internet for real-time data</li>
           <li>No account required. No telemetry by default.</li>
-          <li>Verify: SHA256 above + <a className="amber-link font-semibold" href="https://github.com/sourishdey/bharat-terminal/releases">GPG signature (.asc)</a></li>
+          <li>Verify: SHA256 above + <a className="amber-link font-semibold" href="https://github.com/sourishdey2005/Bharat-terminal-exe/releases">GPG signature (.asc)</a></li>
         </ul>
       </motion.section>
     </Container>

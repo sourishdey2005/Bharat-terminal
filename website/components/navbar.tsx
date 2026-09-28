@@ -7,7 +7,6 @@ import { Logo } from "./brand";
 import { ThemeToggle } from "./theme-toggle";
 
 const LINKS = [
-  { href: "/features", label: "Features" },
   { href: "/download", label: "Downloads" },
   { href: "/docs", label: "Docs" },
   { href: "/pricing", label: "Pricing" },

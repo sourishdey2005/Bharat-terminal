@@ -10,7 +10,8 @@ description = "Bharat Terminal real market data providers (Yahoo, Coinbase, SQLi
 bt-core = { path = "../bt-core" }
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
-reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "cookies"], default-features = false }
+urlencoding = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }

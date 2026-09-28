@@ -11,7 +11,9 @@
 
 pub mod cache;
 pub mod coinbase;
+pub mod fmp;
 pub mod india;
+pub mod nse;
 pub mod provider;
 pub mod symbol;
 pub mod yahoo;
