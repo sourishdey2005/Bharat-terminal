@@ -108,10 +108,14 @@ impl OhlcvSeries {
 
 /// Deterministic, seeded geometric random walk — stands in for a live feed
 /// so every visualization can be demoed and unit-tested offline.
+/// Uses daily timestamps starting from 2024-01-01 for realistic x-axis display.
 pub fn synthetic_ohlcv(symbol: &str, n: usize, seed: u64, start_price: f64) -> OhlcvSeries {
     let mut rng = StdRng::seed_from_u64(seed);
     let mut candles = Vec::with_capacity(n);
     let mut price = start_price.max(1.0);
+
+    let start_ts = 1704067200_i64;
+    let day_secs = 86400_i64;
 
     for i in 0..n {
         let drift = 0.0002;
@@ -123,7 +127,8 @@ pub fn synthetic_ohlcv(symbol: &str, n: usize, seed: u64, start_price: f64) -> O
         let high = open.max(close) * (1.0 + rng.gen_range(0.0..0.01));
         let low = open.min(close) * (1.0 - rng.gen_range(0.0..0.01));
         let volume = rng.gen_range(1_000.0..50_000.0);
-        candles.push(Candle::new(i as f64, open, high, low, close, volume));
+        let t = (start_ts + i as i64 * day_secs) as f64;
+        candles.push(Candle::new(t, open, high, low, close, volume));
         price = close;
     }
 

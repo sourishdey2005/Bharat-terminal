@@ -30,6 +30,16 @@ const LOSS: Color32 = Color32::from_rgb(0xFF, 0x3B, 0x3B);
 const INFO: Color32 = Color32::from_rgb(0x00, 0xBF, 0xFF);
 const PURPLE: Color32 = Color32::from_rgb(0xBF, 0x5A, 0xFF);
 
+const DAY_SECS: f64 = 86400.0;
+const BAR_WIDTH: f64 = 0.7 * DAY_SECS;
+const BAR_HALF: f64 = 0.35 * DAY_SECS;
+
+fn format_ts(ts: f64) -> String {
+    let ts = ts as i64;
+    let dt = chrono::DateTime::from_timestamp(ts, 0).unwrap_or_default();
+    dt.format("%b %Y").to_string()
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Tab {
     Candlestick, HeikinAshi, Renko, Kagi, PointFigure,
@@ -969,11 +979,13 @@ impl BharatApp {
     fn draw_candlestick(&self, ui: &mut egui::Ui) {
         let candles = &self.data.candles;
         ui.label(RichText::new(format!("GP — Candlestick — {}", candles.symbol)).strong());
+        let hover_candle = std::cell::RefCell::new(None::<(f64, f64, f64, f64, f64)>);
         Plot::new("candlestick_plot")
             .auto_bounds_x().auto_bounds_y()
             .height(ui.available_height() * 0.7_f32)
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &candles.candles {
                     let color = if c.is_bullish() { PROFIT } else { LOSS };
@@ -981,27 +993,46 @@ impl BharatApp {
                         Line::new(PlotPoints::from(vec![[c.t, c.low], [c.t, c.high]]))
                             .color(color).width(1.0_f32),
                     );
-                    let half = 0.35_f64;
                     let (top, bottom) = if c.is_bullish() { (c.close, c.open) } else { (c.open, c.close) };
                     plot_ui.polygon(
                         egui_plot::Polygon::new(PlotPoints::from(vec![
-                            [c.t - half, bottom], [c.t + half, bottom],
-                            [c.t + half, top], [c.t - half, top],
+                            [c.t - BAR_HALF, bottom], [c.t + BAR_HALF, bottom],
+                            [c.t + BAR_HALF, top], [c.t - BAR_HALF, top],
                         ]))
                         .fill_color(color).stroke(Stroke::new(1.0_f32, color)),
                     );
                 }
+                if let Some(hover_pos) = plot_ui.pointer_coordinate() {
+                    let t_min = candles.candles.first().map(|c| c.t).unwrap_or(0.0);
+                    let t_max = candles.candles.last().map(|c| c.t).unwrap_or(0.0);
+                    let bar_width = if candles.candles.len() > 1 {
+                        (t_max - t_min) / (candles.candles.len() - 1) as f64
+                    } else {
+                        DAY_SECS
+                    };
+                    let idx = ((hover_pos.x - t_min) / bar_width) as usize;
+                    if idx < candles.candles.len() {
+                        let c = &candles.candles[idx];
+                        *hover_candle.borrow_mut() = Some((c.open, c.high, c.low, c.close, c.volume));
+                    }
+                }
             });
+        if let Some((o, h, l, c, v)) = hover_candle.borrow().as_ref() {
+            egui::show_tooltip_at_pointer(ui.ctx(), egui::LayerId::new(egui::Order::Tooltip, egui::Id::new("candle_tooltip_layer")), egui::Id::new("candle_tooltip"), |ui: &mut egui::Ui| {
+                ui.label(format!("O: {:.2} H: {:.2} L: {:.2} C: {:.2} V: {:.0}", o, h, l, c, v));
+            });
+        }
         Plot::new("candlestick_volume")
             .auto_bounds_x().auto_bounds_y()
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let bars: Vec<Bar> = candles.candles.iter()
                     .map(|c| {
                         let color = if c.is_bullish() { PROFIT } else { LOSS };
-                        Bar::new(c.t, c.volume).width(0.7_f64).fill(color)
+                        Bar::new(c.t, c.volume).width(BAR_WIDTH).fill(color)
                     }).collect();
                 plot_ui.bar_chart(BarChart::new(bars));
             });
@@ -1015,17 +1046,17 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &candles.candles {
                     let ha_close = (c.open + c.high + c.low + c.close) / 4.0;
                     let ha_open = (c.open + c.close) / 2.0;
                     let color = if ha_close >= ha_open { PROFIT } else { LOSS };
-                    let half = 0.35_f64;
                     let (top, bottom) = if ha_close >= ha_open { (ha_close, ha_open) } else { (ha_open, ha_close) };
                     plot_ui.polygon(
                         egui_plot::Polygon::new(PlotPoints::from(vec![
-                            [c.t - half, bottom], [c.t + half, bottom],
-                            [c.t + half, top], [c.t - half, top],
+                            [c.t - BAR_HALF, bottom], [c.t + BAR_HALF, bottom],
+                            [c.t + BAR_HALF, top], [c.t - BAR_HALF, top],
                         ]))
                         .fill_color(color).stroke(Stroke::new(1.0_f32, color)),
                     );
@@ -1041,6 +1072,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for w in candles.candles.windows(2) {
                     let prev = &w[0]; let curr = &w[1];
@@ -1061,6 +1093,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for w in candles.candles.windows(2) {
                     let prev = &w[0]; let curr = &w[1];
@@ -1082,6 +1115,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let box_size = 5.0_f64;
                 let mut last_price = candles.candles[0].close;
@@ -1111,15 +1145,15 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &candles.candles {
                     let color = if c.is_bullish() { PROFIT } else { LOSS };
-                    let half = 0.35_f64;
                     let (top, bottom) = if c.is_bullish() { (c.close, c.open) } else { (c.open, c.close) };
                     plot_ui.polygon(
                         egui_plot::Polygon::new(PlotPoints::from(vec![
-                            [c.t - half, bottom], [c.t + half, bottom],
-                            [c.t + half, top], [c.t - half, top],
+                            [c.t - BAR_HALF, bottom], [c.t + BAR_HALF, bottom],
+                            [c.t + BAR_HALF, top], [c.t - BAR_HALF, top],
                         ]))
                         .fill_color(color).stroke(Stroke::new(1.0_f32, color)),
                     );
@@ -1140,15 +1174,15 @@ impl BharatApp {
             .allow_scroll(true)
             .allow_drag(true)
             .legend(Legend::default())
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &series.candles {
                     let color = if c.is_bullish() { PROFIT } else { LOSS };
-                    let half = 0.35_f64;
                     let (top, bottom) = if c.is_bullish() { (c.close, c.open) } else { (c.open, c.close) };
                     plot_ui.polygon(
                         egui_plot::Polygon::new(PlotPoints::from(vec![
-                            [c.t - half, bottom], [c.t + half, bottom],
-                            [c.t + half, top], [c.t - half, top],
+                            [c.t - BAR_HALF, bottom], [c.t + BAR_HALF, bottom],
+                            [c.t + BAR_HALF, top], [c.t - BAR_HALF, top],
                         ]))
                         .fill_color(color).stroke(Stroke::new(1.0_f32, color)),
                     );
@@ -1178,15 +1212,15 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &series.candles {
                     let color = if c.is_bullish() { PROFIT } else { LOSS };
-                    let half = 0.35_f64;
                     let (top, bottom) = if c.is_bullish() { (c.close, c.open) } else { (c.open, c.close) };
                     plot_ui.polygon(
                         egui_plot::Polygon::new(PlotPoints::from(vec![
-                            [c.t - half, bottom], [c.t + half, bottom],
-                            [c.t + half, top], [c.t - half, top],
+                            [c.t - BAR_HALF, bottom], [c.t + BAR_HALF, bottom],
+                            [c.t + BAR_HALF, top], [c.t - BAR_HALF, top],
                         ]))
                         .fill_color(color).stroke(Stroke::new(1.0_f32, color)),
                     );
@@ -1216,15 +1250,15 @@ impl BharatApp {
             .height(ui.available_height() * 0.65_f32)
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &series.candles {
                     let color = if c.is_bullish() { PROFIT } else { LOSS };
-                    let half = 0.35_f64;
                     let (top, bottom) = if c.is_bullish() { (c.close, c.open) } else { (c.open, c.close) };
                     plot_ui.polygon(
                         egui_plot::Polygon::new(PlotPoints::from(vec![
-                            [c.t - half, bottom], [c.t + half, bottom],
-                            [c.t + half, top], [c.t - half, top],
+                            [c.t - BAR_HALF, bottom], [c.t + BAR_HALF, bottom],
+                            [c.t + BAR_HALF, top], [c.t - BAR_HALF, top],
                         ]))
                         .fill_color(color).stroke(Stroke::new(1.0_f32, color)),
                     );
@@ -1235,6 +1269,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !rsi_vals[i].is_nan() { Some([c.t, rsi_vals[i]]) } else { None })
@@ -1255,15 +1290,15 @@ impl BharatApp {
             .height(ui.available_height() * 0.65_f32)
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &series.candles {
                     let color = if c.is_bullish() { PROFIT } else { LOSS };
-                    let half = 0.35_f64;
                     let (top, bottom) = if c.is_bullish() { (c.close, c.open) } else { (c.open, c.close) };
                     plot_ui.polygon(
                         egui_plot::Polygon::new(PlotPoints::from(vec![
-                            [c.t - half, bottom], [c.t + half, bottom],
-                            [c.t + half, top], [c.t - half, top],
+                            [c.t - BAR_HALF, bottom], [c.t + BAR_HALF, bottom],
+                            [c.t + BAR_HALF, top], [c.t - BAR_HALF, top],
                         ]))
                         .fill_color(color).stroke(Stroke::new(1.0_f32, color)),
                     );
@@ -1274,6 +1309,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !macd_line[i].is_nan() { Some([c.t, macd_line[i]]) } else { None })
@@ -1295,10 +1331,11 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &candles.candles {
                     let color = if c.is_bullish() { PROFIT } else { LOSS };
-                    plot_ui.bar_chart(BarChart::new(vec![Bar::new(c.t, c.volume).width(0.7_f64).fill(color)]));
+                    plot_ui.bar_chart(BarChart::new(vec![Bar::new(c.t, c.volume).width(BAR_WIDTH).fill(color)]));
                 }
             });
     }
@@ -1311,13 +1348,14 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &candles.candles {
                     let range = (c.high - c.low).max(1e-9);
                     let bid_vol = c.volume * (1.0 - (c.close - c.low) / range);
                     let ask_vol = c.volume * ((c.close - c.low) / range);
-                    plot_ui.bar_chart(BarChart::new(vec![Bar::new(c.t - 0.2, bid_vol).width(0.35_f64).fill(LOSS.gamma_multiply(0.7))]));
-                    plot_ui.bar_chart(BarChart::new(vec![Bar::new(c.t + 0.2, ask_vol).width(0.35_f64).fill(PROFIT.gamma_multiply(0.7))]));
+                    plot_ui.bar_chart(BarChart::new(vec![Bar::new(c.t - 0.2 * DAY_SECS, bid_vol).width(0.35 * DAY_SECS).fill(LOSS.gamma_multiply(0.7))]));
+                    plot_ui.bar_chart(BarChart::new(vec![Bar::new(c.t + 0.2 * DAY_SECS, ask_vol).width(0.35 * DAY_SECS).fill(PROFIT.gamma_multiply(0.7))]));
                 }
             });
     }
@@ -1361,6 +1399,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = candles.candles.iter().enumerate()
                     .map(|(i, c)| [c.t, cumulative[i]])
@@ -1377,6 +1416,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &candles.candles {
                     let color = if c.is_bullish() { PROFIT } else { LOSS };
@@ -1393,10 +1433,11 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &candles.candles {
                     let color = if c.is_bullish() { PROFIT } else { LOSS };
-                    plot_ui.bar_chart(BarChart::new(vec![Bar::new(c.t, c.volume).width(0.7_f64).fill(color)]));
+                    plot_ui.bar_chart(BarChart::new(vec![Bar::new(c.t, c.volume).width(BAR_WIDTH).fill(color)]));
                 }
             });
     }
@@ -1409,6 +1450,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &candles.candles {
                     let color = if c.is_bullish() { PROFIT } else { LOSS };
@@ -1426,6 +1468,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = candles.candles.iter().enumerate()
                     .map(|(i, c)| [c.t, cumulative[i]])
@@ -1445,6 +1488,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !rsi_vals[i].is_nan() { Some([c.t, rsi_vals[i]]) } else { None })
@@ -1465,6 +1509,7 @@ impl BharatApp {
             .height(ui.available_height() * 0.5_f32)
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !macd_line[i].is_nan() { Some([c.t, macd_line[i]]) } else { None })
@@ -1480,12 +1525,13 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let bars: Vec<Bar> = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| {
                         if !histogram[i].is_nan() {
                             let color = if histogram[i] >= 0.0 { PROFIT } else { LOSS };
-                            Some(Bar::new(c.t, histogram[i]).width(0.5_f64).fill(color))
+                            Some(Bar::new(c.t, histogram[i]).width(0.5 * DAY_SECS).fill(color))
                         } else { None }
                     }).collect();
                 plot_ui.bar_chart(BarChart::new(bars));
@@ -1502,6 +1548,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let k_pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !k[i].is_nan() { Some([c.t, k[i]]) } else { None })
@@ -1526,6 +1573,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !atr_vals[i].is_nan() { Some([c.t, atr_vals[i]]) } else { None })
@@ -1544,6 +1592,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().enumerate()
                     .map(|(i, c)| [c.t, obv_vals[i]])
@@ -1562,6 +1611,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !vwap_vals[i].is_nan() { Some([c.t, vwap_vals[i]]) } else { None })
@@ -1580,6 +1630,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let mid_pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !mid[i].is_nan() { Some([c.t, mid[i]]) } else { None })
@@ -1606,6 +1657,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| {
@@ -1627,6 +1679,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !adx_vals[i].is_nan() { Some([c.t, adx_vals[i]]) } else { None })
@@ -1646,6 +1699,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !cci_vals[i].is_nan() { Some([c.t, cci_vals[i]]) } else { None })
@@ -1666,6 +1720,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !wr_vals[i].is_nan() { Some([c.t, wr_vals[i]]) } else { None })
@@ -1686,6 +1741,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !roc_vals[i].is_nan() { Some([c.t, roc_vals[i]]) } else { None })
@@ -1705,6 +1761,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !cmf_vals[i].is_nan() { Some([c.t, cmf_vals[i]]) } else { None })
@@ -1722,6 +1779,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().map(|c| [c.t, c.close]).collect();
                 plot_ui.line(Line::new(pts).color(AMBER).width(1.5_f32).name("Price"));
@@ -1740,6 +1798,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let mid_pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !mid[i].is_nan() { Some([c.t, mid[i]]) } else { None })
@@ -1764,6 +1823,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().map(|c| [c.t, c.close]).collect();
                 plot_ui.line(Line::new(pts).color(AMBER).width(1.5_f32).name("Price"));
@@ -1914,6 +1974,7 @@ impl BharatApp {
         Plot::new("rmdd_plot")
             .auto_bounds_x().auto_bounds_y()
             .height(ui.available_height())
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !rmdd[i].is_nan() { Some([c.t, rmdd[i]]) } else { None })
@@ -2301,6 +2362,7 @@ impl BharatApp {
         Plot::new("kalman_plot")
             .auto_bounds_x().auto_bounds_y()
             .height(ui.available_height())
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let mut estimate = candles.candles[0].close;
                 let mut error = 1.0;
@@ -2831,6 +2893,7 @@ impl BharatApp {
             .height(ui.available_height() * 0.5_f32)
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().map(|c| [c.t, c.close]).collect();
                 plot_ui.line(Line::new(pts).color(AMBER).width(1.5_f32).name("Price"));
@@ -2848,6 +2911,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !rsi_vals[i].is_nan() { Some([c.t, rsi_vals[i]]) } else { None })
@@ -2866,6 +2930,7 @@ impl BharatApp {
             .height(ui.available_height() * 0.33_f32)
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().map(|c| [c.t, c.close]).collect();
                 plot_ui.line(Line::new(pts).color(AMBER).width(1.5_f32).name("Daily"));
@@ -2875,6 +2940,7 @@ impl BharatApp {
             .height(ui.available_height() * 0.33_f32)
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let weekly: Vec<(f64, f64)> = series.candles.chunks(5)
                     .map(|chunk| (chunk[0].t, chunk.last().unwrap().close))
@@ -2887,6 +2953,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let monthly: Vec<(f64, f64)> = series.candles.chunks(20)
                     .map(|chunk| (chunk[0].t, chunk.last().unwrap().close))
@@ -2906,6 +2973,7 @@ impl BharatApp {
             .height(ui.available_height() * 0.5_f32)
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().map(|c| [c.t, c.close]).collect();
                 plot_ui.line(Line::new(pts).color(AMBER).width(1.5_f32).name("Price"));
@@ -2915,6 +2983,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !macd_line[i].is_nan() { Some([c.t, macd_line[i]]) } else { None })
@@ -2934,6 +3003,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().map(|c| [c.t, c.close]).collect();
                 plot_ui.line(Line::new(pts).color(AMBER).width(1.5_f32).name("Price"));
@@ -2956,6 +3026,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let max_vol = candles.candles.iter().map(|c| c.volume).fold(0.0_f64, f64::max);
                 for c in &candles.candles {
@@ -2977,6 +3048,7 @@ impl BharatApp {
             .height(ui.available_height() * 0.5_f32)
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().map(|c| [c.t, c.close]).collect();
                 plot_ui.line(Line::new(pts).color(AMBER).width(1.5_f32).name("Price"));
@@ -2986,6 +3058,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| if !roc_vals[i].is_nan() { Some([c.t, roc_vals[i]]) } else { None })
@@ -3036,6 +3109,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 for c in &candles.candles {
                     let color = if c.is_bullish() { PROFIT } else { LOSS };
@@ -3082,6 +3156,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().map(|c| [c.t, c.close]).collect();
                 plot_ui.line(Line::new(pts).color(AMBER).width(1.5_f32).name("Price"));
@@ -3102,12 +3177,13 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let bars: Vec<Bar> = series.candles.iter().enumerate()
                     .filter_map(|(i, c)| {
                         if !histogram[i].is_nan() {
                             let color = if histogram[i] >= 0.0 { PROFIT } else { LOSS };
-                            Some(Bar::new(c.t, histogram[i]).width(0.5_f64).fill(color))
+                            Some(Bar::new(c.t, histogram[i]).width(0.5 * DAY_SECS).fill(color))
                         } else { None }
                     }).collect();
                 plot_ui.bar_chart(BarChart::new(bars));
@@ -3156,6 +3232,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().map(|c| [c.t, c.close]).collect();
                 plot_ui.line(Line::new(pts).color(AMBER).width(1.5_f32).name("Price"));
@@ -3186,6 +3263,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().map(|c| [c.t, c.close]).collect();
                 plot_ui.line(Line::new(pts).color(AMBER).width(1.5_f32).name("Price"));
@@ -3208,6 +3286,7 @@ impl BharatApp {
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
+            .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = series.candles.iter().map(|c| [c.t, c.close]).collect();
                 plot_ui.line(Line::new(pts).color(AMBER).width(1.5_f32).name("Price"));
