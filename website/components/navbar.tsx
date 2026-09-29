@@ -3,7 +3,7 @@ import { SITE } from "@/lib/utils";
 import { Github, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Logo } from "./brand";
+import { BrandLockup } from "./brand";
 import { ThemeToggle } from "./theme-toggle";
 
 const LINKS = [
@@ -39,9 +39,8 @@ export function Navbar() {
       }`}
     >
       <nav aria-label="Primary" className="mx-auto flex h-full w-full max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="group flex items-center gap-2.5" aria-label="Bharat Terminal home">
-          <Logo />
-          <span className="font-display text-sm font-extrabold tracking-widest text-amber">BHARAT TERMINAL</span>
+        <Link href="/" className="group flex items-center" aria-label="Bharat Terminal home">
+          <BrandLockup />
         </Link>
         <div className="hidden items-center gap-7 md:flex">
           {LINKS.map((l) => (

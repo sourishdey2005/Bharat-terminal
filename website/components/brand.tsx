@@ -1,56 +1,36 @@
 import { cn } from "@/lib/utils";
 
-export function BrandMark({ size = 48 }: { size?: number }) {
-  const u = typeof window !== "undefined" ? window.innerHeight / 1058 : 0.07;
-  const w = size || 31.5 * u;
-  const h = 48.5 * u;
-  return (
-    <svg
-      aria-label="Bharat Terminal"
-      role="img"
-      viewBox="0 0 31.5 48.5"
-      width={w}
-      height={h}
-      className="brand-mark"
-      style={{ flexShrink: 0 }}
-    >
-      <defs>
-        <linearGradient id="bg1" x1="8" y1="0" x2="34.1" y2="28.9" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#9e9e9e" />
-          <stop offset="28%" stopColor="#a6a6a6" />
-          <stop offset="34%" stopColor="#a3a3a3" />
-          <stop offset="40%" stopColor="#3a3a3a" />
-          <stop offset="55%" stopColor="#414141" />
-          <stop offset="60%" stopColor="#7a7a7a" />
-          <stop offset="68%" stopColor="#8e8e8e" />
-          <stop offset="80%" stopColor="#a9a9a9" />
-          <stop offset="95%" stopColor="#c4c4c4" />
-          <stop offset="100%" stopColor="#cccccc" />
-        </linearGradient>
-      </defs>
-      <path d="M21.5 0 L21.5 19.5 L31.5 19.5 L31.5 29 L10 48.5 L10 28.5 L0.5 28.5 L0.5 18.5 Z" fill="url(#bg1)" />
-      <rect x="0.5" y="18.5" width="9" height="10" fill="#fdfdfd" />
-      <rect x="22" y="19.5" width="9.5" height="9.5" fill="#fdfdfd" />
-    </svg>
-  );
-}
-
-export function Logo({ size = 32 }: { size?: number }) {
+export function Logo({ size = 36 }: { size?: number }) {
   return (
     <span
-      aria-label="Bharat Terminal logo"
-      role="img"
-      className="group inline-flex items-center justify-center overflow-hidden rounded-[8px] transition-transform duration-300 group-hover:scale-105"
-      style={{ width: size, height: size }}
+      aria-hidden="true"
+      className="inline-flex items-center justify-center overflow-hidden rounded-[8px]"
+      style={{ width: size, height: size, flexShrink: 0 }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/logo.png"
-        alt="Bharat Terminal logo"
+        alt=""
         width={size}
         height={size}
-        style={{ width: size, height: size, objectFit: "contain" }}
+        style={{ width: size, height: size, objectFit: "cover" }}
       />
+    </span>
+  );
+}
+
+export function BrandLockup({ size = 36 }: { size?: number }) {
+  return (
+    <span className="group inline-flex items-center gap-2.5" aria-label="Bharat Terminal home">
+      <span className="inline-flex transition-transform duration-300 group-hover:scale-105">
+        <Logo size={size} />
+      </span>
+      <span
+        className="font-display font-extrabold text-amber"
+        style={{ fontSize: 17, letterSpacing: "0.18em", lineHeight: 1 }}
+      >
+        BHARAT TERMINAL
+      </span>
     </span>
   );
 }

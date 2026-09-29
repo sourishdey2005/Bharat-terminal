@@ -1,6 +1,6 @@
 import { Github, Twitter, MessageCircle, BookOpen } from "lucide-react";
 import Link from "next/link";
-import { Logo } from "./brand";
+import { BrandLockup } from "./brand";
 import { ThemeToggle } from "./theme-toggle";
 
 const COLS: Array<{ title: string; links: Array<[string, string]> }> = [
@@ -15,9 +15,8 @@ export function Footer() {
     <footer className="border-t border-subtle bg-base" aria-label="Footer">
       <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.2fr_repeat(4,1fr)]">
         <div>
-          <div className="flex items-center gap-2.5">
-            <Logo />
-            <span className="font-display text-sm font-extrabold tracking-widest text-amber">BHARAT TERMINAL</span>
+          <div className="flex items-center">
+            <BrandLockup />
           </div>
           <p className="mt-4 max-w-xs text-sm text-secondary">Bloomberg power. Zero cost. Made in India.</p>
           <p className="mt-2 text-sm font-semibold text-amber">Made by Sourish Dey</p>
