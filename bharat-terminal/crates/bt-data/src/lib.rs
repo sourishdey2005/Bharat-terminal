@@ -9,6 +9,7 @@
 //! - SQLite caching with TTL-based expiration
 //! - Symbol resolution for 50+ major companies
 
+pub mod bhavcopy;
 pub mod cache;
 pub mod coinbase;
 pub mod fmp;
@@ -21,10 +22,11 @@ pub mod yahoo;
 pub use provider::{CompanyProfile, DataProvider, Interval, Quote, SymbolInfo};
 pub use symbol::{COMPANY_LIST, DEFAULT_COMPANY};
 
+use crate::bhavcopy::BhavcopyProvider;
 use crate::cache::Cache;
 use crate::coinbase::CoinbaseProvider;
 use crate::yahoo::YahooProvider;
-use bt_core::{OhlcvSeries, Result};
+use bt_core::{BtError, OhlcvSeries, Result};
 use chrono::{DateTime, Utc};
 use std::path::Path;
 
@@ -32,6 +34,8 @@ use std::path::Path;
 pub struct DataService {
     yahoo: YahooProvider,
     coinbase: CoinbaseProvider,
+    /// Official exchange settlement files, used when Yahoo is unavailable.
+    bhavcopy: BhavcopyProvider,
     cache: Cache,
 }
 
@@ -42,6 +46,7 @@ impl DataService {
         Ok(Self {
             yahoo: YahooProvider::new(),
             coinbase: CoinbaseProvider::new(),
+            bhavcopy: BhavcopyProvider::new()?,
             cache: Cache::new("./data/cache.db")?,
         })
     }
@@ -51,6 +56,7 @@ impl DataService {
         Ok(Self {
             yahoo: YahooProvider::new(),
             coinbase: CoinbaseProvider::new(),
+            bhavcopy: BhavcopyProvider::new()?,
             cache: Cache::new(cache_path)?,
         })
     }
@@ -93,14 +99,71 @@ impl DataService {
                 .fetch_candles(symbol, granularity, start_ts, end_ts)
                 .await?
         } else {
-            // Use Yahoo for everything else
-            self.yahoo.fetch_ohlcv(symbol, interval, start, end).await?
+            // Yahoo is the primary source for everything else. If it fails or
+            // returns nothing usable, fall back to the exchange's own daily
+            // settlement file for Indian equities, which needs no API key.
+            match self.yahoo.fetch_ohlcv(symbol, interval, start, end).await {
+                Ok(s) if !s.candles.is_empty() => s,
+                Ok(_) | Err(_) => {
+                    let fallback = self.bhavcopy_history(symbol, &start, &end).await?;
+                    fallback.ok_or_else(|| BtError::EmptySeries(symbol.to_string()))?
+                }
+            }
         };
 
         // Update cache
         let _ = self.cache.put_ohlcv(symbol, interval_str, &series.candles);
 
         Ok(series)
+    }
+
+    /// Builds history from official NSE daily settlement files.
+    ///
+    /// Walks backwards over weekdays from `end` until enough bars are collected
+    /// or the 400-day guard is hit, so a Yahoo outage still yields real data
+    /// rather than synthetic filler. Returns `None` for non-Indian symbols.
+    async fn bhavcopy_history(
+        &self,
+        symbol: &str,
+        start: &DateTime<Utc>,
+        end: &DateTime<Utc>,
+    ) -> Result<Option<OhlcvSeries>> {
+        if !symbol.to_ascii_uppercase().ends_with(".NS") {
+            return Ok(None);
+        }
+        let want = symbol
+            .split('.')
+            .next()
+            .unwrap_or(symbol)
+            .to_ascii_uppercase();
+        let mut date = end.date_naive();
+        let start_date = start.date_naive();
+        let mut collected: Vec<bt_core::Candle> = Vec::new();
+        let mut attempts = 0;
+        // Holidays simply 404, so stop on a generous cap rather than a fixed count.
+        while date >= start_date && attempts < 400 {
+            if let Ok(rows) = self.bhavcopy.fetch_nse_day(date).await {
+                for (scrip, c) in rows {
+                    // Only keep the requested scrip; the file holds every
+                    // listed equity, so without this every symbol would chart
+                    // the whole market.
+                    if scrip == want {
+                        collected.push(c);
+                    }
+                }
+            }
+            if !collected.is_empty() {
+                break;
+            }
+            date -= chrono::Duration::days(1);
+            attempts += 1;
+        }
+        if collected.is_empty() {
+            return Ok(None);
+        }
+        collected.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap_or(std::cmp::Ordering::Equal));
+        collected.dedup_by(|a, b| (a.t - b.t).abs() < f64::EPSILON);
+        Ok(Some(OhlcvSeries::new(symbol, collected)))
     }
 
     /// Fetch real-time quote.

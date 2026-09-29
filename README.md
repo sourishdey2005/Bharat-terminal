@@ -125,13 +125,43 @@ timestamps sets the body width, so 1-minute, 5-minute, daily and weekly series
 all render at the correct density instead of overlapping. Bars are never wider
 than the gap that separates them.
 
+**Double-click to zoom.** Click anywhere on the chart to zoom in around that
+point; click again to step back out, or use **Reset zoom**. The header shows
+the current factor (e.g. `4.0x`). Zoom persists across the 30-second live
+refresh and resets when you switch symbol or timeframe.
+
 **Trend arrows auto-hide above 90 bars**, where a per-bar marker is visual
-noise. The header shows `(hidden: N bars)` so the state is never silent; pick a
-shorter range to see them.
+noise. The header shows `(hidden: N bars)` so the state is never silent; zoom
+in to see them.
+
+The chart fills the full window height, with the price and volume panes
+sharing one x-axis so they stay aligned at any window size.
 
 The same renderer backs the `GP (HA)`, `C3D`, `CMA`, `CBB`, `CRSI` and `CMACD`
 candle tabs, and all of them pin their visible range to the data so a
 previously viewed time range cannot leave them zoomed out.
+
+### Data Source Fallback Chain
+
+| Order | Source | Covers |
+|------:|--------|--------|
+| 1 | SQLite cache | Previously fetched bars within the requested window |
+| 2 | Yahoo Finance | Global equities, indices, ETFs, FX, crypto |
+| 3 | Coinbase | `*-USD` crypto spot markets |
+| 4 | **NSE bhavcopy** | Indian equities, official daily settlement files |
+
+The **bhavcopy** source downloads the exchange's own end-of-day ZIP from
+`archives.nseindia.com` — no API key, no session, no cookie — and parses the
+authoritative settlement record. One file contains every listed scrip (about
+2,600 for NSE), so a Yahoo outage still yields real prices rather than
+synthetic filler. BSE's equivalent `EQ_ISIN_DDMMYY.zip` layout is also parsed.
+
+```rust
+use bt_data::bhavcopy::BhavcopyProvider;
+let p = BhavcopyProvider::new()?;
+let series = p.fetch_nse_symbol("RELIANCE.NS", date).await?;
+```
+
 
 
 #### Alternative Bar Styles

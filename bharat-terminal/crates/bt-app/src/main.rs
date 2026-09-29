@@ -206,12 +206,139 @@ fn style_time_plot<'a>(
         .y_axis_formatter(move |mark, _range| format!("{:.*}", decimals, mark.value))
 }
 
+/// A user-controlled zoom window over the full data range.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct ZoomState {
+    /// `1.0` shows the whole range; larger values zoom in.
+    factor: f64,
+    /// X position (timestamp) to keep centred, or `None` to use the midpoint.
+    focus_x: Option<f64>,
+    /// Y position to keep centred.
+    focus_y: Option<f64>,
+}
+
+impl Default for ZoomState {
+    fn default() -> Self {
+        Self {
+            factor: 1.0,
+            focus_x: None,
+            focus_y: None,
+        }
+    }
+}
+
+impl ZoomState {
+    const MIN_FACTOR: f64 = 1.0;
+    const MAX_FACTOR: f64 = 400.0;
+
+    /// Zoom factor applied by a single double-click step.
+    const STEP: f64 = 2.0;
+
+    /// True when the view is not showing the full range.
+    fn is_zoomed(&self) -> bool {
+        self.factor > Self::MIN_FACTOR + f64::EPSILON
+    }
+
+    /// Zooms in around `(x, y)`, or back out to the full range when already
+    /// fully zoomed in. Returns the new state.
+    fn toggle_step(&self, x: f64, y: f64) -> Self {
+        if !x.is_finite() || !y.is_finite() {
+            return *self;
+        }
+        if self.factor >= Self::MAX_FACTOR {
+            return Self::default();
+        }
+        let next = (self.factor * Self::STEP).min(Self::MAX_FACTOR);
+        // An odd number of steps returns to the unzoomed view, matching the
+        // "double-click toggles" feel of a trading terminal.
+        let factor = if next <= Self::MIN_FACTOR + f64::EPSILON {
+            Self::MIN_FACTOR
+        } else {
+            next
+        };
+        Self {
+            factor,
+            focus_x: Some(x),
+            focus_y: Some(y),
+        }
+    }
+
+    /// Resets to the full range.
+    fn reset(&self) -> Self {
+        Self::default()
+    }
+
+    /// Applies the zoom to `(x0, x1)` and `(y0, y1)`, returning the window to
+    /// display. The focus point stays fixed while the window shrinks around it.
+    fn window(&self, x0: f64, x1: f64, y0: f64, y1: f64) -> (f64, f64, f64, f64) {
+        if !x1.is_finite() || !y1.is_finite() || x1 <= x0 || y1 <= y0 {
+            return (x0, x1, y0, y1);
+        }
+        if !self.is_zoomed() {
+            return (x0, x1, y0, y1);
+        }
+        let cx = self.focus_x.unwrap_or(0.5 * (x0 + x1));
+        let cy = self.focus_y.unwrap_or(0.5 * (y0 + y1));
+        let half_x = 0.5 * (x1 - x0) / self.factor;
+        let half_y = 0.5 * (y1 - y0) / self.factor;
+        (cx - half_x, cx + half_x, cy - half_y, cy + half_y)
+    }
+}
+
+/// Handles a double-click on a plot: zooms in around the clicked point, or
+/// zooms back out when already at the maximum zoom. Returns the new zoom state
+/// when the state changed, otherwise `None`.
+///
+/// The double-click is read from the raw pointer input rather than
+/// `response().double_clicked()`, which egui_plot only reports when the plot
+/// widget itself claims the interaction; the hover check plus
+/// `pointer_coordinate()` is what reliably identifies a click on the chart.
+fn handle_plot_double_click(plot_ui: &egui_plot::PlotUi, current: ZoomState) -> Option<ZoomState> {
+    // egui_plot sets the plot widget's `Sense` itself, so `double_clicked()` on
+    // its response only fires when the plot claims the click. Reading the raw
+    // input and gating it on `hovered()` is what makes double-clicks reliable.
+    let double_clicked = plot_ui.ctx().input(|i| {
+        i.pointer
+            .button_double_clicked(egui::PointerButton::Primary)
+    });
+    if !double_clicked {
+        return None;
+    }
+    if !plot_ui.response().hovered() {
+        return None;
+    }
+    let point = plot_ui.pointer_coordinate()?;
+    let next = if current.factor >= ZoomState::MAX_FACTOR {
+        current.reset()
+    } else {
+        current.toggle_step(point.x, point.y)
+    };
+    if next == current {
+        None
+    } else {
+        Some(next)
+    }
+}
+
 /// Pins a plot's visible range, overriding remembered zoom/pan state so the
 /// chart always refits the data. Call this first inside `Plot::show`.
 fn pin_bounds(plot_ui: &mut egui_plot::PlotUi, x0: f64, x1: f64, y0: f64, y1: f64) {
     if x1 > x0 && y1 > y0 {
         plot_ui.set_plot_bounds(egui_plot::PlotBounds::from_min_max([x0, y0], [x1, y1]));
     }
+}
+
+/// [`pin_bounds`] combined with the user's zoom window.
+fn pin_zoomed_bounds(
+    plot_ui: &mut egui_plot::PlotUi,
+    zoom: ZoomState,
+    x0: f64,
+    x1: f64,
+    y0: f64,
+    y1: f64,
+) {
+    let (zx0, zx1, zy0, zy1) = zoom.window(x0, x1, y0, y1);
+    pin_bounds(plot_ui, zx0, zx1, zy0, zy1);
 }
 
 /// Returns the `(top, bottom)` of the candle body, guaranteeing a visible body
@@ -959,6 +1086,13 @@ struct BharatApp {
     compare_symbols: Vec<String>,
     compare_search: String,
     show_candle_arrows: std::cell::Cell<bool>,
+    /// Double-click zoom applied on top of the full data range.
+    zoom: std::cell::Cell<ZoomState>,
+    /// `symbol|range` that the in-flight fetch was issued for. Compared
+    /// against `last_range_key` to detect a genuine symbol/range switch.
+    data_range_key: String,
+    /// Last applied `data_range_key`; a change resets the zoom.
+    last_range_key: String,
     /// Height of the central panel viewport, captured before the chart
     /// ScrollArea inflates the available space. Used to budget multi-pane
     /// chart layouts so the volume pane is never pushed off-screen.
@@ -1021,6 +1155,9 @@ impl BharatApp {
             ],
             compare_search: String::new(),
             show_candle_arrows: std::cell::Cell::new(true),
+            zoom: std::cell::Cell::new(ZoomState::default()),
+            data_range_key: String::new(),
+            last_range_key: String::new(),
             viewport_h: 600.0,
         };
 
@@ -1063,6 +1200,9 @@ impl BharatApp {
         let interval = self.time_range.to_interval();
         let days = self.time_range.to_days();
         let tx = self.tx.clone();
+        // Record what this fetch is for, so `DataReady` can tell a genuine
+        // symbol/range switch (reset the zoom) from a periodic refresh (keep it).
+        self.data_range_key = format!("{}|{}", symbol, interval.as_str());
 
         self.runtime.spawn(async move {
             let start = Instant::now();
@@ -1100,6 +1240,15 @@ impl BharatApp {
         while let Ok(msg) = self.rx.try_recv() {
             match msg {
                 AppMessage::DataReady(series) => {
+                    // A refresh of the same symbol/range must not discard the
+                    // user's zoom, so only reset when the series identity or
+                    // timeframe actually changed. `trigger_fetch` clears
+                    // `data_range_key` when the user switches symbol or range.
+                    let key = self.data_range_key.clone();
+                    if self.last_range_key != key {
+                        self.last_range_key = key;
+                        self.zoom.set(ZoomState::default());
+                    }
                     self.data.candles = series;
                     self.fetch_in_flight = false;
                     self.last_fetch = Some(Instant::now());
@@ -1332,7 +1481,13 @@ impl BharatApp {
             // chrome the header/tab bars already consumed. Multi-pane chart tabs
             // budget against this so the lower pane is never clipped.
             let screen = ui.ctx().screen_rect();
-            self.viewport_h = (screen.max.y - ui.next_widget_position().y).max(240.0);
+            // `clip_rect()` is the region this panel may actually paint, so the
+            // height left for the chart is the clip height minus the tab's own
+            // header. Budgeting from the screen height instead left a blank
+            // ribbon along the bottom whenever the window was resized.
+            let clip = ui.clip_rect();
+            let available = (clip.height() - ui.next_widget_position().y + clip.min.y).max(240.0);
+            self.viewport_h = available;
 
             if self.scroll_to_chart {
                 self.scroll_to_chart = false;
@@ -1510,6 +1665,30 @@ impl BharatApp {
             }
         });
 
+        // Zoom controls: double-click the chart to zoom in around the pointer
+        // and again to step back out, or use these buttons.
+        ui.horizontal(|ui| {
+            let zoom = self.zoom.get();
+            if zoom.is_zoomed() {
+                ui.label(
+                    RichText::new(format!("\u{1F50D} {:.1}x", zoom.factor)).small().strong(),
+                );
+                if ui
+                    .button("Reset zoom")
+                    .on_hover_text("Return to the full data range")
+                    .clicked()
+                {
+                    self.zoom.set(zoom.reset());
+                }
+            } else {
+                ui.colored_label(
+                    Color32::GRAY,
+                    "Double-click the chart to zoom in",
+                )
+                .on_hover_text("Double-click zooms in around the pointer.\nDouble-click again to step back out.");
+            }
+        });
+
         if series.is_empty() {
             ui.centered_and_justified(|ui| {
                 ui.label("No data for this symbol.");
@@ -1554,6 +1733,13 @@ impl BharatApp {
             ui.label(format!("Vol {}", abbreviate_volume(volume_max)));
         });
 
+        // Full (unzoomed) y-range for the price pane.
+        let y_lo = price_scale(series).0 - range * 0.04 - arrow_pad;
+        let y_hi = price_scale(series).0 + range * 1.04 + arrow_pad;
+        let zoom_now = self.zoom.get();
+        // The two panes must share one x-window, so derive it once here.
+        let (zx0, zx1, _, _) = zoom_now.window(x0, x1, y_lo, y_hi);
+
         let hover_candle = std::cell::RefCell::new(None::<(f64, f64, f64, f64, f64)>);
         let spacing = bar_spacing(series);
         // `viewport_h` runs from the top of the chart area, so it still covers
@@ -1562,7 +1748,7 @@ impl BharatApp {
         // budget reserves room for those plus the status bar; otherwise the
         // volume pane is pushed past the bottom of the window.
         let avail = self.viewport_h.max(280.0);
-        let tab_chrome = 84.0_f32;
+        let tab_chrome = 106.0_f32;
         let axis_h = 46.0_f32;
         let status_h = 24.0_f32;
         let body_h = (avail - tab_chrome - axis_h - status_h).max(200.0);
@@ -1574,37 +1760,66 @@ impl BharatApp {
         let arrows_legible = show_arrows && series.len() <= 90;
         let arrow = range * ARROW_FRAC;
 
+        let hover_series: Vec<Candle> = {
+            // Restrict work to the visible window while zoomed.
+            if zoom_now.is_zoomed() {
+                series
+                    .iter()
+                    .filter(|c| c.t >= zx0 - spacing && c.t <= zx1 + spacing)
+                    .copied()
+                    .collect()
+            } else {
+                Vec::new()
+            }
+        };
+        let visible = if hover_series.is_empty() {
+            &series[..]
+        } else {
+            &hover_series[..]
+        };
+        let visible_half = if zoom_now.is_zoomed() {
+            bar_half(visible)
+        } else {
+            half
+        };
+        let visible_min_body = if zoom_now.is_zoomed() {
+            price_scale(visible).1 * MIN_BODY_FRAC
+        } else {
+            min_body
+        };
+
         style_time_plot(Plot::new("candlestick_plot"), series, price_h)
-            .include_y(price_scale(series).0 - range * 0.04 - arrow_pad)
-            .include_y(price_scale(series).0 + range * 1.04 + arrow_pad)
+            .include_y(y_lo)
+            .include_y(y_hi)
             // Keep the price axis on the right; the x-axis ticks live on the
             // volume pane directly below, which shares the exact same bounds.
             .show_axes([false, true])
             .show(ui, |plot_ui| {
+                // Double-click to zoom in around the pointer, or back out.
+                if let Some(next) = handle_plot_double_click(plot_ui, zoom_now) {
+                    self.zoom.set(next);
+                }
                 // Pin the range so a previously viewed time range cannot leave
-                // this pane zoomed out with the bars squeezed into a sliver.
-                pin_bounds(
-                    plot_ui,
-                    x0,
-                    x1,
-                    price_scale(series).0 - range * 0.04 - arrow_pad,
-                    price_scale(series).0 + range * 1.04 + arrow_pad,
-                );
+                // this pane zoomed out with the bars squeezed into a sliver,
+                // while still honouring the user's zoom.
+                pin_zoomed_bounds(plot_ui, self.zoom.get(), x0, x1, y_lo, y_hi);
                 // Current-price guide, drawn first so bars sit on top of it.
-                plot_ui.hline(
-                    egui_plot::HLine::new(last_close)
-                        .color(Color32::from_gray(140))
-                        .style(egui_plot::LineStyle::dashed_loose()),
-                );
-                for c in series {
-                    draw_candle(plot_ui, c, half, min_body);
+                if last_close >= y_lo && last_close <= y_hi {
+                    plot_ui.hline(
+                        egui_plot::HLine::new(last_close)
+                            .color(Color32::from_gray(140))
+                            .style(egui_plot::LineStyle::dashed_loose()),
+                    );
+                }
+                for c in visible {
+                    draw_candle(plot_ui, c, visible_half, visible_min_body);
                     if arrows_legible {
-                        draw_trend_arrow(plot_ui, c, half, arrow);
+                        draw_trend_arrow(plot_ui, c, visible_half, arrow);
                     }
                 }
                 if let Some(hover_pos) = plot_ui.pointer_coordinate() {
-                    if spacing > 0.0 && x1 > x0 {
-                        let idx = (((hover_pos.x - x0) / spacing).round() as isize)
+                    if spacing > 0.0 && zx1 > zx0 {
+                        let idx = (((hover_pos.x - zx0) / spacing).round() as isize)
                             .clamp(0, series.len() as isize - 1)
                             as usize;
                         let c = &series[idx];
@@ -1643,8 +1858,8 @@ impl BharatApp {
             .allow_drag(true)
             .allow_scroll(true)
             .allow_zoom(false)
-            .include_x(x0)
-            .include_x(x1)
+            .include_x(zx0)
+            .include_x(zx1)
             .include_y(0.0)
             .y_axis_position(egui_plot::HPlacement::Right)
             .y_axis_width(9)
@@ -1653,8 +1868,8 @@ impl BharatApp {
             .y_axis_formatter(move |mark, _range| abbreviate_volume(mark.value))
             .show(ui, |plot_ui| {
                 // Share the price pane's exact x-range so the two align.
-                pin_bounds(plot_ui, x0, x1, 0.0, volume_max.max(1.0) * 1.1);
-                let bars: Vec<Bar> = series
+                pin_bounds(plot_ui, zx0, zx1, 0.0, volume_max.max(1.0) * 1.1);
+                let bars: Vec<Bar> = visible
                     .iter()
                     .map(|c| {
                         let color = if c.is_bullish() { PROFIT } else { LOSS };
@@ -7577,6 +7792,83 @@ mod tests {
         );
         let (x0, x1) = x_bounds(&flat);
         assert!(x1 > x0, "x_bounds must stay ordered even for a single bar");
+    }
+
+    #[test]
+    fn test_zoom_default_shows_the_full_range() {
+        let z = ZoomState::default();
+        assert!(!z.is_zoomed());
+        assert_eq!(z.window(0.0, 100.0, 0.0, 50.0), (0.0, 100.0, 0.0, 50.0));
+    }
+
+    #[test]
+    fn test_zoom_in_shrinks_the_window_around_the_focus() {
+        let z = ZoomState::default().toggle_step(50.0, 25.0);
+        assert!(z.is_zoomed());
+        assert_eq!(z.factor, ZoomState::STEP);
+        let (x0, x1, y0, y1) = z.window(0.0, 100.0, 0.0, 50.0);
+        assert!((0.5 * (x0 + x1) - 50.0).abs() < 1e-9, "x focus preserved");
+        assert!((0.5 * (y0 + y1) - 25.0).abs() < 1e-9, "y focus preserved");
+        assert!((x1 - x0) - 50.0 < 1e-9, "x window halved");
+        assert!((y1 - y0) - 25.0 < 1e-9, "y window halved");
+    }
+
+    #[test]
+    fn test_zoom_keeps_stepping_in_then_resets_at_the_cap() {
+        let mut z = ZoomState::default();
+        // Each step doubles until the cap is reached.
+        for _ in 0..8 {
+            let before = z.factor;
+            z = z.toggle_step(10.0, 10.0);
+            if before < ZoomState::MAX_FACTOR {
+                assert!(z.factor > before, "factor grows while below the cap");
+            }
+        }
+        assert!(z.factor <= ZoomState::MAX_FACTOR);
+        // Once the cap is hit, `toggle_step` returns the full range so the
+        // double-click cycles back out.
+        let mut z = ZoomState {
+            factor: ZoomState::MAX_FACTOR,
+            focus_x: Some(1.0),
+            focus_y: Some(1.0),
+        };
+        let out = z.toggle_step(10.0, 10.0);
+        assert_eq!(out.factor, ZoomState::MIN_FACTOR);
+        assert!(!out.is_zoomed());
+    }
+
+    #[test]
+    fn test_zoom_ignores_non_finite_points() {
+        let z = ZoomState::default();
+        assert_eq!(z.toggle_step(f64::NAN, 1.0), z);
+        assert_eq!(z.toggle_step(1.0, f64::INFINITY), z);
+    }
+
+    #[test]
+    fn test_zoom_window_is_safe_for_degenerate_ranges() {
+        let z = ZoomState::default().toggle_step(5.0, 5.0);
+        assert_eq!(z.window(10.0, 10.0, 0.0, 50.0), (10.0, 10.0, 0.0, 50.0));
+        assert_eq!(z.window(50.0, 10.0, 0.0, 50.0), (50.0, 10.0, 0.0, 50.0));
+    }
+
+    #[test]
+    fn test_zoom_reset_returns_to_full_range() {
+        let z = ZoomState::default().toggle_step(80.0, 20.0);
+        assert!(z.is_zoomed());
+        let r = z.reset();
+        assert!(!r.is_zoomed());
+        assert_eq!(r.window(0.0, 100.0, 0.0, 50.0), (0.0, 100.0, 0.0, 50.0));
+    }
+
+    #[test]
+    fn test_zoomed_window_stays_finite_and_ordered() {
+        let mut z = ZoomState::default();
+        for _ in 0..20 {
+            z = z.toggle_step(1_000.0, 500.0);
+        }
+        let (x0, x1, y0, y1) = z.window(0.0, 2000.0, 0.0, 1000.0);
+        assert!(x0.is_finite() && x1.is_finite() && y0.is_finite() && y1.is_finite());
+        assert!(x1 > x0 && y1 > y0);
     }
 
     #[test]
