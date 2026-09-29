@@ -156,6 +156,22 @@ diagonal pinch zooms both. Because a pinch reports a small factor every frame,
 zoom is continuous rather than the fixed 2× step used by a double-click, so
 the view scales smoothly instead of jumping between extremes.
 
+**Scroll to zoom, drag or swipe to pan (mouse and trackpad).** The wheel works
+from the full-range view, so it is how a zoomed window is entered with a
+mouse: wheel-up zooms in around the pointer, wheel-down zooms out, and
+horizontal scroll (shift+wheel, trackpad swipe) pans through time. Trackpad
+pinch and ctrl+wheel arrive as a proportional zoom and scale both axes around
+the pointer. Dragging pans horizontally and vertically once zoomed in; the
+volume pane answers horizontal drags and scrolls too, so no part of the
+canvas feels dead.
+
+**Long custom windows fetch the whole window.** Yahoo's chart endpoint takes
+*either* a preset range *or* explicit start/end timestamps -- sending both
+makes the preset win and the timestamps vanish, which capped every window
+over 5 years at 5 years of data (a 2017-2026 request charted only ~2021 on).
+Explicit windows are now requested with timestamps alone, so a 9-year custom
+range returns all ~470 weekly bars.
+
 **X-axis labels follow the selected timeframe:**
 
 | Range | Label | Example |

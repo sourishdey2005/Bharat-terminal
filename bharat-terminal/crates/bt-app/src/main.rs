@@ -665,6 +665,27 @@ impl ZoomState {
             ..*self
         }
     }
+
+    /// Shifts only the horizontal axis, leaving the vertical pan untouched.
+    ///
+    /// The volume pane shares the price pane's time axis but has its own fixed
+    /// price axis (`0..max volume`), so a vertical drag there must not move the
+    /// price window. Horizontal drags and scrolls on the volume pane route
+    /// here instead of [`Self::pan_by`].
+    fn pan_x_only(&self, dx: f64, x0: f64, x1: f64) -> Self {
+        if !dx.is_finite() {
+            return *self;
+        }
+        if !self.is_zoomed() {
+            return *self;
+        }
+        let (bx0, bx1, _, _) = self.base_window(x0, x1, 0.0, 1.0);
+        let pan_x = (self.pan_x + dx).clamp(x0 - bx0, x1 - bx1);
+        if (pan_x - self.pan_x).abs() < f64::EPSILON {
+            return *self;
+        }
+        Self { pan_x, ..*self }
+    }
 }
 
 /// Applies a chart zoom gesture.
@@ -739,6 +760,84 @@ fn drag_to_data(drag_px: f32, plot_px: f32, full: f64) -> f64 {
     -full * (drag_px as f64 / plot_px as f64)
 }
 
+/// Maps a vertical scroll delta (points) to a multiplicative zoom factor.
+///
+/// Wheel-up (positive) zooms in, wheel-down zooms out. The exponential keeps
+/// tiny trackpad deltas smooth while a full mouse-wheel notch (~50 points)
+/// steps about 1.16x -- close to one double-click step spread over the
+/// wheel's detents instead of a single jump.
+fn scroll_zoom_factor(scroll_y: f32) -> f64 {
+    const PER_POINT: f64 = 0.003;
+    ((scroll_y as f64) * PER_POINT).exp()
+}
+
+/// Applies mouse-wheel / trackpad zoom and pan on a plot.
+///
+/// egui_plot pins its bounds every frame, which wipes out its own scroll
+/// handling, so without this the wheel did literally nothing on a chart.
+/// Wheel-up zooms in around the pointer, wheel-down zooms out; horizontal
+/// scroll (shift+wheel, trackpad swipe) pans through time. Trackpad pinch and
+/// ctrl+wheel arrive as a `zoom_delta` and are applied as a proportional zoom.
+/// Unlike drag panning, scrolling works from the full-range view, so this is
+/// how a zoomed window is entered with a mouse.
+fn handle_plot_scroll(
+    plot_ui: &egui_plot::PlotUi,
+    current: ZoomState,
+    series: &[Candle],
+    x0: f64,
+    x1: f64,
+    y0: f64,
+    y1: f64,
+) -> Option<ZoomState> {
+    if !plot_ui.response().hovered() {
+        return None;
+    }
+    let (zoom, scroll) = plot_ui.ctx().input(|i| {
+        let scroll = if i.smooth_scroll_delta == egui::Vec2::ZERO {
+            i.raw_scroll_delta
+        } else {
+            i.smooth_scroll_delta
+        };
+        (i.zoom_delta(), scroll)
+    });
+
+    // Pointer position in data space, for anchoring the zoom. Falls back to
+    // the middle of the data when the pointer position is unavailable.
+    let anchor = plot_ui
+        .pointer_coordinate()
+        .and_then(|p| {
+            if p.x.is_finite() && p.y.is_finite() {
+                Some((p.x, p.y))
+            } else {
+                None
+            }
+        })
+        .unwrap_or((0.5 * (x0 + x1), 0.5 * (y0 + y1)));
+
+    let mut next = current;
+    // Trackpad pinch / ctrl+wheel first: it is the finer-grained gesture.
+    if zoom.is_finite() && (zoom - 1.0).abs() > 1e-6 {
+        next = next.zoom_by(zoom as f64, anchor.0, anchor.1, series, x0, x1);
+    } else if scroll.y != 0.0 {
+        let factor = scroll_zoom_factor(scroll.y);
+        next = next.zoom_by(factor, anchor.0, anchor.1, series, x0, x1);
+    }
+    // Horizontal scroll pans, reusing the drag maths so the clamp behaviour
+    // matches a horizontal drag exactly.
+    if scroll.x != 0.0 {
+        let rect = plot_ui.response().rect;
+        let (wx0, wx1, _, _) = next.window_with_data(series, x0, x1, y0, y1);
+        let dx = drag_to_data(scroll.x, rect.width(), wx1 - wx0);
+        next = next.pan_by(dx, 0.0, series, x0, x1, y0, y1);
+    }
+
+    if next == current {
+        None
+    } else {
+        Some(next)
+    }
+}
+
 /// Applies a two-finger pinch and drag on a plot.
 ///
 /// Touch needs its own path: there is no right-click, and a single-finger swipe
@@ -805,6 +904,95 @@ fn handle_plot_pinch(
     }
 }
 
+/// Applies drag, scroll and pinch gestures on the volume pane.
+///
+/// The volume pane shares the price pane's time axis, so horizontal movement
+/// there must move the shared window -- otherwise dragging the lower third of
+/// the canvas feels dead. The vertical axis is fixed (`0..max volume`), so
+/// only the horizontal component of each gesture is honoured: horizontal drags
+/// and scrolls pan through time, and a pinch or wheel-zoom scales the shared
+/// x-scale around the pointer. The price window's y-scale is never touched.
+fn handle_volume_gestures(
+    plot_ui: &egui_plot::PlotUi,
+    current: ZoomState,
+    series: &[Candle],
+    x0: f64,
+    x1: f64,
+    y0: f64,
+    y1: f64,
+) -> Option<ZoomState> {
+    if !plot_ui.response().hovered() {
+        return None;
+    }
+    let mut next = current;
+
+    // Pinch: x-component only.
+    if let Some(touch) = plot_ui.ctx().multi_touch() {
+        if touch.num_touches >= 2 {
+            let zx = touch.zoom_delta_2d.x as f64;
+            let delta = touch.translation_delta;
+            let zooming = (zx - 1.0).abs() > 1e-6;
+            if zooming || delta.x != 0.0 {
+                let rect = plot_ui.response().rect;
+                let anchor = plot_ui
+                    .plot_from_screen(egui::Pos2::new(rect.center().x + delta.x, rect.center().y))
+                    .x;
+                if anchor.is_finite() {
+                    if zooming {
+                        next = next.zoom_x_by(zx, anchor, 0.0, series, x0, x1);
+                    }
+                    if delta.x != 0.0 {
+                        let (wx0, wx1, _, _) = next.window(x0, x1, y0, y1);
+                        let dx = drag_to_data(delta.x, rect.width(), wx1 - wx0);
+                        next = next.pan_x_only(dx, x0, x1);
+                    }
+                }
+            }
+        }
+    }
+
+    // Wheel: vertical scroll zooms the shared x-scale, horizontal scroll pans.
+    let (zoom, scroll) = plot_ui.ctx().input(|i| {
+        let scroll = if i.smooth_scroll_delta == egui::Vec2::ZERO {
+            i.raw_scroll_delta
+        } else {
+            i.smooth_scroll_delta
+        };
+        (i.zoom_delta(), scroll)
+    });
+    // Anchor at the pointer's time; the price is irrelevant here.
+    let anchor_x = plot_ui
+        .pointer_coordinate()
+        .map(|p| p.x)
+        .unwrap_or(0.5 * (x0 + x1));
+    if zoom.is_finite() && (zoom - 1.0).abs() > 1e-6 {
+        if anchor_x.is_finite() {
+            next = next.zoom_x_by(zoom as f64, anchor_x, 0.0, series, x0, x1);
+        }
+    } else if scroll.y != 0.0 && anchor_x.is_finite() {
+        next = next.zoom_x_by(scroll_zoom_factor(scroll.y), anchor_x, 0.0, series, x0, x1);
+    }
+    if scroll.x != 0.0 {
+        let rect = plot_ui.response().rect;
+        let (wx0, wx1, _, _) = next.window(x0, x1, y0, y1);
+        let dx = drag_to_data(scroll.x, rect.width(), wx1 - wx0);
+        next = next.pan_x_only(dx, x0, x1);
+    }
+
+    // Single-finger / mouse drag: horizontal component only. `pan_x_only`
+    // no-ops at the full range, so no zoom gate is needed here.
+    let delta = plot_ui.pointer_coordinate_drag_delta();
+    if delta.x != 0.0 {
+        next = next.pan_x_only(-(delta.x as f64), x0, x1);
+    }
+
+    if next == current {
+        None
+    } else {
+        Some(next)
+    }
+}
+
 /// Applies a drag on a plot as a horizontal/vertical pan of the zoomed window.
 ///
 /// Returns the new state, or `None` when there is nothing to pan. Panning is
@@ -824,15 +1012,17 @@ fn handle_plot_pan(
     }
     // The drag delta is already zero unless the pointer is actually being
     // dragged this frame, so it doubles as the "is dragging" test.
+    //
+    // `pointer_coordinate_drag_delta` is in *data* units, not screen pixels,
+    // so it is negated directly: dragging right pulls the content right, which
+    // moves the window to earlier time. Routing it through `drag_to_data`
+    // (which expects pixels) scaled every drag by ~1e6 and slammed the view to
+    // the clamp edge on the first frame, which is why dragging looked dead.
     let delta = plot_ui.pointer_coordinate_drag_delta();
     if delta.x == 0.0 && delta.y == 0.0 {
         return None;
     }
-    let rect = plot_ui.response().rect;
-    let (wx0, wx1, wy0, wy1) = current.window_with_data(series, x0, x1, y0, y1);
-    let dx = drag_to_data(delta.x, rect.width(), wx1 - wx0);
-    let dy = drag_to_data(delta.y, rect.height(), wy1 - wy0);
-    let next = current.pan_by(dx, dy, series, x0, x1, y0, y1);
+    let next = current.pan_by(-(delta.x as f64), -(delta.y as f64), series, x0, x1, y0, y1);
     if next == current {
         None
     } else {
@@ -870,6 +1060,13 @@ fn apply_zoom_and_pan(
     // also visible as a pointer drag, so letting the pinch resolve first keeps
     // the two from double-applying the same movement.
     if let Some(next) = handle_plot_pinch(plot_ui, zoom.get(), series, x0, x1, y0, y1) {
+        zoom.set(next);
+    }
+    // Wheel and trackpad scroll next: it is the only gesture that works from
+    // the full-range view, so it is how a zoomed window is entered with a
+    // mouse. It never double-applies with a drag because a wheel event carries
+    // no pointer movement.
+    if let Some(next) = handle_plot_scroll(plot_ui, zoom.get(), series, x0, x1, y0, y1) {
         zoom.set(next);
     }
     if let Some(next) = handle_plot_pan(plot_ui, zoom.get(), series, x0, x1, y0, y1) {
@@ -2392,8 +2589,9 @@ impl BharatApp {
             }
         });
 
-        // Zoom controls. Double-click the chart to zoom in at the pointer,
-        // right-click to zoom out at the pointer, or use these buttons.
+        // Zoom controls. Scroll the chart to zoom at the pointer, drag to pan
+        // once zoomed, double-click to zoom in, right-click to zoom out, or
+        // use these buttons. Pinch and two-finger drag work on touchscreens.
         ui.horizontal(|ui| {
             let zoom = self.zoom.get();
             if ui
@@ -2429,7 +2627,7 @@ impl BharatApp {
             } else {
                 ui.colored_label(
                     Color32::GRAY,
-                    "Double-click to zoom in \u{00B7} right-click to zoom out",
+                    "Scroll to zoom \u{00B7} drag to pan \u{00B7} double-click in \u{00B7} right-click out",
                 );
             }
         });
@@ -2659,6 +2857,15 @@ impl BharatApp {
             })
             .y_axis_formatter(move |mark, _range| abbreviate_volume(mark.value))
             .show(ui, |plot_ui| {
+                // Gestures on the volume pane move the shared time axis, so
+                // dragging the lower third of the canvas is not dead. Only the
+                // horizontal component is honoured; the vertical axis here is
+                // fixed at `0..max volume`.
+                if let Some(next) =
+                    handle_volume_gestures(plot_ui, self.zoom.get(), series, x0, x1, y_lo, y_hi)
+                {
+                    self.zoom.set(next);
+                }
                 // Share the price pane's exact x-range so the two align.
                 let (vx0, vx1) = {
                     let slot = visible_cell.borrow();
@@ -8915,6 +9122,77 @@ mod tests {
         let x0 = start - day;
         let x1 = start + 200.0 * day;
         (series, x0, x1, 50.0, 200.0)
+    }
+
+    /// Wheel-up zooms in, wheel-down zooms out, and no scroll means no zoom.
+    #[test]
+    fn test_scroll_zoom_factor_direction_and_neutrality() {
+        assert!((scroll_zoom_factor(0.0) - 1.0).abs() < 1e-12);
+        assert!(scroll_zoom_factor(50.0) > 1.0, "wheel-up must zoom in");
+        assert!(scroll_zoom_factor(-50.0) < 1.0, "wheel-down must zoom out");
+        // A full notch steps about as far as a fraction of a double-click,
+        // never a jump to the cap in one frame.
+        let notch = scroll_zoom_factor(50.0);
+        assert!(
+            notch < 2.0,
+            "one notch must stay well below a 2x step: {notch}"
+        );
+        assert!(notch > 1.0, "one notch must be perceptible: {notch}");
+        // Symmetry: scrolling back down undoes scrolling up.
+        let up = scroll_zoom_factor(50.0);
+        let down = scroll_zoom_factor(-50.0);
+        assert!(
+            (up * down - 1.0).abs() < 1e-9,
+            "wheel gestures must be reversible: {up} * {down}"
+        );
+    }
+
+    /// A tiny trackpad delta produces a tiny factor, never a no-op or a jump.
+    #[test]
+    fn test_scroll_zoom_factor_is_continuous_for_small_deltas() {
+        let tiny = scroll_zoom_factor(2.0);
+        assert!(tiny > 1.0 && tiny < 1.01, "trackpad tick: {tiny}");
+        for raw in [-120.0_f32, -50.0, -5.0, 5.0, 50.0, 120.0] {
+            let f = scroll_zoom_factor(raw);
+            assert!(f.is_finite() && f > 0.0, "sane factor for {raw}: {f}");
+        }
+    }
+
+    /// `pan_x_only` moves the time axis exactly like `pan_by` does, while the
+    /// price offset stays pinned at whatever it was.
+    #[test]
+    fn test_pan_x_only_matches_pan_by_on_x_and_holds_y() {
+        let (series, x0, x1, y0, y1) = pan_fixture();
+        let z = ZoomState::default().zoom_in_centered(125.0);
+        // Give the state a vertical offset first, so the test can prove it is
+        // preserved rather than reset.
+        let z = z.pan_by(0.0, 4.0, &series, x0, x1, y0, y1);
+        assert!((z.pan_y - 4.0).abs() < 1e-6);
+        let before = z.window(x0, x1, y0, y1);
+        let moved = z.pan_x_only(86_400.0 * 3.0, x0, x1);
+        let after = moved.window(x0, x1, y0, y1);
+        assert!((after.0 - before.0 - 86_400.0 * 3.0).abs() < 1e-6);
+        assert!((after.1 - before.1 - 86_400.0 * 3.0).abs() < 1e-6);
+        // Vertical edges untouched.
+        assert!((after.2 - before.2).abs() < 1e-12);
+        assert!((after.3 - before.3).abs() < 1e-12);
+        assert_eq!(moved.pan_y, z.pan_y, "vertical offset must survive");
+    }
+
+    /// `pan_x_only` clamps at the data edges and is a no-op at full range.
+    #[test]
+    fn test_pan_x_only_clamps_and_ignores_full_range() {
+        let (series, x0, x1, y0, y1) = pan_fixture();
+        let flat = ZoomState::default();
+        assert_eq!(flat.pan_x_only(1.0e9, x0, x1), flat);
+        let z = ZoomState::default().zoom_in_centered(125.0);
+        let far = z.pan_x_only(1.0e9, x0, x1);
+        let (fx0, fx1, _, _) = far.window(x0, x1, y0, y1);
+        assert!(fx0 >= x0 - 1e-6 && fx1 <= x1 + 1e-6);
+        // Settled at the limit, further drags are no-ops.
+        assert_eq!(far.pan_x_only(86_400.0, x0, x1), far);
+        // Non-finite input never poisons the state.
+        assert_eq!(z.pan_x_only(f64::NAN, x0, x1), z);
     }
 
     /// Panning is disabled until the view is actually zoomed in.

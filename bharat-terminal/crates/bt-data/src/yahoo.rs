@@ -144,14 +144,36 @@ impl YahooProvider {
         Self { client }
     }
 
-    fn build_chart_url(&self, symbol: &str, interval: Interval, range: &str) -> String {
-        format!(
-            "{}/{}?interval={}&range={}",
-            BASE_CHART,
-            symbol,
-            interval.as_str(),
-            range
-        )
+    fn build_chart_url(
+        &self,
+        symbol: &str,
+        interval: Interval,
+        range: &str,
+        period1: Option<i64>,
+        period2: Option<i64>,
+    ) -> String {
+        // Yahoo accepts *either* a preset `range` *or* explicit `period1` /
+        // `period2` timestamps. When both are sent, the preset wins and the
+        // timestamps are silently ignored -- which capped every long custom
+        // window at 5 years of data. So an explicit window is built without
+        // `range` at all.
+        match (period1, period2) {
+            (Some(p1), Some(p2)) => format!(
+                "{}/{}?interval={}&period1={}&period2={}",
+                BASE_CHART,
+                symbol,
+                interval.as_str(),
+                p1,
+                p2
+            ),
+            _ => format!(
+                "{}/{}?interval={}&range={}",
+                BASE_CHART,
+                symbol,
+                interval.as_str(),
+                range
+            ),
+        }
     }
 
     async fn fetch_with_retry(&self, url: &str) -> Result<reqwest::Response> {
@@ -196,8 +218,10 @@ impl YahooProvider {
         symbol: &str,
         interval: Interval,
         range: &str,
+        period1: Option<i64>,
+        period2: Option<i64>,
     ) -> Result<OhlcvSeries> {
-        let url = self.build_chart_url(symbol, interval, range);
+        let url = self.build_chart_url(symbol, interval, range, period1, period2);
         let resp = self.fetch_with_retry(&url).await?;
         let data: YahooChartResponse = resp
             .json()
@@ -273,7 +297,16 @@ impl DataProvider for YahooProvider {
             "5y".to_string()
         };
 
-        self.fetch_ohlcv_range(symbol, interval, &range).await
+        // For ranges longer than 5 years, use explicit timestamps to bypass
+        // Yahoo's 5y limit on the range parameter.
+        let (period1, period2) = if days > 1825 {
+            (Some(start.timestamp()), Some(end.timestamp()))
+        } else {
+            (None, None)
+        };
+
+        self.fetch_ohlcv_range(symbol, interval, &range, period1, period2)
+            .await
     }
 
     #[instrument(skip(self))]
@@ -369,7 +402,7 @@ mod tests {
     async fn test_resolve_indian_symbol() {
         let provider = YahooProvider::new();
         let series = provider
-            .fetch_ohlcv_range("RELIANCE.NS", Interval::Day1, "1mo")
+            .fetch_ohlcv_range("RELIANCE.NS", Interval::Day1, "1mo", None, None)
             .await;
         assert!(series.is_ok());
         let s = series.unwrap();
@@ -381,12 +414,60 @@ mod tests {
     async fn test_resolve_us_symbol() {
         let provider = YahooProvider::new();
         let series = provider
-            .fetch_ohlcv_range("AAPL", Interval::Day1, "1mo")
+            .fetch_ohlcv_range("AAPL", Interval::Day1, "1mo", None, None)
             .await;
         assert!(series.is_ok());
         let s = series.unwrap();
         assert!(!s.candles.is_empty());
         assert_eq!(s.symbol, "AAPL");
+    }
+
+    #[test]
+    fn test_chart_url_with_periods_omits_range() {
+        // Regression test: sending `range=5y` alongside `period1`/`period2`
+        // made Yahoo honour the preset and silently drop the timestamps, so a
+        // 2017-2026 custom window only ever charted ~5 years ending now.
+        let provider = YahooProvider::new();
+        let url = provider.build_chart_url(
+            "RELIANCE.NS",
+            Interval::Week1,
+            "5y",
+            Some(1_505_000_000),
+            Some(1_790_000_000),
+        );
+        assert!(
+            url.contains("period1=1505000000"),
+            "start timestamp missing: {url}"
+        );
+        assert!(
+            url.contains("period2=1790000000"),
+            "end timestamp missing: {url}"
+        );
+        assert!(
+            !url.contains("range="),
+            "preset range must not shadow explicit timestamps: {url}"
+        );
+        assert!(url.contains("interval=1wk"), "weekly interval: {url}");
+    }
+
+    #[test]
+    fn test_chart_url_without_periods_uses_range() {
+        let provider = YahooProvider::new();
+        let url = provider.build_chart_url("AAPL", Interval::Day1, "1mo", None, None);
+        assert!(url.contains("range=1mo"), "preset range: {url}");
+        assert!(!url.contains("period1"), "no timestamps expected: {url}");
+        assert!(!url.contains("period2"), "no timestamps expected: {url}");
+    }
+
+    #[test]
+    fn test_chart_url_partial_periods_fall_back_to_range() {
+        // A lone timestamp cannot define a window, so it must be dropped
+        // rather than sent half-formed.
+        let provider = YahooProvider::new();
+        let url =
+            provider.build_chart_url("AAPL", Interval::Day1, "1mo", Some(1_700_000_000), None);
+        assert!(url.contains("range=1mo"), "preset range: {url}");
+        assert!(!url.contains("period1"), "half-formed window: {url}");
     }
 
     #[tokio::test]
