@@ -29,6 +29,14 @@ export const metadata: Metadata = {
   authors: [{ name: "Sourish Dey", url: SITE.github }],
   creator: "Sourish Dey",
   keywords: ["bloomberg alternative", "free trading terminal", "rust finance", "quantitative finance", "candlestick charts", "technical analysis", "indian stock market", "NSE BSE data", "open source trading"],
+  icons: {
+    icon: [
+      { url: "/favicon.png", type: "image/png" },
+      { url: "/logo.png", type: "image/png" },
+    ],
+    shortcut: "/favicon.png",
+    apple: [{ url: "/apple-touch-icon.png", type: "image/png" }],
+  },
   openGraph: { siteName: "Bharat Terminal", type: "website", images: [{ url: "/og-image.png", width: 1200, height: 630 }] },
   twitter: { card: "summary_large_image", creator: "@sourishdey", images: ["/og-image.png"] },
 };

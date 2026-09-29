@@ -27,6 +27,9 @@ export const SITE = {
   url: resolveSiteUrl(),
   github: "https://github.com/sourishdey/bharat-terminal",
   githubRepo: (process.env.NEXT_PUBLIC_GITHUB_REPO ?? "").trim() || "sourishdey/bharat-terminal",
+  releases: "https://github.com/sourishdey2005/Bharat-terminal-exe/releases",
+  logo: "/logo.png",
+  favicon: "/favicon.png",
 } as const;
 
 export function formatNumber(n: number): string {

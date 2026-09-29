@@ -40,10 +40,17 @@ export function Logo({ size = 32 }: { size?: number }) {
     <span
       aria-label="Bharat Terminal logo"
       role="img"
-      className="group inline-flex items-center justify-center transition-transform duration-300 group-hover:scale-105"
+      className="group inline-flex items-center justify-center overflow-hidden rounded-[8px] transition-transform duration-300 group-hover:scale-105"
       style={{ width: size, height: size }}
     >
-      <BrandMark size={size} />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/logo.png"
+        alt="Bharat Terminal logo"
+        width={size}
+        height={size}
+        style={{ width: size, height: size, objectFit: "contain" }}
+      />
     </span>
   );
 }
