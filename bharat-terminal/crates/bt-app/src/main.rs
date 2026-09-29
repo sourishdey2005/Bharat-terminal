@@ -8249,8 +8249,9 @@ impl eframe::App for BharatApp {
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1600.0_f32, 1000.0_f32])
+            .with_inner_size([1920.0_f32, 1080.0_f32])
             .with_min_inner_size([1100.0_f32, 700.0_f32])
+            .with_maximized(true)
             .with_title(format!("{} — Made by {}", APP_NAME, AUTHOR)),
         ..Default::default()
     };
