@@ -28,6 +28,8 @@ export const SITE = {
   github: "https://github.com/sourishdey/bharat-terminal",
   githubRepo: (process.env.NEXT_PUBLIC_GITHUB_REPO ?? "").trim() || "sourishdey/bharat-terminal",
   releases: "https://github.com/sourishdey2005/Bharat-terminal-exe/releases",
+  exe: "https://github.com/sourishdey2005/Bharat-terminal-exe",
+  portfolio: "https://sourishdeyportfolio.vercel.app/",
   logo: "/logo.png",
   logoRemote: "https://res.cloudinary.com/dodhvvewu/image/upload/v1790695957/app-1024_mfa8ek.png",
   favicon: "/favicon.png",

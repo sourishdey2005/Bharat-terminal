@@ -1,5 +1,6 @@
 import { Github, Twitter, MessageCircle, BookOpen } from "lucide-react";
 import Link from "next/link";
+import { SITE } from "@/lib/utils";
 import { BrandLockup } from "./brand";
 import { ThemeToggle } from "./theme-toggle";
 
@@ -47,7 +48,7 @@ export function Footer() {
             <a href="/blog" aria-label="Blog" className="text-secondary hover:text-amber"><BookOpen size={18} /></a>
           </div>
         </div>
-        <p className="pb-6 text-center text-xs text-tertiary">Made with ❤️ in India 🇮🇳 · Made by Sourish Dey</p>
+        <p className="pb-6 text-center text-xs text-tertiary">Made with ❤️ in India 🇮🇳 · <a href={SITE.portfolio} target="_blank" rel="noreferrer" className="transition-colors hover:text-amber">Made by Sourish Dey</a></p>
       </div>
     </footer>
   );

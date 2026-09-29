@@ -16,20 +16,10 @@ const LINKS = [
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
-  const [stars, setStars] = useState("2.4k");
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 100);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-  useEffect(() => {
-    fetch(`https://api.github.com/repos/${SITE.githubRepo}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        if (j?.stargazers_count)
-          setStars(j.stargazers_count >= 1000 ? `${(j.stargazers_count / 1000).toFixed(1)}k` : String(j.stargazers_count));
-      })
-      .catch(() => {});
   }, []);
 
   return (
@@ -52,13 +42,13 @@ export function Navbar() {
         <div className="hidden items-center gap-3 md:flex">
           <ThemeToggle />
           <a
-            href={SITE.github}
+            href={SITE.exe}
             target="_blank"
             rel="noreferrer"
             aria-label="GitHub repository"
             className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-subtle bg-panel px-3 text-sm font-semibold text-secondary hover:border-amber hover:text-amber"
           >
-            <Github size={16} /> ★ {stars}
+            <Github size={16} /> GitHub
           </a>
           <Link
             href="/download"
