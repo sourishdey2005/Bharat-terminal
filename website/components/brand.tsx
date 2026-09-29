@@ -19,17 +19,17 @@ export function Logo({ size = 36 }: { size?: number }) {
   );
 }
 
-export function BrandLockup({ size = 36 }: { size?: number }) {
+export function BrandLockup({ size = 34 }: { size?: number }) {
   return (
-    <span className="group inline-flex items-center gap-2.5" aria-label="Bharat Terminal home">
+    <span className="group inline-flex flex-col items-center gap-1" aria-label="Bharat Terminal home">
       <span className="inline-flex transition-transform duration-300 group-hover:scale-105">
         <Logo size={size} />
       </span>
       <span
-        className="font-display font-extrabold text-amber"
-        style={{ fontSize: 17, letterSpacing: "0.18em", lineHeight: 1 }}
+        className="font-display font-extrabold text-amber whitespace-nowrap"
+        style={{ fontSize: 13, letterSpacing: "0.14em", lineHeight: 1.2 }}
       >
-        BHARAT TERMINAL
+        Bharat Terminal
       </span>
     </span>
   );

@@ -35,7 +35,7 @@ export function Navbar() {
   return (
     <header
       className={`sticky top-0 z-50 border-b border-subtle bg-[rgba(5,6,8,0.82)] backdrop-blur-xl transition-all ${
-        scrolled ? "h-14 shadow-md" : "h-16"
+        scrolled ? "h-16 shadow-md" : "h-20"
       }`}
     >
       <nav aria-label="Primary" className="mx-auto flex h-full w-full max-w-6xl items-center justify-between px-4 sm:px-6">
