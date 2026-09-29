@@ -132,10 +132,13 @@ the view smoothly instead of snapping. The header shows the current factor
 control. Zoom persists across the 30-second live refresh and resets when you
 switch symbol or timeframe.
 
-**Drag to pan.** Once zoomed in, dragging the chart moves the view
-horizontally through time and vertically through price. Panning is clamped so
-the view can never be dragged off the data, and a zoom always snaps onto real
-candles even if you double-click empty space.
+**Drag to pan — on every time-series tab.** Once zoomed in, dragging the chart
+moves the view horizontally through time and vertically through price. Panning
+is clamped so the view can never be dragged off the data, and a zoom always
+snaps onto real candles even if you double-click empty space. Every
+candlestick-style tab (`GP — Candlestick`, `GP (HA)`, `C3D`, `CMA`, `CBB`,
+`CRSI`, `CMACD`) shares this behaviour through one common gesture handler, so
+zooming one tab does not leave the others stuck at a stale zoom level.
 
 **X-axis labels follow the selected timeframe:**
 
@@ -144,10 +147,29 @@ candles even if you double-click empty space.
 | `1D` | time + date | `09:30 15 Jan` |
 | `1W`, `1M` | date + month | `15 Jan` |
 | `3M`, `6M`, `1Y`, `5Y` | month + year | `Jan 2024` |
+| `Custom` | chosen from the window length | `15 Jan` or `Jan 2024` |
 
 Switching timeframe always re-requests the matching window, even if a fetch is
 already running, so the chart can never show one range's data under another
 range's label.
+
+**Cached data must actually cover the request.** A cache entry is only reused
+when it spans the whole requested window. Without this check a cached 6-month
+series satisfied a 1-year query — the range filter passed because those bars
+fell inside the year — and `6M` and `1Y` rendered the *same* chart under two
+different labels. A few days of slack is allowed so weekends and holidays do
+not force a refetch.
+
+**Custom date range.** Alongside `1D`, `1W`, `1M`, `3M`, `6M`, `1Y` and `5Y`,
+the header has a **Custom** button that reveals two `YYYY-MM-DD` fields and an
+**Apply** button. The window is validated on apply: the dates may be given in
+either order, but the span must be at least one day and at most ten years, and
+an invalid entry reports why instead of silently falling back to a preset. The
+bar interval and the x-axis label style are both chosen from the requested
+span, so a three-day window uses 5-minute bars with clock labels while a
+two-year window uses daily bars with month labels. The chosen dates are
+persisted and restored on the next launch; if they fail to parse on startup the
+app falls back to the `1Y` preset rather than starting with a broken range.
 
 **Trend arrows auto-hide above 90 bars**, where a per-bar marker is visual
 noise. The header shows `(hidden: N bars)` so the state is never silent; zoom
@@ -157,14 +179,14 @@ The chart fills the full window height, with the price and volume panes
 sharing one x-axis so they stay aligned at any window size.
 
 The same renderer backs the `GP (HA)`, `C3D`, `CMA`, `CBB`, `CRSI` and `CMACD`
-candle tabs, and all of them pin their visible range to the data so a
-previously viewed time range cannot leave them zoomed out.
+candle tabs, and all of them resolve their visible range from the same
+`ZoomState`, so a previously viewed time range cannot leave them zoomed out.
 
 ### Data Source Fallback Chain
 
 | Order | Source | Covers |
 |------:|--------|--------|
-| 1 | SQLite cache | Previously fetched bars within the requested window |
+| 1 | SQLite cache | Previously fetched bars, **only when they span the whole request** |
 | 2 | Yahoo Finance | Global equities, indices, ETFs, FX, crypto |
 | 3 | Coinbase | `*-USD` crypto spot markets |
 | 4 | **NSE bhavcopy** | Indian equities, official daily settlement files |
@@ -174,6 +196,14 @@ The **bhavcopy** source downloads the exchange's own end-of-day ZIP from
 authoritative settlement record. One file contains every listed scrip (about
 2,600 for NSE), so a Yahoo outage still yields real prices rather than
 synthetic filler. BSE's equivalent `EQ_ISIN_DDMMYY.zip` layout is also parsed.
+
+The fallback is restricted to **daily and coarser** requests. A settlement file
+carries one end-of-day bar per scrip, so serving it for a 5-minute request
+would return a single daily candle under an intraday label. Sub-daily ranges
+now report the failure instead of charting a misleading one-bar series. The
+walker also collects **every** trading day in the requested window rather than
+stopping at the first day that happens to contain the scrip — a one-bar
+fallback charts as a flat line, which is worse than reporting the outage.
 
 ```rust
 use bt_data::bhavcopy::BhavcopyProvider;

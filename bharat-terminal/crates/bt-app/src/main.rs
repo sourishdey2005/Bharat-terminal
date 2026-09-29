@@ -121,6 +121,8 @@ impl TimeRange {
             TimeRange::M3 | TimeRange::M6 | TimeRange::Y1 | TimeRange::Y5 => {
                 AxisDateStyle::MonthYear
             }
+            // Refined once the custom window is known.
+            TimeRange::Custom => AxisDateStyle::MonthYear,
         }
     }
 }
@@ -210,7 +212,8 @@ fn abbreviate_volume(v: f64) -> String {
 /// right-hand price axis, timeframe-aware x labels, bounded x range and
 /// a small grid. Every time-series tab uses this so they all look consistent.
 ///
-/// Call [`pin_zoomed_bounds`] inside `show` to lock the visible range. The
+/// Call [`apply_zoom_and_pan`] inside `show` to handle zoom/pan gestures and
+/// lock the visible range. The
 /// x-range is pinned rather than merely included because `include_x` only ever
 /// widens: egui_plot keeps per-plot memory, so a range viewed earlier kept its
 /// zoom and squeezed the next range into a sliver instead of refitting.
@@ -243,6 +246,78 @@ fn style_time_plot<'a>(
         )
         .x_axis_formatter(move |mark, _range| format_ts_styled(mark.value, style))
         .y_axis_formatter(move |mark, _range| format!("{:.*}", decimals, mark.value))
+}
+
+/// Parses a `YYYY-MM-DD` date into a UTC midnight timestamp.
+fn parse_ymd(text: &str) -> Option<i64> {
+    chrono::NaiveDate::parse_from_str(text.trim(), "%Y-%m-%d")
+        .ok()
+        .and_then(|d| d.and_hms_opt(0, 0, 0))
+        .and_then(|dt| chrono::DateTime::from_timestamp(dt.and_utc().timestamp(), 0))
+        .map(|dt| dt.timestamp())
+}
+
+/// Formats a timestamp as `YYYY-MM-DD` for the date fields.
+fn format_ymd(ts: i64) -> String {
+    chrono::DateTime::from_timestamp(ts, 0)
+        .unwrap_or_default()
+        .format("%Y-%m-%d")
+        .to_string()
+}
+
+/// A user-entered start/end window, validated and ordered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CustomWindow {
+    start: i64,
+    end: i64,
+}
+
+impl CustomWindow {
+    /// Builds a window from the two text fields, normalising the order and
+    /// rejecting windows that are empty or longer than 10 years.
+    fn parse(start_text: &str, end_text: &str) -> Option<Self> {
+        let start = parse_ymd(start_text)?;
+        let end = parse_ymd(end_text)?;
+        let (lo, hi) = if start <= end {
+            (start, end)
+        } else {
+            (end, start)
+        };
+        if hi <= lo {
+            return None;
+        }
+        // Yahoo rejects very long intraday requests, and a decade is far beyond
+        // any chart a user wants to read.
+        if hi - lo > 10 * 365 * DAY_SECS as i64 {
+            return None;
+        }
+        Some(Self { start: lo, end: hi })
+    }
+
+    /// Length in days, at least 1.
+    fn days(&self) -> i64 {
+        ((self.end - self.start) / DAY_SECS as i64).max(1)
+    }
+
+    /// Bar interval appropriate to the window length.
+    fn interval(&self) -> Interval {
+        match self.days() {
+            0..=1 => Interval::Min5,
+            2..=7 => Interval::Min15,
+            8..=31 => Interval::Hour1,
+            32..=2000 => Interval::Day1,
+            _ => Interval::Week1,
+        }
+    }
+
+    /// Axis label style appropriate to the window length.
+    fn axis_date_style(&self) -> AxisDateStyle {
+        match self.days() {
+            0..=1 => AxisDateStyle::TimeAndDate,
+            2..=45 => AxisDateStyle::DayMonth,
+            _ => AxisDateStyle::MonthYear,
+        }
+    }
 }
 
 /// Price envelope `(low, high)` of the candles whose timestamp falls inside
@@ -618,20 +693,28 @@ fn pin_bounds(plot_ui: &mut egui_plot::PlotUi, x0: f64, x1: f64, y0: f64, y1: f6
     }
 }
 
-/// [`pin_bounds`] combined with the user's zoom, using the data-aware window so
-/// the applied y-range always covers the candles inside the visible x-range.
-/// Without that, a vertical pan could leave the pane showing a price band that
-/// has no bars in it.
-fn pin_zoomed_bounds(
+/// Applies zoom/pan gestures to a plot and then pins the resulting window.
+///
+/// This is the single entry point every time-series tab uses, so dragging to
+/// pan and double/right-clicking to zoom behave identically on all charts
+/// rather than only on the candlestick tab. The y-range is data-aware, so the
+/// applied window always covers the candles inside the visible x-range.
+fn apply_zoom_and_pan(
     plot_ui: &mut egui_plot::PlotUi,
-    zoom: ZoomState,
+    zoom: &std::cell::Cell<ZoomState>,
     series: &[Candle],
     x0: f64,
     x1: f64,
     y0: f64,
     y1: f64,
 ) {
-    let (zx0, zx1, zy0, zy1) = zoom.window_with_data(series, x0, x1, y0, y1);
+    if let Some(next) = handle_plot_zoom_gesture(plot_ui, zoom.get(), series, x0, x1, y0, y1) {
+        zoom.set(next);
+    }
+    if let Some(next) = handle_plot_pan(plot_ui, zoom.get(), series, x0, x1, y0, y1) {
+        zoom.set(next);
+    }
+    let (zx0, zx1, zy0, zy1) = zoom.get().window_with_data(series, x0, x1, y0, y1);
     pin_bounds(plot_ui, zx0, zx1, zy0, zy1);
 }
 
@@ -1072,6 +1155,8 @@ enum TimeRange {
     M6,
     Y1,
     Y5,
+    /// User-entered start/end dates.
+    Custom,
 }
 
 impl TimeRange {
@@ -1084,6 +1169,7 @@ impl TimeRange {
             TimeRange::M6 => "6M",
             TimeRange::Y1 => "1Y",
             TimeRange::Y5 => "5Y",
+            TimeRange::Custom => "Custom",
         }
     }
 
@@ -1096,6 +1182,9 @@ impl TimeRange {
             TimeRange::M6 => 180,
             TimeRange::Y1 => 365,
             TimeRange::Y5 => 1825,
+            // Overridden by the custom window in `trigger_fetch`; this is only
+            // a sane fallback for callers that need a length.
+            TimeRange::Custom => 365,
         }
     }
 
@@ -1108,6 +1197,8 @@ impl TimeRange {
             TimeRange::M6 => Interval::Day1,
             TimeRange::Y1 => Interval::Day1,
             TimeRange::Y5 => Interval::Week1,
+            // Replaced by an interval chosen from the custom window length.
+            TimeRange::Custom => Interval::Day1,
         }
     }
 }
@@ -1125,6 +1216,9 @@ struct Prefs {
     symbol: String,
     range: String,
     theme: String,
+    /// Custom range bounds as `YYYY-MM-DD`, empty when unused.
+    custom_start: String,
+    custom_end: String,
 }
 
 impl Default for Prefs {
@@ -1134,6 +1228,8 @@ impl Default for Prefs {
             symbol: "RELIANCE.NS".to_string(),
             range: "1y".to_string(),
             theme: "dark".to_string(),
+            custom_start: String::new(),
+            custom_end: String::new(),
         }
     }
 }
@@ -1385,6 +1481,11 @@ struct BharatApp {
     show_candle_arrows: std::cell::Cell<bool>,
     /// Double-click zoom applied on top of the full data range.
     zoom: std::cell::Cell<ZoomState>,
+    /// Text contents of the custom start/end date fields.
+    custom_start_text: String,
+    custom_end_text: String,
+    /// The validated custom window, set when the user applies the fields.
+    custom_window: Option<CustomWindow>,
     /// `symbol|range` that the in-flight fetch was issued for. Compared
     /// against `last_range_key` to detect a genuine symbol/range switch.
     data_range_key: String,
@@ -1413,8 +1514,18 @@ impl BharatApp {
             "1m" => TimeRange::M1,
             "3m" => TimeRange::M3,
             "6m" => TimeRange::M6,
+            "1y" => TimeRange::Y1,
             "5y" => TimeRange::Y5,
+            "custom" => TimeRange::Custom,
             _ => TimeRange::Y1,
+        };
+        // A persisted custom window must still parse, otherwise fall back to
+        // the default preset so the app never starts with a broken range.
+        let custom_window = CustomWindow::parse(&prefs.custom_start, &prefs.custom_end);
+        let time_range = if time_range == TimeRange::Custom && custom_window.is_none() {
+            TimeRange::Y1
+        } else {
+            time_range
         };
 
         let mut app = Self {
@@ -1454,6 +1565,9 @@ impl BharatApp {
             compare_search: String::new(),
             show_candle_arrows: std::cell::Cell::new(true),
             zoom: std::cell::Cell::new(ZoomState::default()),
+            custom_start_text: prefs.custom_start.clone(),
+            custom_end_text: prefs.custom_end.clone(),
+            custom_window,
             data_range_key: String::new(),
             last_range_key: String::new(),
             viewport_h: 600.0,
@@ -1473,11 +1587,15 @@ impl BharatApp {
                 TimeRange::M6 => "6m",
                 TimeRange::Y1 => "1y",
                 TimeRange::Y5 => "5y",
+                // Persisted verbatim; the dates themselves live in the fields.
+                TimeRange::Custom => "custom",
             };
             let prefs = Prefs {
                 live: self.live,
                 symbol: self.selected_company.clone(),
                 range: range_str.to_string(),
+                custom_start: self.custom_start_text.clone(),
+                custom_end: self.custom_end_text.clone(),
                 theme: if self.dark {
                     "dark".to_string()
                 } else {
@@ -1500,17 +1618,21 @@ impl BharatApp {
         }
         self.fetch_in_flight = true;
         let symbol = self.selected_company.clone();
-        let interval = self.time_range.to_interval();
-        let days = self.time_range.to_days();
+        // A custom window, when applied, replaces the preset length and picks
+        // its own bar interval from the requested span.
+        let custom = match self.time_range {
+            TimeRange::Custom => self.custom_window,
+            _ => None,
+        };
+        let interval = custom.map_or_else(|| self.time_range.to_interval(), |w| w.interval());
+        let days = custom.map_or_else(|| self.time_range.to_days(), |w| w.days());
         let tx = self.tx.clone();
         // Record what this fetch is for, so `DataReady` can tell a genuine
         // symbol/range switch (reset the zoom) from a periodic refresh (keep it).
-        self.data_range_key = format!(
-            "{}|{}|{}",
-            symbol,
-            interval.as_str(),
-            self.time_range.label()
-        );
+        let window_tag = custom
+            .map(|w| format!("{}:{}", w.start, w.end))
+            .unwrap_or_else(|| self.time_range.label().to_string());
+        self.data_range_key = format!("{}|{}|{}", symbol, interval.as_str(), window_tag);
 
         self.runtime.spawn(async move {
             let start = Instant::now();
@@ -1524,8 +1646,17 @@ impl BharatApp {
                     return;
                 }
             };
-            let end = Utc::now();
-            let start_date = end - ChronoDuration::days(days);
+            let now = Utc::now();
+            // A custom window pins both ends; a preset measures back from now.
+            let (start_date, end) = match custom {
+                Some(w) => {
+                    let end = chrono::DateTime::from_timestamp(w.end, 0).unwrap_or(now);
+                    let start = chrono::DateTime::from_timestamp(w.start, 0)
+                        .unwrap_or(now - ChronoDuration::days(days));
+                    (start, end.max(now))
+                }
+                None => (now - ChronoDuration::days(days), now),
+            };
             match service
                 .fetch_ohlcv(&symbol, interval, start_date, end)
                 .await
@@ -1650,6 +1781,7 @@ impl BharatApp {
                         self.trigger_fetch();
                     }
                 }
+                self.custom_range_ui(ui);
                 ui.separator();
                 let live_text = if self.live { "Live *" } else { "Off o" };
                 let live_color = if self.live { PROFIT } else { Color32::GRAY };
@@ -1837,6 +1969,94 @@ impl BharatApp {
             // reports an unbounded `available_height()`, which let multi-pane
             // charts grow past the window and clip the lower pane.
             self.dispatch_tab(ui);
+        });
+    }
+
+    /// Axis label style for the active range. A custom window picks its own
+    /// from its length, so a 3-day window shows dates while a 2-year window
+    /// shows months.
+    fn axis_date_style(&self) -> AxisDateStyle {
+        match self.time_range {
+            TimeRange::Custom => self
+                .custom_window
+                .map_or(AxisDateStyle::MonthYear, |w| w.axis_date_style()),
+            other => other.axis_date_style(),
+        }
+    }
+
+    /// Custom start/end date picker, shown next to the preset range buttons.
+    ///
+    /// Fields take `YYYY-MM-DD`. Applying validates the pair, stores it and
+    /// refetches; an invalid or inverted window reports the problem inline
+    /// instead of silently falling back to a preset.
+    fn custom_range_ui(&mut self, ui: &mut egui::Ui) {
+        ui.separator();
+        let selected = self.time_range == TimeRange::Custom;
+        if ui
+            .selectable_label(selected, "Custom")
+            .on_hover_text("Pick an exact start and end date (YYYY-MM-DD)")
+            .clicked()
+        {
+            if !selected {
+                // Seed the fields with the current preset so there is always a
+                // valid, editable starting point.
+                let now = Utc::now().timestamp();
+                let start = self
+                    .custom_window
+                    .map(|w| w.start)
+                    .unwrap_or_else(|| now - self.time_range.to_days() * 86_400);
+                if self.custom_start_text.is_empty() {
+                    self.custom_start_text = format_ymd(start);
+                }
+                if self.custom_end_text.is_empty() {
+                    self.custom_end_text = format_ymd(now);
+                }
+                self.time_range = TimeRange::Custom;
+                self.prefs_dirty = true;
+                self.trigger_fetch();
+            }
+        }
+
+        if !selected {
+            return;
+        }
+
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::TextEdit::singleline(&mut self.custom_start_text)
+                    .desired_width(78.0)
+                    .hint_text("YYYY-MM-DD"),
+            );
+            ui.label("to");
+            ui.add(
+                egui::TextEdit::singleline(&mut self.custom_end_text)
+                    .desired_width(78.0)
+                    .hint_text("YYYY-MM-DD"),
+            );
+            let apply = ui.button("Apply").on_hover_text("Fetch this exact window");
+            if apply.clicked() {
+                match CustomWindow::parse(&self.custom_start_text, &self.custom_end_text) {
+                    Some(w) => {
+                        self.custom_window = Some(w);
+                        self.prefs_dirty = true;
+                        self.trigger_fetch();
+                    }
+                    None => {
+                        self.error_toast = Some((
+                            "Invalid date range. Use YYYY-MM-DD, start before end,                              within 10 years."
+                                .to_string(),
+                            Instant::now(),
+                        ));
+                    }
+                }
+            }
+            if let Some(w) = self.custom_window {
+                ui.label(
+                    RichText::new(format!("{} days", w.days()))
+                        .small()
+                        .color(Color32::GRAY),
+                );
+            }
         });
     }
 
@@ -2121,7 +2341,7 @@ impl BharatApp {
             Plot::new("candlestick_plot"),
             series,
             price_h,
-            self.time_range.axis_date_style(),
+            self.axis_date_style(),
         )
         .include_y(y_lo)
         .include_y(y_hi)
@@ -2180,7 +2400,7 @@ impl BharatApp {
             } else {
                 min_body
             };
-            pin_zoomed_bounds(plot_ui, applied, series, x0, x1, y_lo, y_hi);
+            apply_zoom_and_pan(plot_ui, &self.zoom, series, x0, x1, y_lo, y_hi);
             // Current-price guide, drawn first so bars sit on top of it.
             if last_close >= y_lo && last_close <= y_hi {
                 plot_ui.hline(
@@ -2238,10 +2458,10 @@ impl BharatApp {
             .include_x(visible_cell.borrow().1)
             .include_y(0.0)
             .y_axis_position(egui_plot::HPlacement::Right)
-            .y_axis_width(9)
+            .y_axis_min_width(9.0)
             .show_axes([true, true])
             .x_axis_formatter(move |mark, _range| {
-                format_ts_styled(mark.value, self.time_range.axis_date_style())
+                format_ts_styled(mark.value, self.axis_date_style())
             })
             .y_axis_formatter(move |mark, _range| abbreviate_volume(mark.value))
             .show(ui, |plot_ui| {
@@ -2288,13 +2508,21 @@ impl BharatApp {
             Plot::new("ha_plot"),
             &ha_series,
             height,
-            self.time_range.axis_date_style(),
+            self.axis_date_style(),
         )
         .show_axes([true, true])
         .show(ui, |plot_ui| {
             let (px0, px1) = x_bounds(&ha_series);
             let (plo, prange) = price_scale(&ha_series);
-            pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
+            apply_zoom_and_pan(
+                plot_ui,
+                &self.zoom,
+                &ha_series,
+                px0,
+                px1,
+                plo - prange * 0.05,
+                plo + prange * 1.05,
+            );
             for ha in &ha_series {
                 let color = if ha.is_bullish() { PROFIT } else { LOSS };
                 plot_ui.line(
@@ -2321,8 +2549,7 @@ impl BharatApp {
         let candles = &self.data.candles;
         ui.label(RichText::new(format!("GP (Renko) — Renko — {}", candles.symbol)).strong());
         Plot::new("renko_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -2352,8 +2579,7 @@ impl BharatApp {
         let candles = &self.data.candles;
         ui.label(RichText::new(format!("KAGI — Kagi — {}", candles.symbol)).strong());
         Plot::new("kagi_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -2388,8 +2614,7 @@ impl BharatApp {
         let candles = &self.data.candles;
         ui.label(RichText::new(format!("P&F — Point & Figure — {}", candles.symbol)).strong());
         Plot::new("pf_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -2430,13 +2655,21 @@ impl BharatApp {
             Plot::new("c3d_plot"),
             &candles.candles,
             height,
-            self.time_range.axis_date_style(),
+            self.axis_date_style(),
         )
         .show_axes([true, true])
         .show(ui, |plot_ui| {
             let (px0, px1) = x_bounds(&candles.candles);
             let (plo, prange) = price_scale(&candles.candles);
-            pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
+            apply_zoom_and_pan(
+                plot_ui,
+                &self.zoom,
+                &candles.candles,
+                px0,
+                px1,
+                plo - prange * 0.05,
+                plo + prange * 1.05,
+            );
             for c in &candles.candles {
                 draw_candle(plot_ui, c, half, min_body);
             }
@@ -2457,14 +2690,22 @@ impl BharatApp {
             Plot::new("cma_plot"),
             &series.candles,
             height,
-            self.time_range.axis_date_style(),
+            self.axis_date_style(),
         )
         .show_axes([true, true])
         .legend(Legend::default())
         .show(ui, |plot_ui| {
             let (px0, px1) = x_bounds(&series.candles);
             let (plo, prange) = price_scale(&series.candles);
-            pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
+            apply_zoom_and_pan(
+                plot_ui,
+                &self.zoom,
+                &series.candles,
+                px0,
+                px1,
+                plo - prange * 0.05,
+                plo + prange * 1.05,
+            );
             for c in &series.candles {
                 draw_candle(plot_ui, c, half, min_body);
             }
@@ -2539,13 +2780,21 @@ impl BharatApp {
             Plot::new("cbb_plot"),
             &series.candles,
             height,
-            self.time_range.axis_date_style(),
+            self.axis_date_style(),
         )
         .show_axes([true, true])
         .show(ui, |plot_ui| {
             let (px0, px1) = x_bounds(&series.candles);
             let (plo, prange) = price_scale(&series.candles);
-            pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
+            apply_zoom_and_pan(
+                plot_ui,
+                &self.zoom,
+                &series.candles,
+                px0,
+                px1,
+                plo - prange * 0.05,
+                plo + prange * 1.05,
+            );
             for c in &series.candles {
                 draw_candle(plot_ui, c, half, min_body);
             }
@@ -2613,20 +2862,27 @@ impl BharatApp {
             Plot::new("crsi_price"),
             &series.candles,
             height,
-            self.time_range.axis_date_style(),
+            self.axis_date_style(),
         )
         .show_axes([true, true])
         .show(ui, |plot_ui| {
             let (px0, px1) = x_bounds(&series.candles);
             let (plo, prange) = price_scale(&series.candles);
-            pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
+            apply_zoom_and_pan(
+                plot_ui,
+                &self.zoom,
+                &series.candles,
+                px0,
+                px1,
+                plo - prange * 0.05,
+                plo + prange * 1.05,
+            );
             for c in &series.candles {
                 draw_candle(plot_ui, c, half, min_body);
             }
         });
         Plot::new("crsi_rsi")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -2662,20 +2918,27 @@ impl BharatApp {
             Plot::new("cmacd_price"),
             &series.candles,
             height,
-            self.time_range.axis_date_style(),
+            self.axis_date_style(),
         )
         .show_axes([true, true])
         .show(ui, |plot_ui| {
             let (px0, px1) = x_bounds(&series.candles);
             let (plo, prange) = price_scale(&series.candles);
-            pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
+            apply_zoom_and_pan(
+                plot_ui,
+                &self.zoom,
+                &series.candles,
+                px0,
+                px1,
+                plo - prange * 0.05,
+                plo + prange * 1.05,
+            );
             for c in &series.candles {
                 draw_candle(plot_ui, c, half, min_body);
             }
         });
         Plot::new("cmacd_macd")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -2731,7 +2994,7 @@ impl BharatApp {
             .include_x(x1)
             .y_axis_position(egui_plot::HPlacement::Right)
             .x_axis_formatter(move |mark, _range| {
-                format_ts_styled(mark.value, self.time_range.axis_date_style())
+                format_ts_styled(mark.value, self.axis_date_style())
             })
             .y_axis_formatter(move |mark, _range| abbreviate_volume(mark.value))
             .show(ui, |plot_ui| {
@@ -2748,8 +3011,7 @@ impl BharatApp {
         let candles = &self.data.candles;
         ui.label(RichText::new(format!("FP — Footprint — {}", candles.symbol)).strong());
         Plot::new("fp_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -2815,8 +3077,7 @@ impl BharatApp {
         ui.label(RichText::new(format!("CD — Cumulative Delta — {}", candles.symbol)).strong());
         let (_per_bar, cumulative) = bt_viz::cumulative_delta::compute_deltas(candles);
         Plot::new("cd_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -2836,8 +3097,7 @@ impl BharatApp {
         let candles = &self.data.candles;
         ui.label(RichText::new(format!("MP — Market Profile — {}", candles.symbol)).strong());
         Plot::new("mp_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -2869,7 +3129,7 @@ impl BharatApp {
             .include_x(x1)
             .y_axis_position(egui_plot::HPlacement::Right)
             .x_axis_formatter(move |mark, _range| {
-                format_ts_styled(mark.value, self.time_range.axis_date_style())
+                format_ts_styled(mark.value, self.axis_date_style())
             })
             .y_axis_formatter(move |mark, _range| abbreviate_volume(mark.value))
             .show(ui, |plot_ui| {
@@ -2886,8 +3146,7 @@ impl BharatApp {
         let candles = &self.data.candles;
         ui.label(RichText::new(format!("TT — Tick Tape — {}", candles.symbol)).strong());
         Plot::new("tt_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -2909,8 +3168,7 @@ impl BharatApp {
         ui.label(RichText::new(format!("DD — Delta Divergence — {}", candles.symbol)).strong());
         let (_per_bar, cumulative) = bt_viz::cumulative_delta::compute_deltas(candles);
         Plot::new("dd_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -2935,8 +3193,7 @@ impl BharatApp {
             RichText::new(format!("RSI — Relative Strength Index — {}", series.symbol)).strong(),
         );
         Plot::new("rsi_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -2972,8 +3229,7 @@ impl BharatApp {
             .strong(),
         );
         Plot::new("macd_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height() * 0.5_f32)
             .allow_scroll(true)
             .allow_drag(true)
@@ -3012,8 +3268,7 @@ impl BharatApp {
                 );
             });
         Plot::new("macd_hist")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -3048,8 +3303,7 @@ impl BharatApp {
             RichText::new(format!("STOCH — Stochastic Oscillator — {}", series.symbol)).strong(),
         );
         Plot::new("stoch_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -3092,8 +3346,7 @@ impl BharatApp {
         let atr_vals = atr(series, 14);
         ui.label(RichText::new(format!("ATR — Average True Range — {}", series.symbol)).strong());
         Plot::new("atr_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -3121,8 +3374,7 @@ impl BharatApp {
         let obv_vals = obv(series);
         ui.label(RichText::new(format!("OBV — On-Balance Volume — {}", series.symbol)).strong());
         Plot::new("obv_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -3150,8 +3402,7 @@ impl BharatApp {
             .strong(),
         );
         Plot::new("vwap_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -3179,8 +3430,7 @@ impl BharatApp {
         let (mid, upper, lower) = bollinger(series, 20, 2.0);
         ui.label(RichText::new(format!("BOLL — Bollinger Bands — {}", series.symbol)).strong());
         Plot::new("bollinger_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -3244,8 +3494,7 @@ impl BharatApp {
         let (_mid, upper, lower) = bollinger(series, 20, 2.0);
         ui.label(RichText::new(format!("BBW — Bollinger Band Width — {}", series.symbol)).strong());
         Plot::new("bbw_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -3279,8 +3528,7 @@ impl BharatApp {
             .strong(),
         );
         Plot::new("adx_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -3311,8 +3559,7 @@ impl BharatApp {
             RichText::new(format!("CCI — Commodity Channel Index — {}", series.symbol)).strong(),
         );
         Plot::new("cci_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -3342,8 +3589,7 @@ impl BharatApp {
         let wr_vals = williams_r(series, 14);
         ui.label(RichText::new(format!("W%R — Williams %R — {}", series.symbol)).strong());
         Plot::new("wr_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -3373,8 +3619,7 @@ impl BharatApp {
         let roc_vals = roc(series, 12);
         ui.label(RichText::new(format!("ROC — Rate of Change — {}", series.symbol)).strong());
         Plot::new("roc_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -3403,8 +3648,7 @@ impl BharatApp {
         let cmf_vals = cmf(series, 20);
         ui.label(RichText::new(format!("CMF — Chaikin Money Flow — {}", series.symbol)).strong());
         Plot::new("cmf_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -3431,8 +3675,7 @@ impl BharatApp {
         let series = &self.data.candles;
         ui.label(RichText::new(format!("ICH — Ichimoku Cloud — {}", series.symbol)).strong());
         Plot::new("ich_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -3451,8 +3694,7 @@ impl BharatApp {
         let atr_vals = atr(series, 14);
         ui.label(RichText::new(format!("KEL — Keltner Channels — {}", series.symbol)).strong());
         Plot::new("kel_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -3514,8 +3756,7 @@ impl BharatApp {
         let series = &self.data.candles;
         ui.label(RichText::new(format!("DON — Donchian Channels — {}", series.symbol)).strong());
         Plot::new("don_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -3531,8 +3772,7 @@ impl BharatApp {
         let dd = bt_viz::drawdown::compute_drawdown(&self.data.equity);
         ui.label(RichText::new("VAR — Drawdown Underwater Chart").strong());
         Plot::new("drawdown_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = dd.iter().enumerate().map(|(i, &v)| [i as f64, v]).collect();
@@ -3581,8 +3821,7 @@ impl BharatApp {
     fn draw_vol_smile(&self, ui: &mut egui::Ui) {
         ui.label(RichText::new("SKEW — Volatility Smile / Skew").strong());
         Plot::new("vol_smile_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .legend(Legend::default())
             .show(ui, |plot_ui| {
@@ -3598,8 +3837,7 @@ impl BharatApp {
     fn draw_efficient_frontier(&self, ui: &mut egui::Ui) {
         ui.label(RichText::new("PORT/MARS — Efficient Frontier").strong());
         Plot::new("frontier_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let sharpe_min = self
@@ -3656,8 +3894,7 @@ impl BharatApp {
         let rs = rolling_sharpe(rets, 20, 0.05, 252);
         ui.label(RichText::new("Rolling Sharpe Ratio").strong());
         Plot::new("rs_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = rs
@@ -3683,8 +3920,7 @@ impl BharatApp {
         let rs = rolling_sortino(rets, 20, 0.05, 252);
         ui.label(RichText::new("Rolling Sortino Ratio").strong());
         Plot::new("rsort_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = rs
@@ -3713,8 +3949,7 @@ impl BharatApp {
         ui.label(format!("Beta: {:.4}", b));
         ui.label(format!("Alpha (annual): {:.4}", a));
         Plot::new("beta_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = rets
@@ -3732,8 +3967,7 @@ impl BharatApp {
         let rmdd = rolling_max_drawdown(series, 20);
         ui.label(RichText::new("Rolling Max Drawdown").strong());
         Plot::new("rmdd_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
@@ -3762,8 +3996,7 @@ impl BharatApp {
         ui.label(format!("VaR 95%: {:.4}", var_95));
         ui.label(format!("VaR 99%: {:.4}", var_99));
         Plot::new("var_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = rets
@@ -3784,8 +4017,7 @@ impl BharatApp {
         let std_dev = variance.sqrt();
         ui.label(RichText::new("Monte Carlo Simulation").strong());
         Plot::new("mc_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let mut rng = self.seed_counter;
@@ -3848,8 +4080,7 @@ impl BharatApp {
     fn draw_term_structure(&self, ui: &mut egui::Ui) {
         ui.label(RichText::new("IV Term Structure").strong());
         Plot::new("ts_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let tenors = [7.0_f64, 14.0, 30.0, 60.0, 90.0, 180.0];
@@ -3932,8 +4163,7 @@ impl BharatApp {
     fn draw_vix_term(&self, ui: &mut egui::Ui) {
         ui.label(RichText::new("VIX Term Structure").strong());
         Plot::new("vix_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let tenors = [7.0_f64, 14.0, 30.0, 60.0, 90.0, 180.0, 365.0];
@@ -3953,8 +4183,7 @@ impl BharatApp {
     fn draw_vol_cone(&self, ui: &mut egui::Ui) {
         ui.label(RichText::new("Volatility Cone").strong());
         Plot::new("vol_cone_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let tenors = [7.0_f64, 14.0, 30.0, 60.0, 90.0];
@@ -3992,8 +4221,7 @@ impl BharatApp {
     fn draw_option_payoff(&self, ui: &mut egui::Ui) {
         ui.label(RichText::new("Option Payoff Diagram").strong());
         Plot::new("payoff_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let strike = 100.0_f64;
@@ -4042,8 +4270,7 @@ impl BharatApp {
     fn draw_skew_evolution(&self, ui: &mut egui::Ui) {
         ui.label(RichText::new("Skew Evolution").strong());
         Plot::new("skew_evo_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let days: Vec<f64> = (0..30).map(|i| i as f64).collect();
@@ -4064,8 +4291,7 @@ impl BharatApp {
     fn draw_gamma_exposure(&self, ui: &mut egui::Ui) {
         ui.label(RichText::new("Gamma Exposure by Strike").strong());
         Plot::new("gamma_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let strikes: Vec<f64> = (0..20).map(|i| 80.0 + i as f64 * 5.0).collect();
@@ -4089,8 +4315,7 @@ impl BharatApp {
     fn draw_put_call_ratio(&self, ui: &mut egui::Ui) {
         ui.label(RichText::new("Put/Call Ratio").strong());
         Plot::new("pcr_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let days: Vec<f64> = (0..30).map(|i| i as f64).collect();
@@ -4117,8 +4342,7 @@ impl BharatApp {
         let iv_rank = ((current_iv - min_iv) / (max_iv - min_iv).max(1e-9) * 100.0) as i32;
         ui.label(format!("Current IV Rank: {}%", iv_rank));
         Plot::new("ivr_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = days.iter().zip(iv.iter()).map(|(&d, &v)| [d, v]).collect();
@@ -4172,16 +4396,14 @@ impl BharatApp {
 
         ui.label(RichText::new("ACF").strong());
         Plot::new("acf_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height() * 0.45_f32)
             .show(ui, |plot_ui| {
                 draw_lollipop(plot_ui, &a, conf);
             });
         ui.label(RichText::new("PACF").strong());
         Plot::new("pacf_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 draw_lollipop(plot_ui, &p, conf);
@@ -4239,8 +4461,7 @@ impl BharatApp {
         };
         ui.label(format!("Hurst Exponent: {:.4}", hurst));
         Plot::new("hurst_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = log_n
@@ -4274,8 +4495,7 @@ impl BharatApp {
         let rets = &self.data.returns;
         ui.label(RichText::new("Wavelet Power Spectrum").strong());
         Plot::new("wavelet_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let scales: Vec<f64> = (1..=20).map(|i| i as f64 * 2.0).collect();
@@ -4302,8 +4522,7 @@ impl BharatApp {
         let candles = &self.data.candles;
         ui.label(RichText::new("Kalman Filter").strong());
         Plot::new("kalman_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .label_formatter(|_axis: &str, p: &egui_plot::PlotPoint| format_ts(p.x))
             .show(ui, |plot_ui| {
@@ -4341,8 +4560,7 @@ impl BharatApp {
         let rets = &self.data.returns;
         ui.label(RichText::new("Markov Regime Switching").strong());
         Plot::new("markov_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let mut regime = 0;
@@ -4391,8 +4609,7 @@ impl BharatApp {
         let rets = &self.data.returns;
         ui.label(RichText::new("Q-Q Plot").strong());
         Plot::new("qq_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let mut sorted = rets.to_vec();
@@ -4427,8 +4644,7 @@ impl BharatApp {
         let rets = &self.data.returns;
         ui.label(RichText::new("Return Distribution").strong());
         Plot::new("dist_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let min_r = rets.iter().fold(f64::INFINITY, |a, b| a.min(*b));
@@ -4460,8 +4676,7 @@ impl BharatApp {
         let (roll_mean, roll_std) = rolling_moments(rets, 20);
         ui.label(RichText::new("Rolling Moments").strong());
         Plot::new("rm_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let mean_pts: PlotPoints = roll_mean
@@ -4610,8 +4825,7 @@ impl BharatApp {
     fn draw_fii_dii_flow(&self, ui: &mut egui::Ui) {
         ui.label(RichText::new("FII/DII Flow").strong());
         Plot::new("fii_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let days: Vec<f64> = (0..20).map(|i| i as f64).collect();
@@ -4692,8 +4906,7 @@ impl BharatApp {
     fn draw_yield_curve(&self, ui: &mut egui::Ui) {
         ui.label(RichText::new("GOVT — India Sovereign Yield Curve").strong());
         Plot::new("yield_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .legend(Legend::default())
             .show(ui, |plot_ui| {
@@ -4710,8 +4923,7 @@ impl BharatApp {
     fn draw_usdinr(&self, ui: &mut egui::Ui) {
         ui.label(RichText::new("USD/INR Exchange Rate").strong());
         Plot::new("usdinr_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let days: Vec<f64> = (0..60).map(|i| i as f64).collect();
@@ -4731,8 +4943,7 @@ impl BharatApp {
     fn draw_monsoon_agri(&self, ui: &mut egui::Ui) {
         ui.label(RichText::new("Monsoon & Agriculture").strong());
         Plot::new("monsoon_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let months = ["Jun", "Jul", "Aug", "Sep"];
@@ -5133,8 +5344,7 @@ impl BharatApp {
         let rsi_vals = rsi(series, 14);
         ui.label(RichText::new(format!("MULTI — Multi Indicator — {}", series.symbol)).strong());
         Plot::new("multi_price")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height() * 0.5_f32)
             .allow_scroll(true)
             .allow_drag(true)
@@ -5175,8 +5385,7 @@ impl BharatApp {
                 );
             });
         Plot::new("multi_rsi")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -5204,8 +5413,7 @@ impl BharatApp {
         let series = &self.data.candles;
         ui.label(RichText::new(format!("MTF — Multi Timeframe — {}", series.symbol)).strong());
         Plot::new("mtf_daily")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height() * 0.33_f32)
             .allow_scroll(true)
             .allow_drag(true)
@@ -5215,8 +5423,7 @@ impl BharatApp {
                 plot_ui.line(Line::new(pts).color(AMBER).width(1.5_f32).name("Daily"));
             });
         Plot::new("mtf_weekly")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height() * 0.33_f32)
             .allow_scroll(true)
             .allow_drag(true)
@@ -5231,8 +5438,7 @@ impl BharatApp {
                 plot_ui.line(Line::new(pts).color(INFO).width(2.0_f32).name("Weekly"));
             });
         Plot::new("mtf_monthly")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -5254,8 +5460,7 @@ impl BharatApp {
         let (macd_line, _signal_line, _histogram) = macd(series);
         ui.label(RichText::new(format!("MACD-DIV — MACD Divergence — {}", series.symbol)).strong());
         Plot::new("macd_div_price")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height() * 0.5_f32)
             .allow_scroll(true)
             .allow_drag(true)
@@ -5265,8 +5470,7 @@ impl BharatApp {
                 plot_ui.line(Line::new(pts).color(AMBER).width(1.5_f32).name("Price"));
             });
         Plot::new("macd_div_macd")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -5295,8 +5499,7 @@ impl BharatApp {
         let (_mid, upper, lower) = bollinger(series, 20, 2.0);
         ui.label(RichText::new(format!("BB-BO — Bollinger Breakout — {}", series.symbol)).strong());
         Plot::new("bb_bo_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -5349,8 +5552,7 @@ impl BharatApp {
             RichText::new(format!("VWS — Volume-Price Scatter — {}", candles.symbol)).strong(),
         );
         Plot::new("vws_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -5380,8 +5582,7 @@ impl BharatApp {
         let roc_vals = roc(series, 10);
         ui.label(RichText::new(format!("PM — Price Momentum — {}", series.symbol)).strong());
         Plot::new("pm_price")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height() * 0.5_f32)
             .allow_scroll(true)
             .allow_drag(true)
@@ -5391,8 +5592,7 @@ impl BharatApp {
                 plot_ui.line(Line::new(pts).color(AMBER).width(1.5_f32).name("Price"));
             });
         Plot::new("pm_roc")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -5419,8 +5619,7 @@ impl BharatApp {
         let dd = bt_viz::drawdown::compute_drawdown(&self.data.equity);
         ui.label(RichText::new("Drawdown & Recovery").strong());
         Plot::new("dd_rec_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = dd.iter().enumerate().map(|(i, &v)| [i as f64, v]).collect();
@@ -5452,8 +5651,7 @@ impl BharatApp {
         let rc = rolling_correlation(rets, rets, 20);
         ui.label(RichText::new("Rolling Correlation").strong());
         Plot::new("rc_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = rc
@@ -5476,8 +5674,7 @@ impl BharatApp {
         let candles = &self.data.candles;
         ui.label(RichText::new(format!("TTA — Tick Tape Advanced — {}", candles.symbol)).strong());
         Plot::new("tta_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -5541,8 +5738,7 @@ impl BharatApp {
         let sar = parabolic_sar(series, 0.02, 0.02, 0.2);
         ui.label(RichText::new(format!("PSAR — Parabolic SAR — {}", series.symbol)).strong());
         Plot::new("psar_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -5578,8 +5774,7 @@ impl BharatApp {
         let (_macd_line, _signal_line, histogram) = macd(series);
         ui.label(RichText::new(format!("MACD-H — MACD Histogram — {}", series.symbol)).strong());
         Plot::new("macd_h_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -5649,8 +5844,7 @@ impl BharatApp {
         let ema52 = ema(series, 52);
         ui.label(RichText::new(format!("ICH-E — Ichimoku + EMA — {}", series.symbol)).strong());
         Plot::new("ich_ema_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -5723,8 +5917,7 @@ impl BharatApp {
         let atr_vals = atr(series, 14);
         ui.label(RichText::new(format!("KEL-BO — Keltner Breakout — {}", series.symbol)).strong());
         Plot::new("kel_bo_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -5775,8 +5968,7 @@ impl BharatApp {
         let series = &self.data.candles;
         ui.label(RichText::new(format!("DON-BO — Donchian Breakout — {}", series.symbol)).strong());
         Plot::new("don_bo_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -6303,8 +6495,7 @@ impl BharatApp {
         });
         ui.separator();
         Plot::new("gsec_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = curve
@@ -6518,8 +6709,7 @@ impl BharatApp {
         ui.label(RichText::new("USD/INR — Spot & Forward Curve").strong());
         let fwd = india::sample_usdinr_forward();
         Plot::new("usdinr_fwd_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height() * 0.55_f32)
             .show(ui, |plot_ui| {
                 let pts: PlotPoints = fwd
@@ -6576,8 +6766,7 @@ impl BharatApp {
         ui.label(RichText::new("Yield India — Sovereign, SDL, Corporate Curves").strong());
         let y = india::sample_yield_india();
         Plot::new("yield_india_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .legend(Legend::default())
             .show(ui, |plot_ui| {
@@ -6692,8 +6881,7 @@ impl BharatApp {
         });
         ui.separator();
         Plot::new("fpi_fii_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height() * 0.45_f32)
             .legend(Legend::default())
             .show(ui, |plot_ui| {
@@ -7218,8 +7406,7 @@ impl BharatApp {
         });
         ui.separator();
         Plot::new("gst_plot")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height() * 0.45_f32)
             .show(ui, |plot_ui| {
                 let bars: Vec<Bar> = gst
@@ -7486,8 +7673,7 @@ impl BharatApp {
                             );
                         });
                         Plot::new(format!("dash_spark_{}", i))
-                            .auto_bounds_x()
-                            .auto_bounds_y()
+                            .auto_bounds(egui::emath::Vec2b::new(true, true))
                             .height(36.0_f32)
                             .show_axes([false, false])
                             .show_grid([false, false])
@@ -7712,8 +7898,7 @@ impl BharatApp {
         chart_resp.scroll_to_me(Some(egui::Align::Center));
 
         Plot::new("multi_compare_normalized")
-            .auto_bounds_x()
-            .auto_bounds_y()
+            .auto_bounds(egui::emath::Vec2b::new(true, true))
             .height(ui.available_height())
             .allow_scroll(true)
             .allow_drag(true)
@@ -8376,6 +8561,242 @@ mod tests {
         let (x0, x1, y0, y1) = z.window(0.0, 2000.0, 0.0, 1000.0);
         assert!(x0.is_finite() && x1.is_finite() && y0.is_finite() && y1.is_finite());
         assert!(x1 > x0 && y1 > y0);
+    }
+
+    /// 200 daily bars with a gently rising, noisy price so the envelope is
+    /// strictly inside the requested y-range.
+    fn pan_fixture() -> (Vec<Candle>, f64, f64, f64, f64) {
+        let day = 86_400.0_f64;
+        let start = 1_700_000_000.0_f64;
+        let series: Vec<Candle> = (0..200)
+            .map(|i| {
+                let base = 100.0 + i as f64 * 0.25;
+                Candle::new(
+                    start + i as f64 * day,
+                    base,
+                    base + 2.0,
+                    base - 2.0,
+                    base + 0.5,
+                    1_000.0,
+                )
+            })
+            .collect();
+        let x0 = start - day;
+        let x1 = start + 200.0 * day;
+        (series, x0, x1, 50.0, 200.0)
+    }
+
+    /// Panning is disabled until the view is actually zoomed in.
+    #[test]
+    fn test_pan_is_ignored_before_zooming() {
+        let (series, x0, x1, y0, y1) = pan_fixture();
+        let base = ZoomState::default();
+        assert!(!base.is_zoomed());
+        let panned = base.pan_by(500.0, 10.0, &series, x0, x1, y0, y1);
+        assert_eq!(panned, base, "a full-range view must not pan");
+    }
+
+    /// Horizontal drag shifts the x-window by the data-space delta.
+    #[test]
+    fn test_horizontal_pan_moves_the_x_window() {
+        let (series, x0, x1, y0, y1) = pan_fixture();
+        let z = ZoomState::default().zoom_in_centered(125.0);
+        assert!(z.is_zoomed());
+        let before = z.window(x0, x1, y0, y1);
+        // Drag right: the window should move later in time.
+        let panned = z.pan_by(86_400.0 * 5.0, 0.0, &series, x0, x1, y0, y1);
+        let after = panned.window(x0, x1, y0, y1);
+        assert!((after.0 - before.0 - 86_400.0 * 5.0).abs() < 1e-6);
+        assert!((after.1 - before.1 - 86_400.0 * 5.0).abs() < 1e-6);
+    }
+
+    /// Vertical drag shifts the y-window by the data-space delta.
+    #[test]
+    fn test_vertical_pan_moves_the_y_window() {
+        let (series, x0, x1, y0, y1) = pan_fixture();
+        let z = ZoomState::default().zoom_in_centered(125.0);
+        let before = z.window(x0, x1, y0, y1);
+        let panned = z.pan_by(0.0, 12.5, &series, x0, x1, y0, y1);
+        let after = panned.window(x0, x1, y0, y1);
+        assert!((after.2 - before.2 - 12.5).abs() < 1e-6);
+        assert!((after.3 - before.3 - 12.5).abs() < 1e-6);
+    }
+
+    /// Both axes move together for a diagonal drag.
+    #[test]
+    fn test_pan_moves_both_axes_at_once() {
+        let (series, x0, x1, y0, y1) = pan_fixture();
+        let z = ZoomState::default().zoom_in_centered(125.0);
+        let before = z.window(x0, x1, y0, y1);
+        let panned = z.pan_by(2.0 * 86_400.0, -6.0, &series, x0, x1, y0, y1);
+        let after = panned.window(x0, x1, y0, y1);
+        assert!((after.0 - before.0 - 2.0 * 86_400.0).abs() < 1e-6);
+        assert!((after.2 - before.2 + 6.0).abs() < 1e-6);
+    }
+
+    /// Panning is clamped so the window can never leave the data.
+    #[test]
+    fn test_pan_is_clamped_to_the_data() {
+        let (series, x0, x1, y0, y1) = pan_fixture();
+        let z = ZoomState::default().zoom_in_centered(125.0);
+        // A drag far larger than the series cannot pull the window off the end.
+        let far = z.pan_by(1.0e9, 1.0e9, &series, x0, x1, y0, y1);
+        let (wx0, wx1, _, _) = far.window(x0, x1, y0, y1);
+        assert!(wx0 >= x0 - 1e-6, "left edge escaped the data: {wx0}");
+        assert!(wx1 <= x1 + 1e-6, "right edge escaped the data: {wx1}");
+
+        // And the same in the other direction.
+        let back = z.pan_by(-1.0e9, -1.0e9, &series, x0, x1, y0, y1);
+        let (bx0, bx1, _, _) = back.window(x0, x1, y0, y1);
+        assert!(bx0 >= x0 - 1e-6);
+        assert!(bx1 <= x1 + 1e-6);
+    }
+
+    /// Repeated drags accumulate; the bound must not compound per frame.
+    #[test]
+    fn test_repeated_pan_accumulates_without_compounding_the_clamp() {
+        let (series, x0, x1, y0, y1) = pan_fixture();
+        let mut z = ZoomState::default().zoom_in_centered(125.0);
+        // Many small drags right, in total less than the available slack.
+        for _ in 0..10 {
+            z = z.pan_by(86_400.0, 0.0, &series, x0, x1, y0, y1);
+        }
+        assert!((z.pan_x - 10.0 * 86_400.0).abs() < 1e-6);
+        // Many more than the slack allows: the result must stay inside, and
+        // must equal the clamp limit rather than drift further.
+        for _ in 0..400 {
+            z = z.pan_by(86_400.0, 0.0, &series, x0, x1, y0, y1);
+        }
+        let (wx0, wx1, _, _) = z.window(x0, x1, y0, y1);
+        assert!(wx1 <= x1 + 1e-6, "right edge escaped: {wx1}");
+        let (_, _, _, _) = z.window(x0, x1, y0, y1);
+        // Re-panning at the limit is a no-op rather than an error.
+        let settled = z.pan_by(86_400.0, 0.0, &series, x0, x1, y0, y1);
+        assert_eq!(settled, z);
+    }
+
+    /// Non-finite deltas must never poison the state.
+    #[test]
+    fn test_pan_ignores_non_finite_deltas() {
+        let (series, x0, x1, y0, y1) = pan_fixture();
+        let z = ZoomState::default().zoom_in_centered(125.0);
+        assert_eq!(z.pan_by(f64::NAN, 0.0, &series, x0, x1, y0, y1), z);
+        assert_eq!(z.pan_by(0.0, f64::INFINITY, &series, x0, x1, y0, y1), z);
+    }
+
+    /// A panned view still contains candles, so the pane is never blank.
+    #[test]
+    fn test_panned_window_still_covers_candles() {
+        let (series, x0, x1, y0, y1) = pan_fixture();
+        let mut z = ZoomState::default().zoom_in_centered(125.0);
+        z = z.pan_by(3.0 * 86_400.0, 5.0, &series, x0, x1, y0, y1);
+        let (wx0, wx1, wy0, wy1) = z.window_with_data(&series, x0, x1, y0, y1);
+        let (lo, hi) = price_envelope(&series, wx0, wx1).expect("candles in view");
+        assert!(wy0 <= lo + 1e-6, "visible low {lo} clipped by {wy0}");
+        assert!(wy1 >= hi - 1e-6, "visible high {hi} clipped by {wy1}");
+    }
+
+    /// Zooming in and out returns to the full range.
+    #[test]
+    fn test_zoom_out_unwinds_to_the_full_range() {
+        let (series, x0, x1, y0, y1) = pan_fixture();
+        let mut z = ZoomState::default();
+        for _ in 0..5 {
+            z = z.zoom_in_centered(125.0);
+        }
+        assert!(z.is_zoomed());
+        for _ in 0..10 {
+            z = z.zoom_out_centered();
+        }
+        assert!(!z.is_zoomed());
+        assert_eq!(z.window(x0, x1, y0, y1), (x0, x1, y0, y1));
+    }
+
+    /// The zoom factor is capped, so repeated clicks stay sane.
+    #[test]
+    fn test_zoom_in_is_capped() {
+        let (series, x0, x1, _, _) = pan_fixture();
+        let mut z = ZoomState::default();
+        for _ in 0..50 {
+            z = z.zoom_in(0.5 * (x0 + x1), 0.0, &series, x0, x1);
+        }
+        assert!(z.factor <= ZoomState::MAX_FACTOR + f64::EPSILON);
+    }
+
+    #[test]
+    fn test_custom_window_parses_orders_and_validates() {
+        let day = 86_400_i64;
+        let base = 1_700_000_000_i64;
+        let start = format_ymd(base);
+        let end = format_ymd(base + 30 * day);
+
+        let w = CustomWindow::parse(&start, &end).expect("valid window");
+        assert_eq!(w.days(), 30);
+
+        // Reversed input is normalised rather than rejected.
+        let flipped = CustomWindow::parse(&end, &start).expect("reversed window");
+        assert_eq!(flipped, w);
+
+        // Equal dates leave an empty window.
+        assert!(CustomWindow::parse(&start, &start).is_none());
+        // Unparseable dates are rejected.
+        assert!(CustomWindow::parse("not-a-date", &end).is_none());
+        assert!(CustomWindow::parse("", &end).is_none());
+        // Absurdly long windows are refused.
+        let long_start = format_ymd(base);
+        let long_end = format_ymd(base + 20 * 365 * day);
+        assert!(CustomWindow::parse(&long_start, &long_end).is_none());
+    }
+
+    #[test]
+    fn test_custom_window_picks_interval_and_axis_style_from_its_length() {
+        let day = 86_400_i64;
+        let base = 1_700_000_000_i64;
+        let win = |d: i64| {
+            CustomWindow::parse(&format_ymd(base), &format_ymd(base + d * day)).expect("window")
+        };
+
+        // Intraday spans keep intraday bars and show times.
+        let one_day = win(1);
+        assert_eq!(one_day.interval(), Interval::Min5);
+        assert_eq!(one_day.axis_date_style(), AxisDateStyle::TimeAndDate);
+
+        let one_week = win(7);
+        assert_eq!(one_week.interval(), Interval::Min15);
+        assert_eq!(one_week.axis_date_style(), AxisDateStyle::DayMonth);
+
+        let one_month = win(30);
+        assert_eq!(one_month.interval(), Interval::Hour1);
+        assert_eq!(one_month.axis_date_style(), AxisDateStyle::DayMonth);
+
+        let six_months = win(180);
+        assert_eq!(six_months.interval(), Interval::Day1);
+        assert_eq!(six_months.axis_date_style(), AxisDateStyle::MonthYear);
+
+        let two_years = win(730);
+        assert_eq!(two_years.interval(), Interval::Day1);
+        assert_eq!(two_years.axis_date_style(), AxisDateStyle::MonthYear);
+    }
+
+    #[test]
+    fn test_custom_range_label_and_fallbacks() {
+        assert_eq!(TimeRange::Custom.label(), "Custom");
+        // Presets are unaffected by the new variant.
+        assert_eq!(TimeRange::D1.to_days(), 1);
+        assert_eq!(TimeRange::Y1.to_days(), 365);
+        assert_eq!(TimeRange::Y5.to_days(), 1825);
+    }
+
+    #[test]
+    fn test_ymd_roundtrip() {
+        let ts = 1_700_000_000_i64;
+        let text = format_ymd(ts);
+        let back = parse_ymd(&text).expect("parses back");
+        // Midnight of that day, so it lands on or before the original instant.
+        assert!(back <= ts);
+        assert_eq!(format_ymd(back), text);
+        // Surrounding whitespace is tolerated.
+        assert_eq!(parse_ymd(&format!("  {text}  ")), Some(back));
     }
 
     #[test]
