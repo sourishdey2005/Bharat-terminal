@@ -39,15 +39,36 @@ pub struct DataService {
     cache: Cache,
 }
 
+/// Directory that holds the on-disk cache and settings.
+///
+/// Anchored to the executable's own directory rather than the working
+/// directory: a relative `./data` resolved against wherever the user launched
+/// from, so a copy of the app run from the Desktop would try to create its
+/// cache next to the Desktop (and silently fail if that were read-only), while
+/// the same copy run from a terminal wrote somewhere else entirely. Each build
+/// now keeps its data beside its own binary.
+pub fn default_cache_dir() -> std::path::PathBuf {
+    let base = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    base.join("data")
+}
+
+/// Full path of the OHLCV cache database.
+pub fn default_cache_path() -> std::path::PathBuf {
+    default_cache_dir().join("cache.db")
+}
+
 impl DataService {
     /// Create a new data service with default cache path.
     pub fn new() -> Result<Self> {
-        std::fs::create_dir_all("./data")?;
+        std::fs::create_dir_all(default_cache_dir())?;
         Ok(Self {
             yahoo: YahooProvider::new(),
             coinbase: CoinbaseProvider::new(),
             bhavcopy: BhavcopyProvider::new()?,
-            cache: Cache::new("./data/cache.db")?,
+            cache: Cache::new(&default_cache_path())?,
         })
     }
 

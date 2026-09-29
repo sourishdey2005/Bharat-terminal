@@ -120,6 +120,13 @@ The `GP — Candlestick` tab renders professional Japanese candles:
 | Legend | `Last` price plus `O / H / L / C` and total volume above the chart |
 | Current price | Dashed horizontal guide at the last close |
 
+**`1M` uses daily bars, so it reads like `3M`.** An earlier build mapped `1M`
+to hourly candles, and a month of hourly data is full of overnight and weekend
+gaps — the chart rendered as a scatter of thin floating candles instead of a
+continuous series. `1M` now uses daily bars, giving the same density and
+readability as `3M`, while `1D` and `1W` keep intraday bars where the gaps are
+genuinely part of the picture.
+
 **Bar width is derived from the data.** The median gap between consecutive
 timestamps sets the body width, so 1-minute, 5-minute, daily and weekly series
 all render at the correct density instead of overlapping. Bars are never wider
@@ -139,6 +146,15 @@ snaps onto real candles even if you double-click empty space. Every
 candlestick-style tab (`GP — Candlestick`, `GP (HA)`, `C3D`, `CMA`, `CBB`,
 `CRSI`, `CMACD`) shares this behaviour through one common gesture handler, so
 zooming one tab does not leave the others stuck at a stale zoom level.
+
+**Pinch to zoom, two fingers to move (touch).** On a touchscreen, spread two
+fingers to zoom in and pinch them together to zoom out, around the point
+between your fingers. Dragging two fingers pans the view horizontally and
+vertically at the same time, with the same clamping as a mouse drag. A
+horizontal-only pinch zooms time, a vertical-only pinch zooms price, and a
+diagonal pinch zooms both. Because a pinch reports a small factor every frame,
+zoom is continuous rather than the fixed 2× step used by a double-click, so
+the view scales smoothly instead of jumping between extremes.
 
 **X-axis labels follow the selected timeframe:**
 
@@ -175,8 +191,12 @@ app falls back to the `1Y` preset rather than starting with a broken range.
 noise. The header shows `(hidden: N bars)` so the state is never silent; zoom
 in to see them.
 
-The chart fills the full window height, with the price and volume panes
-sharing one x-axis so they stay aligned at any window size.
+**The chart fills the window.** The price and volume panes are sized from the
+real space left between this tab's own header rows and the bottom of the
+window, after reserving room for the x-axis labels and the status bar. The two
+panes therefore land exactly on the bottom edge at any window size or DPI
+scale, instead of leaving a blank ribbon underneath or pushing the volume pane
+off the bottom.
 
 The same renderer backs the `GP (HA)`, `C3D`, `CMA`, `CBB`, `CRSI` and `CMACD`
 candle tabs, and all of them resolve their visible range from the same
@@ -804,6 +824,25 @@ BharatTerminal/
 | Total crates | 6 |
 
 ---
+
+## 📂 Where Settings and Cache Live
+
+Both are stored in a `data/` folder **next to the executable**, not in the
+working directory:
+
+```
+<app folder>/
+  BharatTerminal-v3.0.0.exe
+  data/
+    prefs.json    last symbol, range, theme, custom dates
+    cache.db      cached OHLCV bars
+```
+
+A relative `./data` path resolved against whatever folder you launched from, so
+the same build wrote its settings in different places depending on how it was
+started — and could not write at all when launched from a read-only location
+such as the Desktop. Anchoring to the executable keeps one build's data with
+that build.
 
 ## 🔒 Privacy & Security
 

@@ -344,6 +344,9 @@ fn price_envelope(candles: &[Candle], wx0: f64, wx1: f64) -> Option<(f64, f64)> 
 struct ZoomState {
     /// `1.0` shows the whole range; larger values zoom in.
     factor: f64,
+    /// Vertical-only scale, for a two-finger pinch held above/below each other.
+    /// Shares the same bounds as `factor`; `1.0` means "no extra y zoom".
+    y_factor: f64,
     /// X position (timestamp) to keep centred, or `None` to use the midpoint.
     focus_x: Option<f64>,
     /// Y position to keep centred.
@@ -358,6 +361,7 @@ impl Default for ZoomState {
     fn default() -> Self {
         Self {
             factor: 1.0,
+            y_factor: 1.0,
             focus_x: None,
             focus_y: None,
             pan_x: 0.0,
@@ -378,6 +382,7 @@ impl ZoomState {
     /// True when the view is not showing the full range.
     fn is_zoomed(&self) -> bool {
         self.factor > Self::MIN_FACTOR + f64::EPSILON
+            || self.y_factor > Self::MIN_FACTOR + f64::EPSILON
     }
 
     /// Zooms in one step around `(x, y)`, keeping that point fixed.
@@ -392,32 +397,17 @@ impl ZoomState {
             return *self;
         }
         let factor = (self.factor * Self::STEP).min(Self::MAX_FACTOR);
-        if (factor - self.factor).abs() < f64::EPSILON {
+        let y_factor = (self.y_factor * Self::STEP).min(Self::MAX_FACTOR);
+        if (factor - self.factor).abs() < f64::EPSILON
+            && (y_factor - self.y_factor).abs() < f64::EPSILON
+        {
             return *self;
         }
         // Snap against the window the new factor will show around `x`.
-        let half_x = if x1 > x0 {
-            0.5 * (x1 - x0) / factor
-        } else {
-            0.0
-        };
-        let y = if y.is_finite() {
-            match price_envelope(series, x - half_x, x + half_x) {
-                Some((lo, hi)) => y.clamp(lo, hi),
-                None => y,
-            }
-        } else {
-            // A non-finite click price would poison the window, so fall back to
-            // the existing focus and finally to the midpoint of the envelope.
-            let mid = price_envelope(series, x - half_x, x + half_x)
-                .map_or(0.0, |(lo, hi)| 0.5 * (lo + hi));
-            match self.focus_y {
-                Some(f) if f.is_finite() => f,
-                _ => mid,
-            }
-        };
+        let y = Self::snap_focus_y(y, x, factor, series, x0, x1, self.focus_y);
         Self {
             factor,
+            y_factor,
             focus_x: Some(x),
             focus_y: Some(y),
             pan_x: 0.0,
@@ -430,20 +420,114 @@ impl ZoomState {
     /// repeated clicks narrow the view smoothly.
     fn zoom_out(&self, x: f64, y: f64) -> Self {
         let factor = (self.factor / Self::STEP).max(Self::MIN_FACTOR);
+        let y_factor = (self.y_factor / Self::STEP).max(Self::MIN_FACTOR);
         if !x.is_finite() || !y.is_finite() {
-            return Self { factor, ..*self };
+            return Self {
+                factor,
+                y_factor,
+                ..*self
+            };
         }
         // At the full range there is nothing left to step out of, so return
         // unchanged rather than recording a focus point that has no effect.
-        if (factor - self.factor).abs() < f64::EPSILON {
+        if (factor - self.factor).abs() < f64::EPSILON
+            && (y_factor - self.y_factor).abs() < f64::EPSILON
+        {
             return *self;
         }
         Self {
             factor,
+            y_factor,
             focus_x: Some(x),
             focus_y: Some(y),
             pan_x: 0.0,
             pan_y: 0.0,
+        }
+    }
+
+    /// Zooms both axes by an arbitrary multiplicative `factor` around `(x, y)`.
+    ///
+    /// Continuous counterpart to [`Self::zoom_in`]. The factor is clamped to the
+    /// same bounds as the stepped gestures, and the focus is snapped into the
+    /// candles the new window will show, so a pinch that lands on empty space
+    /// still ends up showing real bars instead of a blank pane.
+    fn zoom_by(&self, factor: f64, x: f64, y: f64, series: &[Candle], x0: f64, x1: f64) -> Self {
+        self.zoom_x_by(factor, x, y, series, x0, x1)
+            .zoom_y_by(factor, x, y, series, x0, x1)
+    }
+
+    /// Zooms the horizontal axis by `factor` around `(x, y)`, leaving the
+    /// vertical scale untouched. This is egui's `[z, 1]` horizontal pinch.
+    fn zoom_x_by(&self, factor: f64, x: f64, y: f64, series: &[Candle], x0: f64, x1: f64) -> Self {
+        if !factor.is_finite() || factor <= 0.0 || !x.is_finite() {
+            return *self;
+        }
+        let target = (self.factor * factor).clamp(Self::MIN_FACTOR, Self::MAX_FACTOR);
+        if (target - self.factor).abs() < 1e-9 {
+            return *self;
+        }
+        // Snapped against the window the new x-scale will show, so the focus
+        // lands on candles that are actually visible.
+        let y = Self::snap_focus_y(y, x, target, series, x0, x1, self.focus_y);
+        Self {
+            factor: target,
+            y_factor: self.y_factor,
+            focus_x: Some(x),
+            focus_y: Some(y),
+            pan_x: 0.0,
+            pan_y: 0.0,
+        }
+    }
+
+    /// Zooms only the vertical axis, for a two-finger pinch held directly
+    /// above/below each other. `zoom_delta_2d` reports `[1, z]` for that case.
+    fn zoom_y_by(&self, factor: f64, x: f64, y: f64, series: &[Candle], x0: f64, x1: f64) -> Self {
+        if !factor.is_finite() || factor <= 0.0 || !x.is_finite() {
+            return *self;
+        }
+        let target = (self.y_factor * factor).clamp(Self::MIN_FACTOR, Self::MAX_FACTOR);
+        if (target - self.y_factor).abs() < 1e-9 {
+            return *self;
+        }
+        let y = Self::snap_focus_y(y, x, self.factor, series, x0, x1, self.focus_y);
+        Self {
+            factor: self.factor,
+            y_factor: target,
+            focus_x: Some(x),
+            focus_y: Some(y),
+            pan_x: 0.0,
+            pan_y: 0.0,
+        }
+    }
+
+    /// Clamps `y` into the price envelope of the window a factor of `factor`
+    /// will show around `x`, falling back to `fallback` and finally the
+    /// envelope midpoint when `y` is not finite.
+    fn snap_focus_y(
+        y: f64,
+        x: f64,
+        factor: f64,
+        series: &[Candle],
+        x0: f64,
+        x1: f64,
+        fallback: Option<f64>,
+    ) -> f64 {
+        let half_x = if x1 > x0 {
+            0.5 * (x1 - x0) / factor
+        } else {
+            0.0
+        };
+        let envelope = price_envelope(series, x - half_x, x + half_x);
+        if y.is_finite() {
+            return match envelope {
+                Some((lo, hi)) => y.clamp(lo, hi),
+                None => y,
+            };
+        }
+        match (fallback, envelope) {
+            (Some(f), _) if f.is_finite() => f,
+            (_, Some((lo, hi))) => 0.5 * (lo + hi),
+            _ => 0.0,
         }
     }
 
@@ -452,6 +536,7 @@ impl ZoomState {
         let factor = (self.factor * Self::STEP).min(Self::MAX_FACTOR);
         Self {
             factor,
+            y_factor: (self.y_factor * Self::STEP).min(Self::MAX_FACTOR),
             focus_x: self.focus_x,
             focus_y: Some(y),
             pan_x: 0.0,
@@ -462,11 +547,15 @@ impl ZoomState {
     /// Zooms out around the current centre, for the toolbar buttons.
     fn zoom_out_centered(&self) -> Self {
         let factor = (self.factor / Self::STEP).max(Self::MIN_FACTOR);
-        if (factor - self.factor).abs() < f64::EPSILON {
+        let y_factor = (self.y_factor / Self::STEP).max(Self::MIN_FACTOR);
+        if (factor - self.factor).abs() < f64::EPSILON
+            && (y_factor - self.y_factor).abs() < f64::EPSILON
+        {
             return *self;
         }
         Self {
             factor,
+            y_factor,
             focus_x: self.focus_x,
             focus_y: self.focus_y,
             pan_x: 0.0,
@@ -492,7 +581,7 @@ impl ZoomState {
         let cx = self.focus_x.unwrap_or(0.5 * (x0 + x1));
         let cy = self.focus_y.unwrap_or(0.5 * (y0 + y1));
         let half_x = 0.5 * (x1 - x0) / self.factor;
-        let half_y = 0.5 * (y1 - y0) / self.factor;
+        let half_y = 0.5 * (y1 - y0) / self.y_factor;
         (
             cx - half_x + self.pan_x,
             cx + half_x + self.pan_x,
@@ -529,7 +618,7 @@ impl ZoomState {
         let cx = self.focus_x.unwrap_or(0.5 * (x0 + x1));
         let cy = self.focus_y.unwrap_or(0.5 * (y0 + y1));
         let half_x = 0.5 * (x1 - x0) / self.factor;
-        let half_y = 0.5 * (y1 - y0) / self.factor;
+        let half_y = 0.5 * (y1 - y0) / self.y_factor;
         (cx - half_x, cx + half_x, cy - half_y, cy + half_y)
     }
 
@@ -650,6 +739,72 @@ fn drag_to_data(drag_px: f32, plot_px: f32, full: f64) -> f64 {
     -full * (drag_px as f64 / plot_px as f64)
 }
 
+/// Applies a two-finger pinch and drag on a plot.
+///
+/// Touch needs its own path: there is no right-click, and a single-finger swipe
+/// is only reported as a pointer drag once egui decides it is one, which drops
+/// the first frames of the gesture. [`egui::InputState::multi_touch`] exposes
+/// the pinch factor and the average finger translation directly, so both axes
+/// can be zoomed and panned in one gesture:
+///
+/// - `zoom_delta_2d` scales the x and y axes independently. egui reports
+///   `[1, z]` for a vertical pinch and `[z, 1]` for a horizontal one, so an
+///   axis-aligned pinch comes for free.
+/// - `translation_delta` pans, reusing the mouse-drag maths so a two-finger
+///   drag is clamped identically to a one-finger drag.
+fn handle_plot_pinch(
+    plot_ui: &egui_plot::PlotUi,
+    current: ZoomState,
+    series: &[Candle],
+    x0: f64,
+    x1: f64,
+    y0: f64,
+    y1: f64,
+) -> Option<ZoomState> {
+    let touch = plot_ui.ctx().multi_touch()?;
+    // A single tap must keep the existing click behaviour, so require two
+    // fingers before moving the view.
+    if touch.num_touches < 2 {
+        return None;
+    }
+    let zx = touch.zoom_delta_2d.x as f64;
+    let zy = touch.zoom_delta_2d.y as f64;
+    let delta = touch.translation_delta;
+    let zooming = (zx - 1.0).abs() > 1e-6 || (zy - 1.0).abs() > 1e-6;
+    if !zooming && delta.x == 0.0 && delta.y == 0.0 {
+        return None;
+    }
+
+    // Anchor on the finger midpoint so spreading two fingers apart keeps the
+    // point between them stationary.
+    let rect = plot_ui.response().rect;
+    let midpoint = egui::Pos2::new(rect.center().x + delta.x, rect.center().y + delta.y);
+    let anchor = plot_ui.plot_from_screen(midpoint);
+    if !anchor.x.is_finite() || !anchor.y.is_finite() {
+        return None;
+    }
+
+    let mut next = current;
+    if (zx - 1.0).abs() > 1e-6 {
+        next = next.zoom_x_by(zx, anchor.x, anchor.y, series, x0, x1);
+    }
+    if (zy - 1.0).abs() > 1e-6 {
+        next = next.zoom_y_by(zy, anchor.x, anchor.y, series, x0, x1);
+    }
+    if delta.x != 0.0 || delta.y != 0.0 {
+        let (wx0, wx1, wy0, wy1) = next.window_with_data(series, x0, x1, y0, y1);
+        let dx = drag_to_data(delta.x, rect.width(), wx1 - wx0);
+        let dy = drag_to_data(delta.y, rect.height(), wy1 - wy0);
+        next = next.pan_by(dx, dy, series, x0, x1, y0, y1);
+    }
+
+    if next == current {
+        None
+    } else {
+        Some(next)
+    }
+}
+
 /// Applies a drag on a plot as a horizontal/vertical pan of the zoomed window.
 ///
 /// Returns the new state, or `None` when there is nothing to pan. Panning is
@@ -709,6 +864,12 @@ fn apply_zoom_and_pan(
     y1: f64,
 ) {
     if let Some(next) = handle_plot_zoom_gesture(plot_ui, zoom.get(), series, x0, x1, y0, y1) {
+        zoom.set(next);
+    }
+    // Pinch first: it is the finer-grained gesture, and a two-finger drag is
+    // also visible as a pointer drag, so letting the pinch resolve first keeps
+    // the two from double-applying the same movement.
+    if let Some(next) = handle_plot_pinch(plot_ui, zoom.get(), series, x0, x1, y0, y1) {
         zoom.set(next);
     }
     if let Some(next) = handle_plot_pan(plot_ui, zoom.get(), series, x0, x1, y0, y1) {
@@ -1192,7 +1353,10 @@ impl TimeRange {
         match self {
             TimeRange::D1 => Interval::Min5,
             TimeRange::W1 => Interval::Min15,
-            TimeRange::M1 => Interval::Hour1,
+            // Daily bars, not hourly: hourly data over a month is full of
+            // overnight and weekend gaps, so the chart rendered as sparse
+            // floating candles instead of the continuous 3M view.
+            TimeRange::M1 => Interval::Day1,
             TimeRange::M3 => Interval::Day1,
             TimeRange::M6 => Interval::Day1,
             TimeRange::Y1 => Interval::Day1,
@@ -1235,8 +1399,19 @@ impl Default for Prefs {
 }
 
 impl Prefs {
+    /// Location of the settings file.
+    ///
+    /// Anchored to the executable's own directory, not the working directory.
+    /// A relative `./data/prefs.json` resolved against whatever directory the
+    /// user happened to launch from, so the packaged app scattered its settings
+    /// around (and could fail to write at all from a read-only location like the
+    /// Desktop). Each build now keeps its settings next to its own binary.
     fn prefs_path() -> std::path::PathBuf {
-        std::path::PathBuf::from("./data/prefs.json")
+        let base = std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
+            .unwrap_or_else(|| std::path::PathBuf::from("."));
+        base.join("data").join("prefs.json")
     }
 
     fn load() -> Self {
@@ -2314,20 +2489,39 @@ impl BharatApp {
         let frame: std::cell::RefCell<(f64, f64, std::rc::Rc<Vec<Candle>>)> =
             std::cell::RefCell::new((x0, x1, std::rc::Rc::new(Vec::new())));
 
-        let hover_candle = std::cell::RefCell::new(None::<(f64, f64, f64, f64, f64)>);
+        // Height budget for the price and volume panes, measured in absolute
+        // screen coordinates.
+        //
+        // `ui.available_height()` over-reports here by roughly 70px: the
+        // CentralPanel is laid out before the status bar has claimed its strip,
+        // so budgeting from it pushed the volume pane's x-axis labels and the
+        // status bar past the bottom of the window, leaving the chart either
+        // clipped or floating above a blank strip.
+        //
+        // Instead, measure the space between this tab's own chrome (which ends
+        // at the next widget position) and the bottom of the region this panel
+        // may paint, then reserve the status bar and the x-axis label strip --
+        // egui_plot draws those labels *outside* the height it is given. The
+        // two panes then land on the bottom edge at any window size.
+        const STATUS_H: f32 = 26.0;
+        const AXIS_H: f32 = 30.0;
+        // `clip_rect()` is infinite on some frames (an unconstrained Ui), which
+        // would hand egui_plot an infinite height and stop the window painting
+        // at all, so fall back to a default and clamp both ends.
+        const FALLBACK_H: f32 = 620.0;
+        let paint_bottom = ui.clip_rect().max.y;
+        let chrome_bottom = ui.next_widget_position().y;
+        let avail = if paint_bottom.is_finite() && chrome_bottom.is_finite() {
+            (paint_bottom - chrome_bottom - STATUS_H - AXIS_H).clamp(180.0, 4000.0)
+        } else {
+            FALLBACK_H
+        };
+        let vol_h = (avail * 0.22).clamp(60.0, 130.0);
+        let price_h = (avail - vol_h).max(140.0);
+        // Median gap between bars, used to pick the hovered candle and to pad
+        // the visible slice so a bar at the very edge is not clipped.
         let spacing = bar_spacing(series);
-        // `viewport_h` runs from the top of the chart area, so it still covers
-        // this tab's own title, arrow toggle and OHLC legend. egui_plot also
-        // draws its axis tick labels outside the requested `height`, so the
-        // budget reserves room for those plus the status bar; otherwise the
-        // volume pane is pushed past the bottom of the window.
-        let avail = self.viewport_h.max(280.0);
-        let tab_chrome = 106.0_f32;
-        let axis_h = 46.0_f32;
-        let status_h = 24.0_f32;
-        let body_h = (avail - tab_chrome - axis_h - status_h).max(200.0);
-        let vol_h = (body_h * 0.24).clamp(70.0, 150.0);
-        let price_h = body_h - vol_h;
+        let hover_candle = std::cell::RefCell::new(None::<(f64, f64, f64, f64, f64)>);
 
         // Trend arrows only stay legible when bars are wide enough on screen.
         // At ~250+ bars a per-bar arrow is visual noise, so it is suppressed.
@@ -8561,6 +8755,142 @@ mod tests {
         let (x0, x1, y0, y1) = z.window(0.0, 2000.0, 0.0, 1000.0);
         assert!(x0.is_finite() && x1.is_finite() && y0.is_finite() && y1.is_finite());
         assert!(x1 > x0 && y1 > y0);
+    }
+
+    /// A pinch reports a small multiplicative factor per frame, so the zoom
+    /// must be continuous rather than a fixed 2x step. Several small pinches
+    /// must land on the same result as one equivalent factor.
+    #[test]
+    fn test_zoom_by_is_continuous_and_matches_a_single_step() {
+        let (series, x0, x1, _, _) = pan_fixture();
+        let mid = 0.5 * (x0 + x1);
+        let one_step = ZoomState::default().zoom_by(4.0, mid, 0.0, &series, x0, x1);
+        let two_steps = ZoomState::default()
+            .zoom_by(2.0, mid, 0.0, &series, x0, x1)
+            .zoom_by(2.0, mid, 0.0, &series, x0, x1);
+        assert!((one_step.factor - two_steps.factor).abs() < 1e-9);
+        assert!((one_step.factor - 4.0).abs() < 1e-9);
+    }
+
+    /// Many tiny pinch deltas must not overshoot, and must stay clamped.
+    #[test]
+    fn test_zoom_by_accumulates_tiny_deltas_and_clamps() {
+        let (series, x0, x1, _, _) = pan_fixture();
+        let mid = 0.5 * (x0 + x1);
+        let mut z = ZoomState::default();
+        for _ in 0..200 {
+            z = z.zoom_by(1.05, mid, 0.0, &series, x0, x1);
+        }
+        assert!(z.factor <= ZoomState::MAX_FACTOR + 1e-9, "{}", z.factor);
+        // Pinching closed walks back down to the full range.
+        for _ in 0..400 {
+            z = z.zoom_by(0.95, mid, 0.0, &series, x0, x1);
+        }
+        assert!(z.factor >= ZoomState::MIN_FACTOR - 1e-9);
+    }
+
+    /// Pinching beyond the limit, or with a junk factor, must be a no-op.
+    #[test]
+    fn test_zoom_by_rejects_invalid_factors() {
+        let (series, x0, x1, _, _) = pan_fixture();
+        let mid = 0.5 * (x0 + x1);
+        let z = ZoomState::default().zoom_in_centered(125.0);
+        assert_eq!(z.zoom_by(f64::NAN, mid, 0.0, &series, x0, x1), z);
+        assert_eq!(z.zoom_by(0.0, mid, 0.0, &series, x0, x1), z);
+        assert_eq!(z.zoom_by(-2.0, mid, 0.0, &series, x0, x1), z);
+        assert_eq!(z.zoom_by(1.0, mid, 0.0, &series, x0, x1), z);
+        assert_eq!(z.zoom_by(2.0, f64::NAN, 0.0, &series, x0, x1), z);
+    }
+
+    /// A vertical-only pinch scales the y-window while leaving the x-window
+    /// alone. This is the `[1, z]` case egui reports for fingers stacked
+    /// vertically.
+    #[test]
+    fn test_vertical_pinch_scales_only_the_y_axis() {
+        let (series, x0, x1, y0, y1) = pan_fixture();
+        let z = ZoomState::default();
+        let (bx0, bx1, by0, by1) = z.window(x0, x1, y0, y1);
+        let v = z.zoom_y_by(4.0, 0.5 * (x0 + x1), 0.5 * (y0 + y1), &series, x0, x1);
+        let (ax0, ax1, ay0, ay1) = v.window(x0, x1, y0, y1);
+        // x-window untouched, y-window a quarter of its original height.
+        assert!((ax0 - bx0).abs() < 1e-6);
+        assert!((ax1 - bx1).abs() < 1e-6);
+        assert!((0.25 * (by1 - by0) - (ay1 - ay0)).abs() < 1e-6);
+        // A y-only pinch still counts as zoomed, so panning is available.
+        assert!(v.is_zoomed());
+    }
+
+    /// A horizontal pinch scales the x-window and leaves y alone.
+    #[test]
+    fn test_horizontal_pinch_scales_only_the_x_axis() {
+        let (series, x0, x1, y0, y1) = pan_fixture();
+        let z = ZoomState::default();
+        let (bx0, bx1, by0, by1) = z.window(x0, x1, y0, y1);
+        let h = z.zoom_x_by(4.0, 0.5 * (x0 + x1), 0.5 * (y0 + y1), &series, x0, x1);
+        let (ax0, ax1, ay0, ay1) = h.window(x0, x1, y0, y1);
+        assert!((0.25 * (bx1 - bx0) - (ax1 - ax0)).abs() < 1e-6);
+        assert!((ay0 - by0).abs() < 1e-6);
+        assert!((ay1 - by1).abs() < 1e-6);
+    }
+
+    /// The y-scale is clamped to the same limit as the x-scale.
+    #[test]
+    fn test_vertical_pinch_is_clamped() {
+        let (series, x0, x1, _, _) = pan_fixture();
+        let mut v = ZoomState::default();
+        for _ in 0..300 {
+            v = v.zoom_y_by(1.1, 0.5 * (x0 + x1), 125.0, &series, x0, x1);
+        }
+        assert!(v.y_factor <= ZoomState::MAX_FACTOR + 1e-9, "{}", v.y_factor);
+    }
+
+    /// A y-only pinch leaves the x-scale at 1.0, so the x-window already spans
+    /// the whole series: a horizontal pan must be a no-op rather than sliding
+    /// the window off the data. A vertical pan still works.
+    #[test]
+    fn test_y_zoomed_view_pans_vertically_but_not_horizontally() {
+        let (series, x0, x1, y0, y1) = pan_fixture();
+        let v = ZoomState::default().zoom_y_by(4.0, 0.5 * (x0 + x1), 125.0, &series, x0, x1);
+        assert!(v.is_zoomed(), "a y-only pinch must count as zoomed");
+
+        // Horizontal drag: the x-window already covers everything, so it holds.
+        let before_x = v.window(x0, x1, y0, y1);
+        let h = v.pan_by(86_400.0 * 4.0, 0.0, &series, x0, x1, y0, y1);
+        let after_x = h.window(x0, x1, y0, y1);
+        assert!((after_x.0 - before_x.0).abs() < 1e-6, "x must not move");
+        assert!((after_x.1 - before_x.1).abs() < 1e-6, "x must not move");
+        assert!(
+            (after_x.1 - after_x.0 - (x1 - x0)).abs() < 1e-6,
+            "x must stay full width"
+        );
+
+        // Vertical drag does move the y-window.
+        let t = v.pan_by(0.0, 3.0, &series, x0, x1, y0, y1);
+        let (_, _, ay, by) = t.window(x0, x1, y0, y1);
+        let (_, _, cy, dy) = v.window(x0, x1, y0, y1);
+        assert!((ay - cy - 3.0).abs() < 1e-6, "y low edge: {ay} vs {cy}");
+        assert!((by - dy - 3.0).abs() < 1e-6, "y high edge: {by} vs {dy}");
+
+        // And a huge drag on both axes still stays inside the data.
+        let far = v.pan_by(1.0e9, 1.0e9, &series, x0, x1, y0, y1);
+        let (fx0, fx1, _, _) = far.window(x0, x1, y0, y1);
+        assert!(fx0 >= x0 - 1e-6 && fx1 <= x1 + 1e-6);
+    }
+
+    /// Stepping out of a y-only zoom returns to the full range, and the x-scale
+    /// must not be left stranded mid-zoom.
+    #[test]
+    fn test_zoom_out_after_a_vertical_pinch_returns_to_full_range() {
+        let (series, x0, x1, y0, y1) = pan_fixture();
+        let mut v = ZoomState::default()
+            .zoom_y_by(8.0, 0.5 * (x0 + x1), 125.0, &series, x0, x1)
+            .zoom_in_centered(125.0);
+        assert!(v.is_zoomed());
+        for _ in 0..12 {
+            v = v.zoom_out_centered();
+        }
+        assert!(!v.is_zoomed(), "x or y still zoomed: {v:?}");
+        assert_eq!(v.window(x0, x1, y0, y1), (x0, x1, y0, y1));
     }
 
     /// 200 daily bars with a gently rising, noisy price so the envelope is
