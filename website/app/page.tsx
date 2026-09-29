@@ -1,29 +1,26 @@
 // app/page.tsx — Made by Sourish Dey
-import { BarChart3, Cpu, Download, Globe2, IndianRupee, LineChart } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
+import { Download } from "lucide-react";
 import { CodeBlock, ComparisonTable } from "@/components/charts";
 import { NewsletterForm } from "@/components/forms";
-import { FeatureCard, Hero } from "@/components/home";
+import { Hero } from "@/components/home";
 import { Container, SectionHeader } from "@/components/layout";
 import { LiveChart } from "@/components/live-chart";
 import { SITE } from "@/lib/utils";
 import { pageMeta } from "@/lib/seo";
-import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/scroll-animations";
+import { ScrollReveal } from "@/components/scroll-animations";
+
+const HorizontalFeatures = dynamic(
+  () => import("@/components/horizontal-features").then((mod) => mod.HorizontalFeatures),
+  { ssr: false, loading: () => <div className="py-20 sm:py-24" /> }
+);
 
 export const metadata = pageMeta({
   title: "Bharat Terminal",
   description: "Free open-source Bloomberg alternative in Rust: 140+ visualizations, real NSE/BSE data. Made by Sourish Dey.",
   path: "/",
 });
-
-const FEATURES = [
-  { icon: <BarChart3 size={22} />, title: "140+ Visualizations", desc: "Candlesticks, Bollinger, Ichimoku, IV surfaces, Monte Carlo, more.", href: "/features" },
-  { icon: <LineChart size={22} />, title: "Real Market Data", desc: "Yahoo, Coinbase, NSE/BSE. No API keys. SQLite cache.", href: "/docs/api" },
-  { icon: <Cpu size={22} />, title: "Built in Rust", desc: "60ms for 10 charts. SIMD, Tokio, Rayon. Native performance.", href: "/docs" },
-  { icon: <Download size={22} />, title: "Native Windows App", desc: "Windows .exe — installer, portable ZIP, and MSI builds.", href: "/download" },
-  { icon: <Globe2 size={22} />, title: "100% Free Forever", desc: "MIT license. No subscriptions. No tiers. No limits.", href: "/pricing" },
-  { icon: <IndianRupee size={22} />, title: "Made in India", desc: "Built by Sourish Dey. For Indian and global markets.", href: "/about" },
-];
 
 export default function Home() {
   return (
@@ -41,20 +38,7 @@ export default function Home() {
         </Container>
       </section>
 
-      <section aria-label="Features">
-        <Container className="py-20 sm:py-24">
-          <ScrollReveal variant="slideLeft">
-            <SectionHeader eyebrow="Why Bharat Terminal" title="Everything a terminal should be" sub="Fast, free, and honest. No upsells hiding behind the charts." />
-          </ScrollReveal>
-          <StaggerGroup>
-            {FEATURES.map((f, i) => (
-              <StaggerItem key={f.title}>
-                <FeatureCard {...f} index={i} />
-              </StaggerItem>
-            ))}
-          </StaggerGroup>
-        </Container>
-      </section>
+      <HorizontalFeatures />
 
       <section aria-label="Comparison">
         <Container className="py-20 sm:py-24">

@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Candle } from "@/lib/data";
 
 const SYMBOLS = ["RELIANCE.NS", "TCS.NS", "INFY.NS", "AAPL", "BTC-USD"];
 const TFS = ["1D", "1W", "1M", "3M", "1Y"];
 
-export function LiveChart() {
+function LiveChartClient() {
   const [symbol, setSymbol] = useState("RELIANCE.NS");
   const [tf, setTf] = useState("1M");
   const [candles, setCandles] = useState<Candle[]>([]);
@@ -26,11 +27,10 @@ export function LiveChart() {
   }, [symbol, tf]);
 
   useEffect(() => {
-    let chart: { remove: () => void } | null = null;
-    let cancelled = false;
     if (!chartRef.current || candles.length === 0) return;
-    (async () => {
-      const { createChart, ColorType } = await import("lightweight-charts");
+    let cancelled = false;
+
+    import("lightweight-charts").then(({ createChart, ColorType }) => {
       if (cancelled || !chartRef.current) return;
       chartRef.current.innerHTML = "";
       const dark = !document.documentElement.classList.contains("light");
@@ -55,9 +55,10 @@ export function LiveChart() {
       });
       series.setData(candles.map((k) => ({ time: k.time as never, open: k.open, high: k.high, low: k.low, close: k.close })));
       c.timeScale().fitContent();
-      chart = c;
-    })();
-    return () => { cancelled = true; chart?.remove(); };
+      return () => { c.remove(); };
+    });
+
+    return () => { cancelled = true; };
   }, [candles]);
 
   return (
@@ -80,10 +81,28 @@ export function LiveChart() {
       </div>
       <div className="relative overflow-hidden rounded-xl border border-subtle bg-void">
         {loading && <p className="absolute inset-0 grid place-items-center font-mono text-sm text-tertiary" role="status">Loading {symbol} · {tf}…</p>}
-        <div ref={chartRef} className="w-full" aria-label={`Candlestick chart for ${symbol}`} />
+        <div ref={chartRef} className="w-full h-[340px]" aria-label={`Candlestick chart for ${symbol}`} />
       </div>
       {error && <p className="mt-2 font-mono text-xs text-loss" role="alert">{error}</p>}
       <p className="mt-3 text-xs text-tertiary">Powered by Bharat Terminal&apos;s bt-data crate · Yahoo Finance · cached 5 min</p>
     </div>
   );
+}
+
+export function LiveChart() {
+  const [isClient, setIsClient] = useState(false);
+
+  useLayoutEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return (
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--void)] h-[340px] flex items-center justify-center">
+        <p className="font-mono text-sm text-[var(--muted)]">Loading chart…</p>
+      </div>
+    );
+  }
+
+  return <LiveChartClient />;
 }
