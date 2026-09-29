@@ -125,10 +125,12 @@ timestamps sets the body width, so 1-minute, 5-minute, daily and weekly series
 all render at the correct density instead of overlapping. Bars are never wider
 than the gap that separates them.
 
-**Double-click to zoom.** Click anywhere on the chart to zoom in around that
-point; click again to step back out, or use **Reset zoom**. The header shows
-the current factor (e.g. `4.0x`). Zoom persists across the 30-second live
-refresh and resets when you switch symbol or timeframe.
+**Double-click to zoom in, right-click to zoom out.** Both step one level
+(2× in, ½× out) and centre on the pointer, so repeated clicks tighten or widen
+the view smoothly instead of snapping. The header shows the current factor
+(e.g. `4.0x`) with **🔍−**, **🔍+** and **Reset** buttons for pointer-free
+control. Zoom persists across the 30-second live refresh and resets when you
+switch symbol or timeframe.
 
 **Trend arrows auto-hide above 90 bars**, where a per-bar marker is visual
 noise. The header shows `(hidden: N bars)` so the state is never silent; zoom

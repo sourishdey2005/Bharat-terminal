@@ -239,27 +239,65 @@ impl ZoomState {
         self.factor > Self::MIN_FACTOR + f64::EPSILON
     }
 
-    /// Zooms in around `(x, y)`, or back out to the full range when already
-    /// fully zoomed in. Returns the new state.
-    fn toggle_step(&self, x: f64, y: f64) -> Self {
+    /// Zooms in one step around `(x, y)`, keeping that point fixed.
+    fn zoom_in(&self, x: f64, y: f64) -> Self {
         if !x.is_finite() || !y.is_finite() {
             return *self;
         }
-        if self.factor >= Self::MAX_FACTOR {
-            return Self::default();
+        let factor = (self.factor * Self::STEP).min(Self::MAX_FACTOR);
+        if (factor - self.factor).abs() < f64::EPSILON {
+            return *self;
         }
-        let next = (self.factor * Self::STEP).min(Self::MAX_FACTOR);
-        // An odd number of steps returns to the unzoomed view, matching the
-        // "double-click toggles" feel of a trading terminal.
-        let factor = if next <= Self::MIN_FACTOR + f64::EPSILON {
-            Self::MIN_FACTOR
-        } else {
-            next
-        };
         Self {
             factor,
             focus_x: Some(x),
             focus_y: Some(y),
+        }
+    }
+
+    /// Zooms out one step around `(x, y)`, keeping that point fixed. Steps all
+    /// the way back to the full range rather than resetting in one jump, so
+    /// repeated clicks narrow the view smoothly.
+    fn zoom_out(&self, x: f64, y: f64) -> Self {
+        let factor = (self.factor / Self::STEP).max(Self::MIN_FACTOR);
+        if !x.is_finite() || !y.is_finite() {
+            return Self { factor, ..*self };
+        }
+        // At the full range there is nothing left to step out of, so return
+        // unchanged rather than recording a focus point that has no effect.
+        if (factor - self.factor).abs() < f64::EPSILON {
+            return *self;
+        }
+        Self {
+            factor,
+            focus_x: Some(x),
+            focus_y: Some(y),
+        }
+    }
+
+    /// Zooms in around the current centre, for the toolbar buttons.
+    ///
+    /// Keeps the existing focus so repeated button presses keep tightening on
+    /// the same point instead of drifting to the window midpoint.
+    fn zoom_in_centered(&self) -> Self {
+        let factor = (self.factor * Self::STEP).min(Self::MAX_FACTOR);
+        Self {
+            factor,
+            focus_x: self.focus_x,
+            focus_y: self.focus_y,
+        }
+    }
+
+    /// Zooms out around the current centre, for the toolbar buttons.
+    fn zoom_out_centered(&self) -> Self {
+        let factor = (self.factor / Self::STEP).max(Self::MIN_FACTOR);
+        if (factor - self.factor).abs() < f64::EPSILON {
+            return *self;
+        }
+        Self {
+            factor,
+            focus_x: self.focus_x,
+            focus_y: self.focus_y,
         }
     }
 
@@ -285,33 +323,37 @@ impl ZoomState {
     }
 }
 
-/// Handles a double-click on a plot: zooms in around the clicked point, or
-/// zooms back out when already at the maximum zoom. Returns the new zoom state
-/// when the state changed, otherwise `None`.
+/// Applies a chart zoom gesture.
 ///
-/// The double-click is read from the raw pointer input rather than
-/// `response().double_clicked()`, which egui_plot only reports when the plot
-/// widget itself claims the interaction; the hover check plus
-/// `pointer_coordinate()` is what reliably identifies a click on the chart.
-fn handle_plot_double_click(plot_ui: &egui_plot::PlotUi, current: ZoomState) -> Option<ZoomState> {
-    // egui_plot sets the plot widget's `Sense` itself, so `double_clicked()` on
-    // its response only fires when the plot claims the click. Reading the raw
-    // input and gating it on `hovered()` is what makes double-clicks reliable.
-    let double_clicked = plot_ui.ctx().input(|i| {
-        i.pointer
-            .button_double_clicked(egui::PointerButton::Primary)
-    });
-    if !double_clicked {
-        return None;
-    }
+/// - **Double-click** zooms **in** around the pointer.
+/// - **Right-click** zooms **out** around the pointer.
+///
+/// Each gesture steps one level (2x in, 1/2x out) and the out-step unwinds
+/// smoothly back to the full range rather than snapping to it. Returns the new
+/// state, or `None` when the gesture produced no change.
+fn handle_plot_zoom_gesture(plot_ui: &egui_plot::PlotUi, current: ZoomState) -> Option<ZoomState> {
     if !plot_ui.response().hovered() {
         return None;
     }
-    let point = plot_ui.pointer_coordinate()?;
-    let next = if current.factor >= ZoomState::MAX_FACTOR {
-        current.reset()
-    } else {
-        current.toggle_step(point.x, point.y)
+    // egui_plot sets the plot widget's `Sense` itself, so a response-level
+    // double-click only fires when the plot claims the interaction. Reading the
+    // raw input and gating it on `hovered()` is what makes this reliable.
+    let zoom_in = plot_ui.ctx().input(|i| {
+        i.pointer
+            .button_double_clicked(egui::PointerButton::Primary)
+    });
+    let zoom_out = plot_ui
+        .ctx()
+        .input(|i| i.pointer.button_clicked(egui::PointerButton::Secondary));
+    if !zoom_in && !zoom_out {
+        return None;
+    }
+    let next = match (zoom_in, zoom_out, plot_ui.pointer_coordinate()) {
+        (true, _, Some(p)) => current.zoom_in(p.x, p.y),
+        (_, true, Some(p)) => current.zoom_out(p.x, p.y),
+        (true, _, None) => current.zoom_in_centered(),
+        (_, true, None) => current.zoom_out_centered(),
+        _ => return None,
     };
     if next == current {
         None
@@ -1665,16 +1707,35 @@ impl BharatApp {
             }
         });
 
-        // Zoom controls: double-click the chart to zoom in around the pointer
-        // and again to step back out, or use these buttons.
+        // Zoom controls. Double-click the chart to zoom in at the pointer,
+        // right-click to zoom out at the pointer, or use these buttons.
         ui.horizontal(|ui| {
             let zoom = self.zoom.get();
+            if ui
+                .add_enabled(zoom.is_zoomed(), egui::Button::new("\u{1F517}").small())
+                .on_hover_text("Zoom out one step")
+                .clicked()
+            {
+                self.zoom.set(zoom.zoom_out_centered());
+            }
+            if ui
+                .add_enabled(
+                    zoom.factor < ZoomState::MAX_FACTOR - f64::EPSILON,
+                    egui::Button::new("\u{1F517}+").small(),
+                )
+                .on_hover_text("Zoom in one step")
+                .clicked()
+            {
+                self.zoom.set(zoom.zoom_in_centered());
+            }
             if zoom.is_zoomed() {
                 ui.label(
-                    RichText::new(format!("\u{1F50D} {:.1}x", zoom.factor)).small().strong(),
+                    RichText::new(format!("{:.1}x", zoom.factor))
+                        .small()
+                        .strong(),
                 );
                 if ui
-                    .button("Reset zoom")
+                    .button("Reset")
                     .on_hover_text("Return to the full data range")
                     .clicked()
                 {
@@ -1683,9 +1744,8 @@ impl BharatApp {
             } else {
                 ui.colored_label(
                     Color32::GRAY,
-                    "Double-click the chart to zoom in",
-                )
-                .on_hover_text("Double-click zooms in around the pointer.\nDouble-click again to step back out.");
+                    "Double-click to zoom in \u{00B7} right-click to zoom out",
+                );
             }
         });
 
@@ -1796,7 +1856,7 @@ impl BharatApp {
             .show_axes([false, true])
             .show(ui, |plot_ui| {
                 // Double-click to zoom in around the pointer, or back out.
-                if let Some(next) = handle_plot_double_click(plot_ui, zoom_now) {
+                if let Some(next) = handle_plot_zoom_gesture(plot_ui, zoom_now) {
                     self.zoom.set(next);
                 }
                 // Pin the range so a previously viewed time range cannot leave
@@ -7802,8 +7862,8 @@ mod tests {
     }
 
     #[test]
-    fn test_zoom_in_shrinks_the_window_around_the_focus() {
-        let z = ZoomState::default().toggle_step(50.0, 25.0);
+    fn test_zoom_in_halves_the_window_around_the_focus() {
+        let z = ZoomState::default().zoom_in(50.0, 25.0);
         assert!(z.is_zoomed());
         assert_eq!(z.factor, ZoomState::STEP);
         let (x0, x1, y0, y1) = z.window(0.0, 100.0, 0.0, 50.0);
@@ -7813,47 +7873,89 @@ mod tests {
         assert!((y1 - y0) - 25.0 < 1e-9, "y window halved");
     }
 
+    /// The user's core complaint: zooming out must step back down, not snap.
     #[test]
-    fn test_zoom_keeps_stepping_in_then_resets_at_the_cap() {
+    fn test_zoom_out_steps_back_down_one_level_at_a_time() {
         let mut z = ZoomState::default();
-        // Each step doubles until the cap is reached.
-        for _ in 0..8 {
-            let before = z.factor;
-            z = z.toggle_step(10.0, 10.0);
-            if before < ZoomState::MAX_FACTOR {
-                assert!(z.factor > before, "factor grows while below the cap");
-            }
+        z = z.zoom_in(50.0, 25.0);
+        assert_eq!(z.factor, 2.0);
+        z = z.zoom_out(50.0, 25.0);
+        assert_eq!(z.factor, 1.0, "one out-step undoes one in-step");
+        assert!(!z.is_zoomed());
+
+        // Three steps in, then one out, leaves two steps in.
+        let mut z = ZoomState::default();
+        for _ in 0..3 {
+            z = z.zoom_in(10.0, 10.0);
         }
-        assert!(z.factor <= ZoomState::MAX_FACTOR);
-        // Once the cap is hit, `toggle_step` returns the full range so the
-        // double-click cycles back out.
-        let mut z = ZoomState {
-            factor: ZoomState::MAX_FACTOR,
-            focus_x: Some(1.0),
-            focus_y: Some(1.0),
-        };
-        let out = z.toggle_step(10.0, 10.0);
+        assert_eq!(z.factor, 8.0);
+        let back = z.zoom_out(10.0, 10.0);
+        assert_eq!(back.factor, 4.0, "out-step halves, it does not reset");
+        assert!(back.is_zoomed());
+    }
+
+    #[test]
+    fn test_zoom_out_unwinds_all_the_way_to_the_full_range() {
+        let mut z = ZoomState::default();
+        for _ in 0..5 {
+            z = z.zoom_in(10.0, 10.0);
+        }
+        let start = z.factor;
+        for _ in 0..20 {
+            z = z.zoom_out(10.0, 10.0);
+        }
+        assert_eq!(z.factor, ZoomState::MIN_FACTOR);
+        assert!(!z.is_zoomed());
+        assert!(start > 1.0);
+    }
+
+    #[test]
+    fn test_zoom_out_never_goes_below_the_full_range() {
+        let z = ZoomState::default();
+        let out = z.zoom_out(10.0, 10.0);
         assert_eq!(out.factor, ZoomState::MIN_FACTOR);
-        assert!(!out.is_zoomed());
+        assert_eq!(out, z, "zooming out from full range is a no-op");
+    }
+
+    #[test]
+    fn test_zoom_in_is_capped_at_the_maximum() {
+        let mut z = ZoomState::default();
+        for _ in 0..40 {
+            z = z.zoom_in(10.0, 10.0);
+        }
+        assert_eq!(z.factor, ZoomState::MAX_FACTOR);
+        let capped = z.zoom_in(10.0, 10.0);
+        assert_eq!(capped, z, "further zoom-in changes nothing");
+    }
+
+    #[test]
+    fn test_centered_steps_work_without_a_pointer() {
+        let mut z = ZoomState::default();
+        z = z.zoom_in_centered();
+        assert_eq!(z.factor, ZoomState::STEP);
+        // With no focus recorded, the window centres on its midpoint.
+        let (x0, x1, _, _) = z.window(0.0, 100.0, 0.0, 50.0);
+        assert!((0.5 * (x0 + x1) - 50.0).abs() < 1e-9);
+        assert_eq!(z.zoom_out_centered().factor, ZoomState::MIN_FACTOR);
     }
 
     #[test]
     fn test_zoom_ignores_non_finite_points() {
         let z = ZoomState::default();
-        assert_eq!(z.toggle_step(f64::NAN, 1.0), z);
-        assert_eq!(z.toggle_step(1.0, f64::INFINITY), z);
+        assert_eq!(z.zoom_in(f64::NAN, 1.0), z);
+        assert_eq!(z.zoom_in(1.0, f64::INFINITY), z);
     }
 
     #[test]
     fn test_zoom_window_is_safe_for_degenerate_ranges() {
-        let z = ZoomState::default().toggle_step(5.0, 5.0);
+        let z = ZoomState::default().zoom_in(5.0, 5.0);
         assert_eq!(z.window(10.0, 10.0, 0.0, 50.0), (10.0, 10.0, 0.0, 50.0));
         assert_eq!(z.window(50.0, 10.0, 0.0, 50.0), (50.0, 10.0, 0.0, 50.0));
     }
 
     #[test]
     fn test_zoom_reset_returns_to_full_range() {
-        let z = ZoomState::default().toggle_step(80.0, 20.0);
+        let z = ZoomState::default().zoom_in(80.0, 20.0);
         assert!(z.is_zoomed());
         let r = z.reset();
         assert!(!r.is_zoomed());
@@ -7864,7 +7966,7 @@ mod tests {
     fn test_zoomed_window_stays_finite_and_ordered() {
         let mut z = ZoomState::default();
         for _ in 0..20 {
-            z = z.toggle_step(1_000.0, 500.0);
+            z = z.zoom_in(1_000.0, 500.0);
         }
         let (x0, x1, y0, y1) = z.window(0.0, 2000.0, 0.0, 1000.0);
         assert!(x0.is_finite() && x1.is_finite() && y0.is_finite() && y1.is_finite());
