@@ -699,13 +699,23 @@ Reference rates, monetary policy.
 
 ## 🚀 Installation
 
-### Option 1: Portable (Download .exe)
+### Option 1: Installer (Recommended)
 
-1. Download `BharatTerminal-v3.0.0.exe` from the [releases](releases/) folder
+1. Download `BharatTerminal-v3.0.0.msi` from the [releases](bharat-terminal/releases/) folder
+2. Double-click it — installs per-user to `%LOCALAPPDATA%\Programs\BharatTerminal`, **no admin prompt**
+3. Launch **Bharat Terminal** from the Start Menu (the icon, taskbar and window carry the brand mark)
+
+To uninstall, use Settings → Apps → Bharat Terminal → Uninstall. Your local
+cache and preferences survive uninstalling; delete the install folder's
+`data/` subfolder if you want those gone too.
+
+### Option 2: Portable (Download .exe)
+
+1. Download `BharatTerminal-v3.0.0.exe` from the [releases](bharat-terminal/releases/) folder
 2. Double-click to run — **no installation required**
 3. The app creates `./data/` on first run for cache and preferences
 
-### Option 2: Build from Source
+### Option 3: Build from Source
 
 ```cmd
 git clone https://github.com/sourishdey2005/Bharat-terminal-exe.git
@@ -717,7 +727,7 @@ Output binaries:
 - `target/release/bt-app.exe` — Desktop GUI
 - `target/release/bt-cli.exe` — Command-line tool
 
-### Option 3: CLI Usage
+### Option 4: CLI Usage
 
 ```cmd
 :: List all supported companies

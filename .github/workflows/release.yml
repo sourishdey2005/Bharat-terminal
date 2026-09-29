@@ -8,6 +8,9 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: bharat-terminal
     steps:
       - uses: actions/checkout@v4
       
@@ -17,17 +20,27 @@ jobs:
       - name: Build
         run: cargo build --release --workspace
       
+      - name: Install WiX Toolset
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          wix extension add --global WixToolset.UI.wixext/5.0.2
+      
+      - name: Build MSI installer
+        working-directory: bharat-terminal/installer
+        run: wix build BharatTerminal.wxs -o "../releases/BharatTerminal-v3.0.0.msi" -ext WixToolset.UI.wixext -arch x64 -d AppVersion=3.0.0
+      
       - name: Create portable ZIP
         run: |
-          Compress-Archive -Path "target\release\bt-app.exe","target\release\bt-cli.exe","assets","README.md" -DestinationPath "target\release\BharatTerminal-v3.0.0-portable.zip"
+          Compress-Archive -Path "target\release\bt-app.exe","target\release\bt-cli.exe","assets","..\README.md" -DestinationPath "releases\BharatTerminal-v3.0.0-portable.zip"
       
       - name: Upload Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
+            releases/BharatTerminal-v3.0.0.msi
             target/release/bt-app.exe
             target/release/bt-cli.exe
-            target/release/BharatTerminal-v3.0.0-portable.zip
+            releases/BharatTerminal-v3.0.0-portable.zip
           body: |
             Bharat Terminal v3 — Made by Sourish Dey
             
@@ -39,8 +52,8 @@ jobs:
             - Windows installer + portable ZIP
             
             ## Installation
+            - **Installer:** Run BharatTerminal-v3.0.0.msi (per-user, no admin needed)
             - **Portable:** Extract ZIP and run bt-app.exe
-            - **Installer:** Run the MSI/EXE installer
             
             Bloomberg power. Zero cost. Made in India.
         env:

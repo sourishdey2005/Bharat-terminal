@@ -10,6 +10,9 @@ description = "Bharat Terminal desktop app (egui/eframe) — real data, 21 tabs,
 name = "bt-app"
 path = "src/main.rs"
 
+[build-dependencies]
+embed-resource = "3"
+
 [dependencies]
 bt-core = { path = "../bt-core" }
 bt-viz = { path = "../bt-viz" }

@@ -10,6 +10,9 @@ description = "Bharat Terminal CLI — renders all 25 visualizations with real o
 name = "bt-cli"
 path = "src/main.rs"
 
+[build-dependencies]
+embed-resource = "3"
+
 [dependencies]
 bt-core = { path = "../bt-core" }
 bt-viz = { path = "../bt-viz" }

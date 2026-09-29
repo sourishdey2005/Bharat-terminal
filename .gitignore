@@ -12,6 +12,10 @@ prefs.json
 # egui / eframe persistence
 *.ron
 
+# WiX build artifacts (rebuilt by every MSI build)
+*.wixpdb
+*.wixobj
+
 # Editor / OS
 .vscode/
 .idea/
