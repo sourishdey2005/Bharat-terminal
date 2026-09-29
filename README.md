@@ -132,6 +132,23 @@ the view smoothly instead of snapping. The header shows the current factor
 control. Zoom persists across the 30-second live refresh and resets when you
 switch symbol or timeframe.
 
+**Drag to pan.** Once zoomed in, dragging the chart moves the view
+horizontally through time and vertically through price. Panning is clamped so
+the view can never be dragged off the data, and a zoom always snaps onto real
+candles even if you double-click empty space.
+
+**X-axis labels follow the selected timeframe:**
+
+| Range | Label | Example |
+|-------|:------|:--------|
+| `1D` | time + date | `09:30 15 Jan` |
+| `1W`, `1M` | date + month | `15 Jan` |
+| `3M`, `6M`, `1Y`, `5Y` | month + year | `Jan 2024` |
+
+Switching timeframe always re-requests the matching window, even if a fetch is
+already running, so the chart can never show one range's data under another
+range's label.
+
 **Trend arrows auto-hide above 90 bars**, where a per-bar marker is visual
 noise. The header shows `(hidden: N bars)` so the state is never silent; zoom
 in to see them.

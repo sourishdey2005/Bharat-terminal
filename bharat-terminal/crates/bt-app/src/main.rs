@@ -95,17 +95,56 @@ fn x_bounds(candles: &[Candle]) -> (f64, f64) {
     (lo - pad, hi + pad)
 }
 
+/// Label granularity for the x-axis, chosen from the selected timeframe so
+/// every range reads the way a trader expects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxisDateStyle {
+    /// Intraday: clock time plus date, e.g. `09:30 15 Jan`.
+    TimeAndDate,
+    /// Weekly: day and month, e.g. `15 Jan`.
+    DayMonth,
+    /// Multi-month and yearly: month and year, e.g. `Jan 2024`.
+    MonthYear,
+}
+
+impl TimeRange {
+    /// The x-axis label style used for this timeframe.
+    ///
+    /// - `1D` shows `HH:MM DD Mon`, because a single session is only hours wide
+    ///   and bare times would be ambiguous across days
+    /// - `1W`/`1M` show `DD Mon`
+    /// - `3M` and longer show `Mon YYYY`
+    pub fn axis_date_style(self) -> AxisDateStyle {
+        match self {
+            TimeRange::D1 => AxisDateStyle::TimeAndDate,
+            TimeRange::W1 | TimeRange::M1 => AxisDateStyle::DayMonth,
+            TimeRange::M3 | TimeRange::M6 | TimeRange::Y1 | TimeRange::Y5 => {
+                AxisDateStyle::MonthYear
+            }
+        }
+    }
+}
+
+/// Formats a timestamp using the requested axis style.
+fn format_ts_styled(ts: f64, style: AxisDateStyle) -> String {
+    let secs = ts as i64;
+    let dt = chrono::DateTime::from_timestamp(secs, 0).unwrap_or_default();
+    match style {
+        AxisDateStyle::TimeAndDate => dt.format("%H:%M %d %b").to_string(),
+        AxisDateStyle::DayMonth => dt.format("%d %b").to_string(),
+        AxisDateStyle::MonthYear => dt.format("%b %Y").to_string(),
+    }
+}
+
 /// Formats a timestamp, choosing a format appropriate to the bar cadence so
 /// intraday charts show a clock time and longer ranges show a date.
 fn format_ts_for(ts: f64, spacing: f64) -> String {
-    let secs = ts as i64;
-    let dt = chrono::DateTime::from_timestamp(secs, 0).unwrap_or_default();
     if spacing < DAY_SECS {
-        dt.format("%H:%M").to_string()
+        format_ts_styled(ts, AxisDateStyle::TimeAndDate)
     } else if spacing < 20.0 * DAY_SECS {
-        dt.format("%d %b").to_string()
+        format_ts_styled(ts, AxisDateStyle::DayMonth)
     } else {
-        dt.format("%b %Y").to_string()
+        format_ts_styled(ts, AxisDateStyle::MonthYear)
     }
 }
 
@@ -168,19 +207,19 @@ fn abbreviate_volume(v: f64) -> String {
 }
 
 /// Applies the shared professional chart chrome to a time-series plot:
-/// right-hand price axis, date/time-aware x labels, bounded x range and
+/// right-hand price axis, timeframe-aware x labels, bounded x range and
 /// a small grid. Every time-series tab uses this so they all look consistent.
 ///
-/// Call [`pin_bounds`] inside `show` to lock the visible range. `include_x` on
-/// its own only ever widens the range: egui_plot keeps per-plot memory, so a
-/// range viewed earlier kept its zoom and squeezed the next range into a
-/// sliver instead of refitting the data.
+/// Call [`pin_zoomed_bounds`] inside `show` to lock the visible range. The
+/// x-range is pinned rather than merely included because `include_x` only ever
+/// widens: egui_plot keeps per-plot memory, so a range viewed earlier kept its
+/// zoom and squeezed the next range into a sliver instead of refitting.
 fn style_time_plot<'a>(
     plot: egui_plot::Plot<'a>,
     series: &[Candle],
     height: f32,
+    style: AxisDateStyle,
 ) -> egui_plot::Plot<'a> {
-    let spacing = bar_spacing(series);
     let (x0, x1) = x_bounds(series);
     let (lo, range) = price_scale(series);
     let last = series.last().map(|c| c.close).unwrap_or(1.0);
@@ -194,7 +233,7 @@ fn style_time_plot<'a>(
         .include_y(lo - range * 0.05)
         .include_y(lo + range * 1.05)
         .y_axis_position(egui_plot::HPlacement::Right)
-        .y_axis_width((decimals + 6).clamp(8, 18))
+        .y_axis_min_width(((decimals + 6) * 7) as f32)
         // egui_plot's default corner readout prints raw epoch values over the
         // chart, which is noise here; the OHLC legend and hover tooltip cover
         // the same information properly.
@@ -202,8 +241,27 @@ fn style_time_plot<'a>(
             egui_plot::Corner::LeftTop,
             egui_plot::CoordinatesFormatter::new(|_point, _bounds| String::new()),
         )
-        .x_axis_formatter(move |mark, _range| format_ts_for(mark.value, spacing))
+        .x_axis_formatter(move |mark, _range| format_ts_styled(mark.value, style))
         .y_axis_formatter(move |mark, _range| format!("{:.*}", decimals, mark.value))
+}
+
+/// Price envelope `(low, high)` of the candles whose timestamp falls inside
+/// `[wx0, wx1]`. Returns `None` when the window contains no bars, so a zoom can
+/// be pulled onto real data instead of empty space.
+fn price_envelope(candles: &[Candle], wx0: f64, wx1: f64) -> Option<(f64, f64)> {
+    let mut lo = f64::INFINITY;
+    let mut hi = f64::NEG_INFINITY;
+    for c in candles {
+        if c.t >= wx0 && c.t <= wx1 {
+            lo = lo.min(c.low);
+            hi = hi.max(c.high);
+        }
+    }
+    if lo.is_finite() && hi.is_finite() && hi >= lo {
+        Some((lo, hi))
+    } else {
+        None
+    }
 }
 
 /// A user-controlled zoom window over the full data range.
@@ -215,6 +273,10 @@ struct ZoomState {
     focus_x: Option<f64>,
     /// Y position to keep centred.
     focus_y: Option<f64>,
+    /// Horizontal drag offset in x (time) units.
+    pan_x: f64,
+    /// Vertical drag offset in y (price) units.
+    pan_y: f64,
 }
 
 impl Default for ZoomState {
@@ -223,13 +285,17 @@ impl Default for ZoomState {
             factor: 1.0,
             focus_x: None,
             focus_y: None,
+            pan_x: 0.0,
+            pan_y: 0.0,
         }
     }
 }
 
 impl ZoomState {
     const MIN_FACTOR: f64 = 1.0;
-    const MAX_FACTOR: f64 = 400.0;
+    /// Cap chosen so daily data still shows several bars at full zoom; beyond
+    /// this the chart is a single candle and further magnification is useless.
+    const MAX_FACTOR: f64 = 60.0;
 
     /// Zoom factor applied by a single double-click step.
     const STEP: f64 = 2.0;
@@ -240,18 +306,47 @@ impl ZoomState {
     }
 
     /// Zooms in one step around `(x, y)`, keeping that point fixed.
-    fn zoom_in(&self, x: f64, y: f64) -> Self {
-        if !x.is_finite() || !y.is_finite() {
+    ///
+    /// The focus price is snapped into the candles that the *new* window will
+    /// actually show. Snapping against the currently visible envelope is not
+    /// enough: on the first step the view is the whole series, so a click in
+    /// empty space above the local bars would sit inside the global range and
+    /// stay unclamped, leaving a blank pane once the window tightened.
+    fn zoom_in(&self, x: f64, y: f64, series: &[Candle], x0: f64, x1: f64) -> Self {
+        if !x.is_finite() {
             return *self;
         }
         let factor = (self.factor * Self::STEP).min(Self::MAX_FACTOR);
         if (factor - self.factor).abs() < f64::EPSILON {
             return *self;
         }
+        // Snap against the window the new factor will show around `x`.
+        let half_x = if x1 > x0 {
+            0.5 * (x1 - x0) / factor
+        } else {
+            0.0
+        };
+        let y = if y.is_finite() {
+            match price_envelope(series, x - half_x, x + half_x) {
+                Some((lo, hi)) => y.clamp(lo, hi),
+                None => y,
+            }
+        } else {
+            // A non-finite click price would poison the window, so fall back to
+            // the existing focus and finally to the midpoint of the envelope.
+            let mid = price_envelope(series, x - half_x, x + half_x)
+                .map_or(0.0, |(lo, hi)| 0.5 * (lo + hi));
+            match self.focus_y {
+                Some(f) if f.is_finite() => f,
+                _ => mid,
+            }
+        };
         Self {
             factor,
             focus_x: Some(x),
             focus_y: Some(y),
+            pan_x: 0.0,
+            pan_y: 0.0,
         }
     }
 
@@ -272,19 +367,20 @@ impl ZoomState {
             factor,
             focus_x: Some(x),
             focus_y: Some(y),
+            pan_x: 0.0,
+            pan_y: 0.0,
         }
     }
 
-    /// Zooms in around the current centre, for the toolbar buttons.
-    ///
-    /// Keeps the existing focus so repeated button presses keep tightening on
-    /// the same point instead of drifting to the window midpoint.
-    fn zoom_in_centered(&self) -> Self {
+    /// Zooms in around the current focus, for the toolbar buttons.
+    fn zoom_in_centered(&self, y: f64) -> Self {
         let factor = (self.factor * Self::STEP).min(Self::MAX_FACTOR);
         Self {
             factor,
             focus_x: self.focus_x,
-            focus_y: self.focus_y,
+            focus_y: Some(y),
+            pan_x: 0.0,
+            pan_y: 0.0,
         }
     }
 
@@ -298,6 +394,8 @@ impl ZoomState {
             factor,
             focus_x: self.focus_x,
             focus_y: self.focus_y,
+            pan_x: 0.0,
+            pan_y: 0.0,
         }
     }
 
@@ -307,7 +405,8 @@ impl ZoomState {
     }
 
     /// Applies the zoom to `(x0, x1)` and `(y0, y1)`, returning the window to
-    /// display. The focus point stays fixed while the window shrinks around it.
+    /// display. The focus point stays fixed while the window shrinks around it,
+    /// and any pan offset is added on top.
     fn window(&self, x0: f64, x1: f64, y0: f64, y1: f64) -> (f64, f64, f64, f64) {
         if !x1.is_finite() || !y1.is_finite() || x1 <= x0 || y1 <= y0 {
             return (x0, x1, y0, y1);
@@ -319,7 +418,88 @@ impl ZoomState {
         let cy = self.focus_y.unwrap_or(0.5 * (y0 + y1));
         let half_x = 0.5 * (x1 - x0) / self.factor;
         let half_y = 0.5 * (y1 - y0) / self.factor;
+        (
+            cx - half_x + self.pan_x,
+            cx + half_x + self.pan_x,
+            cy - half_y + self.pan_y,
+            cy + half_y + self.pan_y,
+        )
+    }
+
+    /// Same as [`Self::window`] but grows the y-range, when needed, so every
+    /// candle inside the x-window stays visible. Zooming both axes equally can
+    /// otherwise crop the visible bars out of the pane and look blank.
+    fn window_with_data(
+        &self,
+        series: &[Candle],
+        x0: f64,
+        x1: f64,
+        y0: f64,
+        y1: f64,
+    ) -> (f64, f64, f64, f64) {
+        let (wx0, wx1, wy0, wy1) = self.window(x0, x1, y0, y1);
+        if !self.is_zoomed() {
+            return (wx0, wx1, wy0, wy1);
+        }
+        match price_envelope(series, wx0, wx1) {
+            Some((lo, hi)) => (wx0, wx1, wy0.min(lo), wy1.max(hi)),
+            None => (wx0, wx1, wy0, wy1),
+        }
+    }
+
+    /// The window before any pan is applied. Panning is clamped against this
+    /// rather than [`Self::window`], because `window()` already folds in the
+    /// current pan offset and would compound the bound on every frame.
+    fn base_window(&self, x0: f64, x1: f64, y0: f64, y1: f64) -> (f64, f64, f64, f64) {
+        let cx = self.focus_x.unwrap_or(0.5 * (x0 + x1));
+        let cy = self.focus_y.unwrap_or(0.5 * (y0 + y1));
+        let half_x = 0.5 * (x1 - x0) / self.factor;
+        let half_y = 0.5 * (y1 - y0) / self.factor;
         (cx - half_x, cx + half_x, cy - half_y, cy + half_y)
+    }
+
+    /// Shifts the view by `(dx, dy)` in data units, clamped so the window can
+    /// never be dragged off the data. Returns the new state.
+    fn pan_by(
+        &self,
+        dx: f64,
+        dy: f64,
+        series: &[Candle],
+        x0: f64,
+        x1: f64,
+        y0: f64,
+        y1: f64,
+    ) -> Self {
+        if !dx.is_finite() || !dy.is_finite() {
+            return *self;
+        }
+        if !self.is_zoomed() {
+            // Panning only makes sense once the view is smaller than the data.
+            return *self;
+        }
+        let (bx0, bx1, by0, by1) = self.base_window(x0, x1, y0, y1);
+        // The total pan must keep `[bx + p]` inside the data on both sides:
+        // `bx0 + p >= x0` gives the lower bound and `bx1 + p <= x1` the upper.
+        let min_x = x0 - bx0;
+        let max_x = x1 - bx1;
+        // Vertically the useful bound is the price envelope of the candles in
+        // the horizontal window, not the global high/low. Panning to a price
+        // band with no bars in view just shows an empty pane, so the y offset
+        // is limited to what keeps the visible candles on screen.
+        let (lo, hi) =
+            price_envelope(series, bx0 + self.pan_x, bx1 + self.pan_x).unwrap_or((y0, y1));
+        let min_y = lo - by1;
+        let max_y = hi - by0;
+        let pan_x = (self.pan_x + dx).clamp(min_x, max_x);
+        let pan_y = (self.pan_y + dy).clamp(min_y, max_y);
+        if (pan_x - self.pan_x).abs() < f64::EPSILON && (pan_y - self.pan_y).abs() < f64::EPSILON {
+            return *self;
+        }
+        Self {
+            pan_x,
+            pan_y,
+            ..*self
+        }
     }
 }
 
@@ -331,7 +511,15 @@ impl ZoomState {
 /// Each gesture steps one level (2x in, 1/2x out) and the out-step unwinds
 /// smoothly back to the full range rather than snapping to it. Returns the new
 /// state, or `None` when the gesture produced no change.
-fn handle_plot_zoom_gesture(plot_ui: &egui_plot::PlotUi, current: ZoomState) -> Option<ZoomState> {
+fn handle_plot_zoom_gesture(
+    plot_ui: &egui_plot::PlotUi,
+    current: ZoomState,
+    series: &[Candle],
+    x0: f64,
+    x1: f64,
+    y0: f64,
+    y1: f64,
+) -> Option<ZoomState> {
     if !plot_ui.response().hovered() {
         return None;
     }
@@ -348,13 +536,73 @@ fn handle_plot_zoom_gesture(plot_ui: &egui_plot::PlotUi, current: ZoomState) -> 
     if !zoom_in && !zoom_out {
         return None;
     }
+    let _ = (y0, y1);
     let next = match (zoom_in, zoom_out, plot_ui.pointer_coordinate()) {
-        (true, _, Some(p)) => current.zoom_in(p.x, p.y),
+        (true, _, Some(p)) => current.zoom_in(p.x, p.y, series, x0, x1),
         (_, true, Some(p)) => current.zoom_out(p.x, p.y),
-        (true, _, None) => current.zoom_in_centered(),
-        (_, true, None) => current.zoom_out_centered(),
+        (true, _, None) => current.zoom_in(
+            current.focus_x.unwrap_or(x0),
+            current.focus_y.unwrap_or(0.0),
+            series,
+            x0,
+            x1,
+        ),
+        (_, true, None) => current.zoom_out(
+            current.focus_x.unwrap_or(x0),
+            current.focus_y.unwrap_or(0.0),
+        ),
         _ => return None,
     };
+    if next == current {
+        None
+    } else {
+        Some(next)
+    }
+}
+
+/// Converts a pointer drag into a data-space delta for one axis.
+///
+/// `drag_px` is how far the pointer moved on that axis and `plot_px` is the
+/// plot's size on that axis, so the ratio is the fraction of the window that
+/// the drag covers. Dragging right or up moves the *view* back, hence the sign.
+fn drag_to_data(drag_px: f32, plot_px: f32, full: f64) -> f64 {
+    if !drag_px.is_finite() || !plot_px.is_finite() || plot_px.abs() < 1.0 {
+        return 0.0;
+    }
+    if !full.is_finite() || full <= 0.0 {
+        return 0.0;
+    }
+    -full * (drag_px as f64 / plot_px as f64)
+}
+
+/// Applies a drag on a plot as a horizontal/vertical pan of the zoomed window.
+///
+/// Returns the new state, or `None` when there is nothing to pan. Panning is
+/// only active while zoomed in, because at the full range the window already
+/// shows everything.
+fn handle_plot_pan(
+    plot_ui: &egui_plot::PlotUi,
+    current: ZoomState,
+    series: &[Candle],
+    x0: f64,
+    x1: f64,
+    y0: f64,
+    y1: f64,
+) -> Option<ZoomState> {
+    if !current.is_zoomed() || !plot_ui.response().hovered() {
+        return None;
+    }
+    // The drag delta is already zero unless the pointer is actually being
+    // dragged this frame, so it doubles as the "is dragging" test.
+    let delta = plot_ui.pointer_coordinate_drag_delta();
+    if delta.x == 0.0 && delta.y == 0.0 {
+        return None;
+    }
+    let rect = plot_ui.response().rect;
+    let (wx0, wx1, wy0, wy1) = current.window_with_data(series, x0, x1, y0, y1);
+    let dx = drag_to_data(delta.x, rect.width(), wx1 - wx0);
+    let dy = drag_to_data(delta.y, rect.height(), wy1 - wy0);
+    let next = current.pan_by(dx, dy, series, x0, x1, y0, y1);
     if next == current {
         None
     } else {
@@ -370,16 +618,20 @@ fn pin_bounds(plot_ui: &mut egui_plot::PlotUi, x0: f64, x1: f64, y0: f64, y1: f6
     }
 }
 
-/// [`pin_bounds`] combined with the user's zoom window.
+/// [`pin_bounds`] combined with the user's zoom, using the data-aware window so
+/// the applied y-range always covers the candles inside the visible x-range.
+/// Without that, a vertical pan could leave the pane showing a price band that
+/// has no bars in it.
 fn pin_zoomed_bounds(
     plot_ui: &mut egui_plot::PlotUi,
     zoom: ZoomState,
+    series: &[Candle],
     x0: f64,
     x1: f64,
     y0: f64,
     y1: f64,
 ) {
-    let (zx0, zx1, zy0, zy1) = zoom.window(x0, x1, y0, y1);
+    let (zx0, zx1, zy0, zy1) = zoom.window_with_data(series, x0, x1, y0, y1);
     pin_bounds(plot_ui, zx0, zx1, zy0, zy1);
 }
 
@@ -1108,6 +1360,9 @@ struct BharatApp {
     live: bool,
     last_fetch: Option<Instant>,
     fetch_in_flight: bool,
+    /// A fetch was requested while one was already running; re-issue it on
+    /// completion so the requested range is never silently dropped.
+    fetch_pending: bool,
     status_source: String,
     status_last_update: String,
     status_latency_ms: u64,
@@ -1173,6 +1428,7 @@ impl BharatApp {
             live: prefs.live,
             last_fetch: None,
             fetch_in_flight: false,
+            fetch_pending: false,
             status_source: "Synthetic".to_string(),
             status_last_update: "—".to_string(),
             status_latency_ms: 0,
@@ -1235,6 +1491,11 @@ impl BharatApp {
 
     fn trigger_fetch(&mut self) {
         if self.fetch_in_flight {
+            // Do not drop the request. A range or symbol switch during an
+            // in-flight fetch (common while the 30s live refresh is running)
+            // used to be discarded, which left the header showing the new range
+            // while the chart still held the old range's data.
+            self.fetch_pending = true;
             return;
         }
         self.fetch_in_flight = true;
@@ -1244,7 +1505,12 @@ impl BharatApp {
         let tx = self.tx.clone();
         // Record what this fetch is for, so `DataReady` can tell a genuine
         // symbol/range switch (reset the zoom) from a periodic refresh (keep it).
-        self.data_range_key = format!("{}|{}", symbol, interval.as_str());
+        self.data_range_key = format!(
+            "{}|{}|{}",
+            symbol,
+            interval.as_str(),
+            self.time_range.label()
+        );
 
         self.runtime.spawn(async move {
             let start = Instant::now();
@@ -1279,6 +1545,7 @@ impl BharatApp {
     }
 
     fn drain_messages(&mut self) {
+        let mut completed = false;
         while let Ok(msg) = self.rx.try_recv() {
             match msg {
                 AppMessage::DataReady(series) => {
@@ -1293,6 +1560,7 @@ impl BharatApp {
                     }
                     self.data.candles = series;
                     self.fetch_in_flight = false;
+                    completed = true;
                     self.last_fetch = Some(Instant::now());
                     self.status_source = format!("Yahoo ({})", self.selected_company);
                     self.status_last_update = Utc::now().format("%H:%M:%S").to_string();
@@ -1301,6 +1569,7 @@ impl BharatApp {
                 }
                 AppMessage::FetchError(err) => {
                     self.fetch_in_flight = false;
+                    completed = true;
                     self.error_toast = Some((err.clone(), Instant::now()));
                     self.warning_banner = Some("Using synthetic fallback data".to_string());
                     self.warning_until = Some(Instant::now() + Duration::from_secs(30));
@@ -1316,6 +1585,13 @@ impl BharatApp {
                 }
                 AppMessage::QuoteReady(_) => {}
             }
+        }
+        // A range or symbol switch during the fetch was deferred, not dropped.
+        // Re-issue it now that the slot is free, so the chart always matches
+        // the range shown in the header.
+        if completed && self.fetch_pending {
+            self.fetch_pending = false;
+            self.trigger_fetch();
         }
     }
 
@@ -1441,6 +1717,20 @@ impl BharatApp {
                 });
             });
         });
+    }
+
+    /// Price to zoom the toolbar button around: the current focus when set,
+    /// otherwise the midpoint of the visible candles.
+    fn zoom_focus_y(&self) -> f64 {
+        let series = &self.data.candles.candles;
+        if series.is_empty() {
+            return self.zoom.get().focus_y.unwrap_or(0.0);
+        }
+        let (x0, x1) = x_bounds(series);
+        let (_, range) = price_scale(series);
+        let lo = price_scale(series).0;
+        let (wx0, wx1, _, _) = self.zoom.get().window(x0, x1, lo, lo + range);
+        price_envelope(series, wx0, wx1).map_or(lo + 0.5 * range, |(a, b)| 0.5 * (a + b))
     }
 
     fn status_bar(&self, ctx: &egui::Context) {
@@ -1726,7 +2016,7 @@ impl BharatApp {
                 .on_hover_text("Zoom in one step")
                 .clicked()
             {
-                self.zoom.set(zoom.zoom_in_centered());
+                self.zoom.set(zoom.zoom_in_centered(self.zoom_focus_y()));
             }
             if zoom.is_zoomed() {
                 ui.label(
@@ -1797,8 +2087,12 @@ impl BharatApp {
         let y_lo = price_scale(series).0 - range * 0.04 - arrow_pad;
         let y_hi = price_scale(series).0 + range * 1.04 + arrow_pad;
         let zoom_now = self.zoom.get();
-        // The two panes must share one x-window, so derive it once here.
-        let (zx0, zx1, _, _) = zoom_now.window(x0, x1, y_lo, y_hi);
+        // Resolved inside the price pane closure, once the pan/zoom gesture for
+        // this frame has been applied, then reused by the volume pane so both
+        // panes stay aligned. Deriving it before the closure would draw the
+        // previous window's candles and leave the pane blank after a drag.
+        let frame: std::cell::RefCell<(f64, f64, std::rc::Rc<Vec<Candle>>)> =
+            std::cell::RefCell::new((x0, x1, std::rc::Rc::new(Vec::new())));
 
         let hover_candle = std::cell::RefCell::new(None::<(f64, f64, f64, f64, f64)>);
         let spacing = bar_spacing(series);
@@ -1820,74 +2114,96 @@ impl BharatApp {
         let arrows_legible = show_arrows && series.len() <= 90;
         let arrow = range * ARROW_FRAC;
 
-        let hover_series: Vec<Candle> = {
-            // Restrict work to the visible window while zoomed.
-            if zoom_now.is_zoomed() {
-                series
-                    .iter()
-                    .filter(|c| c.t >= zx0 - spacing && c.t <= zx1 + spacing)
-                    .copied()
-                    .collect()
-            } else {
-                Vec::new()
-            }
-        };
-        let visible = if hover_series.is_empty() {
-            &series[..]
-        } else {
-            &hover_series[..]
-        };
-        let visible_half = if zoom_now.is_zoomed() {
-            bar_half(visible)
-        } else {
-            half
-        };
-        let visible_min_body = if zoom_now.is_zoomed() {
-            price_scale(visible).1 * MIN_BODY_FRAC
-        } else {
-            min_body
-        };
+        // Borrowed inside the closure so the gesture can update it.
+        let visible_cell: &std::cell::RefCell<(f64, f64, std::rc::Rc<Vec<Candle>>)> = &frame;
 
-        style_time_plot(Plot::new("candlestick_plot"), series, price_h)
-            .include_y(y_lo)
-            .include_y(y_hi)
-            // Keep the price axis on the right; the x-axis ticks live on the
-            // volume pane directly below, which shares the exact same bounds.
-            .show_axes([false, true])
-            .show(ui, |plot_ui| {
-                // Double-click to zoom in around the pointer, or back out.
-                if let Some(next) = handle_plot_zoom_gesture(plot_ui, zoom_now) {
-                    self.zoom.set(next);
+        style_time_plot(
+            Plot::new("candlestick_plot"),
+            series,
+            price_h,
+            self.time_range.axis_date_style(),
+        )
+        .include_y(y_lo)
+        .include_y(y_hi)
+        // Keep the price axis on the right; the x-axis ticks live on the
+        // volume pane directly below, which shares the exact same bounds.
+        .show_axes([false, true])
+        .show(ui, |plot_ui| {
+            // Double-click zooms in, right-click zooms out.
+            if let Some(next) =
+                handle_plot_zoom_gesture(plot_ui, zoom_now, series, x0, x1, y_lo, y_hi)
+            {
+                self.zoom.set(next);
+            }
+            // Dragging pans the zoomed window horizontally and vertically.
+            if let Some(next) =
+                handle_plot_pan(plot_ui, self.zoom.get(), series, x0, x1, y_lo, y_hi)
+            {
+                self.zoom.set(next);
+            }
+            // Pin the range so a previously viewed time range cannot leave
+            // this pane zoomed out with the bars squeezed into a sliver,
+            // while still honouring the user's zoom.
+            let applied = self.zoom.get();
+            // Resolve the window actually being shown, then restrict the
+            // drawn candles to it.
+            let (ax0, ax1, _, _) = applied.window_with_data(series, x0, x1, y_lo, y_hi);
+            let slice: std::rc::Rc<Vec<Candle>> = if applied.is_zoomed() {
+                std::rc::Rc::new(
+                    series
+                        .iter()
+                        .filter(|c| c.t >= ax0 - spacing && c.t <= ax1 + spacing)
+                        .copied()
+                        .collect(),
+                )
+            } else {
+                std::rc::Rc::new(Vec::new())
+            };
+            {
+                let mut slot = visible_cell.borrow_mut();
+                slot.0 = ax0;
+                slot.1 = ax1;
+                slot.2 = std::rc::Rc::clone(&slice);
+            }
+            let visible: &[Candle] = if slice.is_empty() {
+                &series[..]
+            } else {
+                &slice[..]
+            };
+            let v_half = if applied.is_zoomed() {
+                bar_half(visible)
+            } else {
+                half
+            };
+            let v_min_body = if applied.is_zoomed() {
+                price_scale(visible).1 * MIN_BODY_FRAC
+            } else {
+                min_body
+            };
+            pin_zoomed_bounds(plot_ui, applied, series, x0, x1, y_lo, y_hi);
+            // Current-price guide, drawn first so bars sit on top of it.
+            if last_close >= y_lo && last_close <= y_hi {
+                plot_ui.hline(
+                    egui_plot::HLine::new(last_close)
+                        .color(Color32::from_gray(140))
+                        .style(egui_plot::LineStyle::dashed_loose()),
+                );
+            }
+            for c in visible {
+                draw_candle(plot_ui, c, v_half, v_min_body);
+                if arrows_legible {
+                    draw_trend_arrow(plot_ui, c, v_half, arrow);
                 }
-                // Pin the range so a previously viewed time range cannot leave
-                // this pane zoomed out with the bars squeezed into a sliver,
-                // while still honouring the user's zoom.
-                pin_zoomed_bounds(plot_ui, self.zoom.get(), x0, x1, y_lo, y_hi);
-                // Current-price guide, drawn first so bars sit on top of it.
-                if last_close >= y_lo && last_close <= y_hi {
-                    plot_ui.hline(
-                        egui_plot::HLine::new(last_close)
-                            .color(Color32::from_gray(140))
-                            .style(egui_plot::LineStyle::dashed_loose()),
-                    );
+            }
+            if let Some(hover_pos) = plot_ui.pointer_coordinate() {
+                if spacing > 0.0 && ax1 > ax0 {
+                    let idx = (((hover_pos.x - ax0) / spacing).round() as isize)
+                        .clamp(0, series.len() as isize - 1) as usize;
+                    let c = &series[idx];
+                    *hover_candle.borrow_mut() = Some((c.open, c.high, c.low, c.close, c.volume));
                 }
-                for c in visible {
-                    draw_candle(plot_ui, c, visible_half, visible_min_body);
-                    if arrows_legible {
-                        draw_trend_arrow(plot_ui, c, visible_half, arrow);
-                    }
-                }
-                if let Some(hover_pos) = plot_ui.pointer_coordinate() {
-                    if spacing > 0.0 && zx1 > zx0 {
-                        let idx = (((hover_pos.x - zx0) / spacing).round() as isize)
-                            .clamp(0, series.len() as isize - 1)
-                            as usize;
-                        let c = &series[idx];
-                        *hover_candle.borrow_mut() =
-                            Some((c.open, c.high, c.low, c.close, c.volume));
-                    }
-                }
-            });
+            }
+        });
 
         if let Some((o, h, l, c, v)) = hover_candle.borrow().as_ref() {
             egui::show_tooltip_at_pointer(
@@ -1918,26 +2234,39 @@ impl BharatApp {
             .allow_drag(true)
             .allow_scroll(true)
             .allow_zoom(false)
-            .include_x(zx0)
-            .include_x(zx1)
+            .include_x(visible_cell.borrow().0)
+            .include_x(visible_cell.borrow().1)
             .include_y(0.0)
             .y_axis_position(egui_plot::HPlacement::Right)
             .y_axis_width(9)
             .show_axes([true, true])
-            .x_axis_formatter(move |mark, _range| format_ts_for(mark.value, spacing))
+            .x_axis_formatter(move |mark, _range| {
+                format_ts_styled(mark.value, self.time_range.axis_date_style())
+            })
             .y_axis_formatter(move |mark, _range| abbreviate_volume(mark.value))
             .show(ui, |plot_ui| {
                 // Share the price pane's exact x-range so the two align.
-                pin_bounds(plot_ui, zx0, zx1, 0.0, volume_max.max(1.0) * 1.1);
-                let bars: Vec<Bar> = visible
-                    .iter()
-                    .map(|c| {
-                        let color = if c.is_bullish() { PROFIT } else { LOSS };
-                        Bar::new(c.t, c.volume)
-                            .width(spacing * BAR_FILL)
-                            .fill(color.gamma_multiply(0.75))
-                    })
-                    .collect();
+                let (vx0, vx1) = {
+                    let slot = visible_cell.borrow();
+                    (slot.0, slot.1)
+                };
+                pin_bounds(plot_ui, vx0, vx1, 0.0, volume_max.max(1.0) * 1.1);
+                let bars: Vec<Bar> = {
+                    let slice = visible_cell.borrow();
+                    let src: &[Candle] = if slice.2.is_empty() {
+                        &series[..]
+                    } else {
+                        &slice.2[..]
+                    };
+                    src.iter()
+                        .map(|c| {
+                            let color = if c.is_bullish() { PROFIT } else { LOSS };
+                            Bar::new(c.t, c.volume)
+                                .width(spacing * BAR_FILL)
+                                .fill(color.gamma_multiply(0.75))
+                        })
+                        .collect()
+                };
                 plot_ui.bar_chart(BarChart::new(bars));
             });
     }
@@ -1955,32 +2284,37 @@ impl BharatApp {
         let min_body = price_scale(&ha_series).1 * MIN_BODY_FRAC;
         let half = bar_half(&ha_series);
         let height = ui.available_height();
-        style_time_plot(Plot::new("ha_plot"), &ha_series, height)
-            .show_axes([true, true])
-            .show(ui, |plot_ui| {
-                let (px0, px1) = x_bounds(&ha_series);
-                let (plo, prange) = price_scale(&ha_series);
-                pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
-                for ha in &ha_series {
-                    let color = if ha.is_bullish() { PROFIT } else { LOSS };
-                    plot_ui.line(
-                        Line::new(PlotPoints::from(vec![[ha.t, ha.low], [ha.t, ha.high]]))
-                            .color(color)
-                            .width(1.0_f32),
-                    );
-                    let (top, bottom) = candle_body(ha, min_body);
-                    plot_ui.polygon(
-                        egui_plot::Polygon::new(PlotPoints::from(vec![
-                            [ha.t - half, bottom],
-                            [ha.t + half, bottom],
-                            [ha.t + half, top],
-                            [ha.t - half, top],
-                        ]))
-                        .fill_color(color)
-                        .stroke(Stroke::new(1.0_f32, color)),
-                    );
-                }
-            });
+        style_time_plot(
+            Plot::new("ha_plot"),
+            &ha_series,
+            height,
+            self.time_range.axis_date_style(),
+        )
+        .show_axes([true, true])
+        .show(ui, |plot_ui| {
+            let (px0, px1) = x_bounds(&ha_series);
+            let (plo, prange) = price_scale(&ha_series);
+            pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
+            for ha in &ha_series {
+                let color = if ha.is_bullish() { PROFIT } else { LOSS };
+                plot_ui.line(
+                    Line::new(PlotPoints::from(vec![[ha.t, ha.low], [ha.t, ha.high]]))
+                        .color(color)
+                        .width(1.0_f32),
+                );
+                let (top, bottom) = candle_body(ha, min_body);
+                plot_ui.polygon(
+                    egui_plot::Polygon::new(PlotPoints::from(vec![
+                        [ha.t - half, bottom],
+                        [ha.t + half, bottom],
+                        [ha.t + half, top],
+                        [ha.t - half, top],
+                    ]))
+                    .fill_color(color)
+                    .stroke(Stroke::new(1.0_f32, color)),
+                );
+            }
+        });
     }
 
     fn draw_renko(&self, ui: &mut egui::Ui) {
@@ -2092,16 +2426,21 @@ impl BharatApp {
         let min_body = price_scale(&candles.candles).1 * MIN_BODY_FRAC;
         let half = bar_half(&candles.candles);
         let height = ui.available_height();
-        style_time_plot(Plot::new("c3d_plot"), &candles.candles, height)
-            .show_axes([true, true])
-            .show(ui, |plot_ui| {
-                let (px0, px1) = x_bounds(&candles.candles);
-                let (plo, prange) = price_scale(&candles.candles);
-                pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
-                for c in &candles.candles {
-                    draw_candle(plot_ui, c, half, min_body);
-                }
-            });
+        style_time_plot(
+            Plot::new("c3d_plot"),
+            &candles.candles,
+            height,
+            self.time_range.axis_date_style(),
+        )
+        .show_axes([true, true])
+        .show(ui, |plot_ui| {
+            let (px0, px1) = x_bounds(&candles.candles);
+            let (plo, prange) = price_scale(&candles.candles);
+            pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
+            for c in &candles.candles {
+                draw_candle(plot_ui, c, half, min_body);
+            }
+        });
     }
 
     fn draw_candlestick_ma(&self, ui: &mut egui::Ui) {
@@ -2114,71 +2453,76 @@ impl BharatApp {
         let min_body = price_scale(&series.candles).1 * MIN_BODY_FRAC;
         let half = bar_half(&series.candles);
         let height = ui.available_height();
-        style_time_plot(Plot::new("cma_plot"), &series.candles, height)
-            .show_axes([true, true])
-            .legend(Legend::default())
-            .show(ui, |plot_ui| {
-                let (px0, px1) = x_bounds(&series.candles);
-                let (plo, prange) = price_scale(&series.candles);
-                pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
-                for c in &series.candles {
-                    draw_candle(plot_ui, c, half, min_body);
-                }
-                let sma20_pts: PlotPoints = series
-                    .candles
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, c)| {
-                        if !sma20[i].is_nan() {
-                            Some([c.t, sma20[i]])
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                plot_ui.line(
-                    Line::new(sma20_pts)
-                        .color(INFO)
-                        .width(2.0_f32)
-                        .name("SMA20"),
-                );
-                let sma50_pts: PlotPoints = series
-                    .candles
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, c)| {
-                        if !sma50[i].is_nan() {
-                            Some([c.t, sma50[i]])
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                plot_ui.line(
-                    Line::new(sma50_pts)
-                        .color(AMBER)
-                        .width(2.0_f32)
-                        .name("SMA50"),
-                );
-                let ema200_pts: PlotPoints = series
-                    .candles
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, c)| {
-                        if !ema200[i].is_nan() {
-                            Some([c.t, ema200[i]])
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                plot_ui.line(
-                    Line::new(ema200_pts)
-                        .color(PURPLE)
-                        .width(2.0_f32)
-                        .name("EMA200"),
-                );
-            });
+        style_time_plot(
+            Plot::new("cma_plot"),
+            &series.candles,
+            height,
+            self.time_range.axis_date_style(),
+        )
+        .show_axes([true, true])
+        .legend(Legend::default())
+        .show(ui, |plot_ui| {
+            let (px0, px1) = x_bounds(&series.candles);
+            let (plo, prange) = price_scale(&series.candles);
+            pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
+            for c in &series.candles {
+                draw_candle(plot_ui, c, half, min_body);
+            }
+            let sma20_pts: PlotPoints = series
+                .candles
+                .iter()
+                .enumerate()
+                .filter_map(|(i, c)| {
+                    if !sma20[i].is_nan() {
+                        Some([c.t, sma20[i]])
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            plot_ui.line(
+                Line::new(sma20_pts)
+                    .color(INFO)
+                    .width(2.0_f32)
+                    .name("SMA20"),
+            );
+            let sma50_pts: PlotPoints = series
+                .candles
+                .iter()
+                .enumerate()
+                .filter_map(|(i, c)| {
+                    if !sma50[i].is_nan() {
+                        Some([c.t, sma50[i]])
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            plot_ui.line(
+                Line::new(sma50_pts)
+                    .color(AMBER)
+                    .width(2.0_f32)
+                    .name("SMA50"),
+            );
+            let ema200_pts: PlotPoints = series
+                .candles
+                .iter()
+                .enumerate()
+                .filter_map(|(i, c)| {
+                    if !ema200[i].is_nan() {
+                        Some([c.t, ema200[i]])
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            plot_ui.line(
+                Line::new(ema200_pts)
+                    .color(PURPLE)
+                    .width(2.0_f32)
+                    .name("EMA200"),
+            );
+        });
     }
 
     fn draw_candlestick_bollinger(&self, ui: &mut egui::Ui) {
@@ -2191,65 +2535,70 @@ impl BharatApp {
         let min_body = price_scale(&series.candles).1 * MIN_BODY_FRAC;
         let half = bar_half(&series.candles);
         let height = ui.available_height();
-        style_time_plot(Plot::new("cbb_plot"), &series.candles, height)
-            .show_axes([true, true])
-            .show(ui, |plot_ui| {
-                let (px0, px1) = x_bounds(&series.candles);
-                let (plo, prange) = price_scale(&series.candles);
-                pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
-                for c in &series.candles {
-                    draw_candle(plot_ui, c, half, min_body);
-                }
-                let mid_pts: PlotPoints = series
-                    .candles
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, c)| {
-                        if !mid[i].is_nan() {
-                            Some([c.t, mid[i]])
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                plot_ui.line(Line::new(mid_pts).color(AMBER).width(2.0_f32).name("SMA20"));
-                let upper_pts: PlotPoints = series
-                    .candles
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, c)| {
-                        if !upper[i].is_nan() {
-                            Some([c.t, upper[i]])
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                plot_ui.line(
-                    Line::new(upper_pts)
-                        .color(INFO)
-                        .width(1.0_f32)
-                        .name("Upper"),
-                );
-                let lower_pts: PlotPoints = series
-                    .candles
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, c)| {
-                        if !lower[i].is_nan() {
-                            Some([c.t, lower[i]])
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                plot_ui.line(
-                    Line::new(lower_pts)
-                        .color(INFO)
-                        .width(1.0_f32)
-                        .name("Lower"),
-                );
-            });
+        style_time_plot(
+            Plot::new("cbb_plot"),
+            &series.candles,
+            height,
+            self.time_range.axis_date_style(),
+        )
+        .show_axes([true, true])
+        .show(ui, |plot_ui| {
+            let (px0, px1) = x_bounds(&series.candles);
+            let (plo, prange) = price_scale(&series.candles);
+            pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
+            for c in &series.candles {
+                draw_candle(plot_ui, c, half, min_body);
+            }
+            let mid_pts: PlotPoints = series
+                .candles
+                .iter()
+                .enumerate()
+                .filter_map(|(i, c)| {
+                    if !mid[i].is_nan() {
+                        Some([c.t, mid[i]])
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            plot_ui.line(Line::new(mid_pts).color(AMBER).width(2.0_f32).name("SMA20"));
+            let upper_pts: PlotPoints = series
+                .candles
+                .iter()
+                .enumerate()
+                .filter_map(|(i, c)| {
+                    if !upper[i].is_nan() {
+                        Some([c.t, upper[i]])
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            plot_ui.line(
+                Line::new(upper_pts)
+                    .color(INFO)
+                    .width(1.0_f32)
+                    .name("Upper"),
+            );
+            let lower_pts: PlotPoints = series
+                .candles
+                .iter()
+                .enumerate()
+                .filter_map(|(i, c)| {
+                    if !lower[i].is_nan() {
+                        Some([c.t, lower[i]])
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            plot_ui.line(
+                Line::new(lower_pts)
+                    .color(INFO)
+                    .width(1.0_f32)
+                    .name("Lower"),
+            );
+        });
     }
 
     fn draw_candlestick_rsi(&self, ui: &mut egui::Ui) {
@@ -2260,16 +2609,21 @@ impl BharatApp {
         let min_body = price_scale(&series.candles).1 * MIN_BODY_FRAC;
         let half = bar_half(&series.candles);
         let height = (ui.available_height() * 0.65_f32).max(120.0);
-        style_time_plot(Plot::new("crsi_price"), &series.candles, height)
-            .show_axes([true, true])
-            .show(ui, |plot_ui| {
-                let (px0, px1) = x_bounds(&series.candles);
-                let (plo, prange) = price_scale(&series.candles);
-                pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
-                for c in &series.candles {
-                    draw_candle(plot_ui, c, half, min_body);
-                }
-            });
+        style_time_plot(
+            Plot::new("crsi_price"),
+            &series.candles,
+            height,
+            self.time_range.axis_date_style(),
+        )
+        .show_axes([true, true])
+        .show(ui, |plot_ui| {
+            let (px0, px1) = x_bounds(&series.candles);
+            let (plo, prange) = price_scale(&series.candles);
+            pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
+            for c in &series.candles {
+                draw_candle(plot_ui, c, half, min_body);
+            }
+        });
         Plot::new("crsi_rsi")
             .auto_bounds_x()
             .auto_bounds_y()
@@ -2304,16 +2658,21 @@ impl BharatApp {
         let min_body = price_scale(&series.candles).1 * MIN_BODY_FRAC;
         let half = bar_half(&series.candles);
         let height = (ui.available_height() * 0.65_f32).max(120.0);
-        style_time_plot(Plot::new("cmacd_price"), &series.candles, height)
-            .show_axes([true, true])
-            .show(ui, |plot_ui| {
-                let (px0, px1) = x_bounds(&series.candles);
-                let (plo, prange) = price_scale(&series.candles);
-                pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
-                for c in &series.candles {
-                    draw_candle(plot_ui, c, half, min_body);
-                }
-            });
+        style_time_plot(
+            Plot::new("cmacd_price"),
+            &series.candles,
+            height,
+            self.time_range.axis_date_style(),
+        )
+        .show_axes([true, true])
+        .show(ui, |plot_ui| {
+            let (px0, px1) = x_bounds(&series.candles);
+            let (plo, prange) = price_scale(&series.candles);
+            pin_bounds(plot_ui, px0, px1, plo - prange * 0.05, plo + prange * 1.05);
+            for c in &series.candles {
+                draw_candle(plot_ui, c, half, min_body);
+            }
+        });
         Plot::new("cmacd_macd")
             .auto_bounds_x()
             .auto_bounds_y()
@@ -2371,7 +2730,9 @@ impl BharatApp {
             .include_x(x0)
             .include_x(x1)
             .y_axis_position(egui_plot::HPlacement::Right)
-            .x_axis_formatter(move |mark, _range| format_ts_for(mark.value, spacing))
+            .x_axis_formatter(move |mark, _range| {
+                format_ts_styled(mark.value, self.time_range.axis_date_style())
+            })
             .y_axis_formatter(move |mark, _range| abbreviate_volume(mark.value))
             .show(ui, |plot_ui| {
                 for c in &candles.candles {
@@ -2507,7 +2868,9 @@ impl BharatApp {
             .include_x(x0)
             .include_x(x1)
             .y_axis_position(egui_plot::HPlacement::Right)
-            .x_axis_formatter(move |mark, _range| format_ts_for(mark.value, spacing))
+            .x_axis_formatter(move |mark, _range| {
+                format_ts_styled(mark.value, self.time_range.axis_date_style())
+            })
             .y_axis_formatter(move |mark, _range| abbreviate_volume(mark.value))
             .show(ui, |plot_ui| {
                 for c in &candles.candles {
@@ -7759,8 +8122,8 @@ mod tests {
         let t = 1_704_110_100.0_f64;
         assert_eq!(
             format_ts_for(t, 60.0),
-            "11:55",
-            "intraday shows a clock time"
+            "11:55 01 Jan",
+            "intraday shows a clock time and the date"
         );
         assert_eq!(format_ts_for(t, DAY_SECS), "01 Jan", "daily shows a date");
         assert_eq!(
@@ -7863,7 +8226,7 @@ mod tests {
 
     #[test]
     fn test_zoom_in_halves_the_window_around_the_focus() {
-        let z = ZoomState::default().zoom_in(50.0, 25.0);
+        let z = ZoomState::default().zoom_in(50.0, 25.0, &[], 0.0, 100.0);
         assert!(z.is_zoomed());
         assert_eq!(z.factor, ZoomState::STEP);
         let (x0, x1, y0, y1) = z.window(0.0, 100.0, 0.0, 50.0);
@@ -7877,7 +8240,7 @@ mod tests {
     #[test]
     fn test_zoom_out_steps_back_down_one_level_at_a_time() {
         let mut z = ZoomState::default();
-        z = z.zoom_in(50.0, 25.0);
+        z = z.zoom_in(50.0, 25.0, &[], 0.0, 100.0);
         assert_eq!(z.factor, 2.0);
         z = z.zoom_out(50.0, 25.0);
         assert_eq!(z.factor, 1.0, "one out-step undoes one in-step");
@@ -7886,7 +8249,7 @@ mod tests {
         // Three steps in, then one out, leaves two steps in.
         let mut z = ZoomState::default();
         for _ in 0..3 {
-            z = z.zoom_in(10.0, 10.0);
+            z = z.zoom_in(10.0, 10.0, &[], 0.0, 1000.0);
         }
         assert_eq!(z.factor, 8.0);
         let back = z.zoom_out(10.0, 10.0);
@@ -7898,7 +8261,7 @@ mod tests {
     fn test_zoom_out_unwinds_all_the_way_to_the_full_range() {
         let mut z = ZoomState::default();
         for _ in 0..5 {
-            z = z.zoom_in(10.0, 10.0);
+            z = z.zoom_in(10.0, 10.0, &[], 0.0, 1000.0);
         }
         let start = z.factor;
         for _ in 0..20 {
@@ -7921,17 +8284,17 @@ mod tests {
     fn test_zoom_in_is_capped_at_the_maximum() {
         let mut z = ZoomState::default();
         for _ in 0..40 {
-            z = z.zoom_in(10.0, 10.0);
+            z = z.zoom_in(10.0, 10.0, &[], 0.0, 1000.0);
         }
         assert_eq!(z.factor, ZoomState::MAX_FACTOR);
-        let capped = z.zoom_in(10.0, 10.0);
+        let capped = z.zoom_in(10.0, 10.0, &[], 0.0, 1000.0);
         assert_eq!(capped, z, "further zoom-in changes nothing");
     }
 
     #[test]
     fn test_centered_steps_work_without_a_pointer() {
         let mut z = ZoomState::default();
-        z = z.zoom_in_centered();
+        z = z.zoom_in_centered(50.0);
         assert_eq!(z.factor, ZoomState::STEP);
         // With no focus recorded, the window centres on its midpoint.
         let (x0, x1, _, _) = z.window(0.0, 100.0, 0.0, 50.0);
@@ -7942,20 +8305,62 @@ mod tests {
     #[test]
     fn test_zoom_ignores_non_finite_points() {
         let z = ZoomState::default();
-        assert_eq!(z.zoom_in(f64::NAN, 1.0), z);
-        assert_eq!(z.zoom_in(1.0, f64::INFINITY), z);
+        // A non-finite x cannot be centred on, so nothing changes.
+        assert_eq!(z.zoom_in(f64::NAN, 1.0, &[], 0.0, 100.0), z);
+        // A non-finite price is replaced by a usable value rather than being
+        // stored, which would otherwise produce a permanently blank pane.
+        let zy = z.zoom_in(1.0, f64::INFINITY, &[], 0.0, 100.0);
+        assert!(zy.focus_y.map(f64::is_finite).unwrap_or(true));
+        assert!(zy.is_zoomed(), "a valid x still zooms");
+    }
+
+    /// Regression test: double-clicking empty space above the series zoomed to
+    /// a price band containing no candles, leaving a blank pane. The focus
+    /// price is now pulled into the visible candles' envelope.
+    #[test]
+    fn test_zoom_snaps_the_focus_onto_real_candles() {
+        let candles: Vec<Candle> = (0..50)
+            .map(|i| Candle::new(1_000.0 + i as f64 * 60.0, 100.0, 102.0, 99.0, 101.0, 1.0))
+            .collect();
+        let snap = price_envelope(&candles, 1_000.0, 4_000.0);
+        assert!(snap.is_some());
+        let (lo, hi) = snap.unwrap();
+        assert!((lo - 99.0).abs() < 1e-9);
+        assert!((hi - 102.0).abs() < 1e-9);
+
+        // Click far above the series: the zoom must land inside the envelope.
+        let z = ZoomState::default().zoom_in(2_500.0, 5_000.0, &candles, 1_000.0, 4_000.0);
+        let focus_y = z.focus_y.unwrap();
+        assert!(
+            focus_y >= lo && focus_y <= hi,
+            "focus {} escaped the candle envelope {lo}..{hi}",
+            focus_y
+        );
+    }
+
+    #[test]
+    fn test_zoom_without_snap_keeps_the_raw_focus() {
+        let z = ZoomState::default().zoom_in(500.0, 42.0, &[], 0.0, 100.0);
+        assert!((z.focus_y.unwrap() - 42.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_snap_range_is_none_when_the_window_has_no_bars() {
+        let candles = vec![Candle::new(0.0, 1.0, 2.0, 0.5, 1.5, 1.0)];
+        assert!(price_envelope(&candles, 5_000.0, 6_000.0).is_none());
+        assert!(price_envelope(&[], 0.0, 1.0).is_none());
     }
 
     #[test]
     fn test_zoom_window_is_safe_for_degenerate_ranges() {
-        let z = ZoomState::default().zoom_in(5.0, 5.0);
+        let z = ZoomState::default().zoom_in(5.0, 5.0, &[], 0.0, 10.0);
         assert_eq!(z.window(10.0, 10.0, 0.0, 50.0), (10.0, 10.0, 0.0, 50.0));
         assert_eq!(z.window(50.0, 10.0, 0.0, 50.0), (50.0, 10.0, 0.0, 50.0));
     }
 
     #[test]
     fn test_zoom_reset_returns_to_full_range() {
-        let z = ZoomState::default().zoom_in(80.0, 20.0);
+        let z = ZoomState::default().zoom_in(80.0, 20.0, &[], 0.0, 100.0);
         assert!(z.is_zoomed());
         let r = z.reset();
         assert!(!r.is_zoomed());
@@ -7966,11 +8371,195 @@ mod tests {
     fn test_zoomed_window_stays_finite_and_ordered() {
         let mut z = ZoomState::default();
         for _ in 0..20 {
-            z = z.zoom_in(1_000.0, 500.0);
+            z = z.zoom_in(1_000.0, 500.0, &[], 0.0, 2000.0);
         }
         let (x0, x1, y0, y1) = z.window(0.0, 2000.0, 0.0, 1000.0);
         assert!(x0.is_finite() && x1.is_finite() && y0.is_finite() && y1.is_finite());
         assert!(x1 > x0 && y1 > y0);
+    }
+
+    #[test]
+    fn test_axis_date_style_matches_the_selected_timeframe() {
+        assert_eq!(TimeRange::D1.axis_date_style(), AxisDateStyle::TimeAndDate);
+        assert_eq!(TimeRange::W1.axis_date_style(), AxisDateStyle::DayMonth);
+        assert_eq!(TimeRange::M1.axis_date_style(), AxisDateStyle::DayMonth);
+        assert_eq!(TimeRange::M3.axis_date_style(), AxisDateStyle::MonthYear);
+        assert_eq!(TimeRange::M6.axis_date_style(), AxisDateStyle::MonthYear);
+        assert_eq!(TimeRange::Y1.axis_date_style(), AxisDateStyle::MonthYear);
+        assert_eq!(TimeRange::Y5.axis_date_style(), AxisDateStyle::MonthYear);
+    }
+
+    #[test]
+    fn test_each_timeframe_uses_a_distinct_axis_format() {
+        // 1D must show both a clock and a date.
+        let t = 1_704_110_100.0; // 2024-01-01 11:55 UTC
+        assert_eq!(
+            format_ts_styled(t, AxisDateStyle::TimeAndDate),
+            "11:55 01 Jan"
+        );
+        // 1W shows a day and month, with no time component.
+        assert_eq!(format_ts_styled(t, AxisDateStyle::DayMonth), "01 Jan");
+        // 3M and longer collapse to month and year.
+        assert_eq!(format_ts_styled(t, AxisDateStyle::MonthYear), "Jan 2024");
+    }
+
+    #[test]
+    fn test_different_ranges_are_actually_distinct_requests() {
+        // The 1Y/6M charts looked identical because the key only carried the
+        // interval, and both are daily. The window length must differ.
+        assert!(TimeRange::Y1.to_days() > TimeRange::M6.to_days());
+        assert!(TimeRange::M6.to_days() > TimeRange::M3.to_days());
+        assert!(TimeRange::M3.to_days() > TimeRange::M1.to_days());
+        // Daily and longer ranges share an interval but not a window.
+        assert_eq!(TimeRange::M6.to_interval(), TimeRange::Y1.to_interval());
+    }
+
+    #[test]
+    fn test_drag_to_data_maps_pixels_to_the_window_fraction() {
+        // Dragging a quarter of the plot width moves the view a quarter span.
+        let dx = drag_to_data(200.0, 800.0, 1000.0);
+        assert!((dx + 250.0).abs() < 1e-9, "drag right moves the view back");
+        let dy = drag_to_data(-100.0, 400.0, 500.0);
+        assert!((dy - 125.0).abs() < 1e-9, "drag up moves the view down");
+    }
+
+    #[test]
+    fn test_drag_to_data_ignores_degenerate_input() {
+        assert_eq!(drag_to_data(100.0, 0.0, 1000.0), 0.0, "zero plot size");
+        assert_eq!(drag_to_data(100.0, 800.0, 0.0), 0.0, "zero span");
+        assert_eq!(drag_to_data(100.0, 800.0, -5.0), 0.0, "negative span");
+        assert_eq!(drag_to_data(f32::NAN, 800.0, 1000.0), 0.0);
+    }
+
+    #[test]
+    fn test_pan_shifts_the_window_and_keeps_its_size() {
+        let z = ZoomState::default().zoom_in(500.0, 50.0, &[], 0.0, 1000.0);
+        let before = z.window(0.0, 1000.0, 0.0, 100.0);
+        let panned = z.pan_by(-100.0, -10.0, &flat_series(), 0.0, 1000.0, 0.0, 100.0);
+        let after = panned.window(0.0, 1000.0, 0.0, 100.0);
+        assert!(
+            ((after.1 - after.0) - (before.1 - before.0)).abs() < 1e-9,
+            "size kept"
+        );
+        assert!(
+            ((after.3 - after.2) - (before.3 - before.2)).abs() < 1e-9,
+            "height kept"
+        );
+        assert!(after.0 < before.0, "moved left");
+        assert!(after.2 < before.2, "moved down");
+    }
+
+    #[test]
+    fn test_pan_is_ignored_when_not_zoomed() {
+        let z = ZoomState::default();
+        assert_eq!(
+            z.pan_by(-50.0, -5.0, &flat_series(), 0.0, 1000.0, 0.0, 100.0),
+            z
+        );
+    }
+
+    /// A simple flat series used by the pan tests so the price envelope is
+    /// well defined and the clamp has real candles to work against.
+    fn flat_series() -> Vec<Candle> {
+        (0..100)
+            .map(|i| Candle::new(1_000.0 + i as f64 * 10.0, 45.0, 55.0, 40.0, 50.0, 1.0))
+            .collect()
+    }
+
+    #[test]
+    fn test_pan_is_clamped_to_the_data_extent() {
+        let candles = flat_series();
+        let z = ZoomState::default().zoom_in(1_500.0, 47.5, &candles, 1_000.0, 2_000.0);
+        // A huge drag must not fling the chart off into empty space.
+        let far = z.pan_by(-1.0e9, -1.0e9, &candles, 1_000.0, 2_000.0, 40.0, 55.0);
+        let (wx0, wx1, wy0, _) = far.window(1_000.0, 2_000.0, 40.0, 55.0);
+        assert!(
+            wx0 >= -1e-6 && wx1 <= 2_000.0 + 1e-6,
+            "x window must stay on the data"
+        );
+        assert!(wy0 >= -1e-6, "y window must stay on the data");
+        assert!(far.pan_x.abs() < 1.0e9);
+    }
+
+    #[test]
+    fn test_pan_settles_at_the_data_edge() {
+        let candles = flat_series();
+        let z = ZoomState::default().zoom_in(1_500.0, 47.5, &candles, 1_000.0, 2_000.0);
+        // Push hard to the right; the window should stop at the data edge.
+        let mut p = z;
+        for _ in 0..50 {
+            p = p.pan_by(500.0, 500.0, &candles, 1_000.0, 2_000.0, 40.0, 55.0);
+        }
+        let (wx0, wx1, _, _) = p.window(1_000.0, 2_000.0, 40.0, 55.0);
+        assert!(
+            (wx1 - 2_000.0).abs() < 1.0,
+            "right edge stops at the data end"
+        );
+        assert!(wx0 < 2_000.0, "window still has width");
+    }
+
+    /// Regression test: the clamp was derived from the *panned* window, so the
+    /// allowed range grew every frame and repeated drags walked the chart off
+    /// the data entirely, leaving a blank pane at high zoom.
+    #[test]
+    fn test_repeated_pan_does_not_drift_off_the_data() {
+        let candles = flat_series();
+        let mut z = ZoomState::default().zoom_in(1_500.0, 47.5, &candles, 1_000.0, 2_000.0);
+        z = z.zoom_in(1_500.0, 47.5, &candles, 1_000.0, 2_000.0);
+        for _ in 0..200 {
+            z = z.pan_by(-25.0, -5.0, &candles, 1_000.0, 2_000.0, 40.0, 55.0);
+            let (wx0, wx1, wy0, wy1) = z.window(1_000.0, 2_000.0, 40.0, 55.0);
+            assert!(
+                wx0 >= -1e-6 && wx1 <= 2_000.0 + 1e-6,
+                "x window escaped the data"
+            );
+            assert!(
+                wy0 >= -1e-6 && wy1 <= 55.0 + 1e-6,
+                "y window escaped the data"
+            );
+        }
+        let (wx0, wx1, _, _) = z.window(1_000.0, 2_000.0, 40.0, 55.0);
+        assert!(wx1 - wx0 > 0.0, "window must stay a valid width");
+        assert!(z.pan_x.is_finite() && z.pan_y.is_finite());
+    }
+
+    /// Vertical panning must not move the view into a price band that has no
+    /// bars in the visible x-window, which would render an empty pane.
+    #[test]
+    fn test_vertical_pan_keeps_visible_candles_on_screen() {
+        let candles = flat_series();
+        let z = ZoomState::default().zoom_in(1_500.0, 47.5, &candles, 1_000.0, 2_000.0);
+        let mut p = z;
+        for _ in 0..60 {
+            p = p.pan_by(0.0, -50.0, &candles, 1_000.0, 2_000.0, 40.0, 55.0);
+        }
+        let (wx0, wx1, wy0, wy1) = p.window(1_000.0, 2_000.0, 40.0, 55.0);
+        let (lo, hi) = price_envelope(&candles, wx0, wx1).unwrap();
+        assert!(
+            wy0 <= hi && wy1 >= lo,
+            "y window ({wy0}..{wy1}) must still overlap the candles ({lo}..{hi})"
+        );
+    }
+
+    #[test]
+    fn test_zooming_clears_any_pan_so_the_new_centre_wins() {
+        let mut z = ZoomState::default().zoom_in(500.0, 50.0, &[], 0.0, 1000.0);
+        z = z.pan_by(-80.0, -8.0, &flat_series(), 0.0, 1000.0, 0.0, 100.0);
+        assert!(z.pan_x.abs() > f64::EPSILON, "pan recorded");
+        let z = z.zoom_in(500.0, 50.0, &[], 0.0, 1000.0);
+        assert_eq!(z.pan_x, 0.0, "zoom-in drops the pan");
+        assert_eq!(z.pan_y, 0.0, "zoom-in drops the pan");
+    }
+
+    #[test]
+    fn test_reset_clears_zoom_and_pan() {
+        let mut z = ZoomState::default().zoom_in(500.0, 50.0, &[], 0.0, 1000.0);
+        z = z.pan_by(-80.0, -8.0, &flat_series(), 0.0, 1000.0, 0.0, 100.0);
+        let r = z.reset();
+        assert!(!r.is_zoomed());
+        assert_eq!(r.pan_x, 0.0);
+        assert_eq!(r.pan_y, 0.0);
+        assert_eq!(r.focus_x, None);
     }
 
     #[test]
